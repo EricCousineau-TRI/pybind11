@@ -207,7 +207,7 @@ class PyExtBase(Base):
         print("PyExtBase.__del__")
     def value(self):
         print("PyExtBase.value")
-        return Base.value(self)
+        return 10 * Base.value(self)
 
 class PyExtChild(Child):
     def __init__(self, value):
@@ -336,7 +336,7 @@ del obj
 void check_terminal() {
     cout << "\n[ check_terminal ]\n";
     py::exec(R"(
-move.terminal_func([move.Base(20)])
+move.terminal_func([move.PyExtBase(20)])
 )");
 }
 
