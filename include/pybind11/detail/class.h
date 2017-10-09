@@ -313,11 +313,7 @@ inline void clear_instance(PyObject *self) {
                 pybind11_fail("pybind11_object_dealloc(): Tried to deallocate unregistered instance!");
 
             if (instance->owned || v_h.holder_constructed()) {
-                std::cout << "free owned" << std::endl;
                 v_h.type->dealloc(v_h);
-            }
-            else {
-                std::cout << "free reference" << std::endl;
             }
         }
     }
