@@ -71,14 +71,14 @@ public:
     /// Construct a cpp_function from a class method (non-const)
     template <typename Return, typename Class, typename... Arg, typename... Extra>
     cpp_function(Return (Class::*f)(Arg...), const Extra&... extra) {
-        initialize([f](Class *c, Arg... args) -> Return { return (c->*f)(args...); },
+        initialize([f](Class *c, Arg... args) -> Return { return (c->*f)(std::forward<Arg>(args)...); },
                    (Return (*) (Class *, Arg...)) nullptr, extra...);
     }
 
     /// Construct a cpp_function from a class method (const)
     template <typename Return, typename Class, typename... Arg, typename... Extra>
     cpp_function(Return (Class::*f)(Arg...) const, const Extra&... extra) {
-        initialize([f](const Class *c, Arg... args) -> Return { return (c->*f)(args...); },
+        initialize([f](const Class *c, Arg... args) -> Return { return (c->*f)(std::forward<Arg>(args)...); },
                    (Return (*)(const Class *, Arg ...)) nullptr, extra...);
     }
 
@@ -1199,6 +1199,9 @@ public:
         auto* tinfo = get_type_info();
         if (inst->owned || v_h.holder_constructed()) {
             throw std::runtime_error("Derived Python object should live in C++");
+        }
+        if (!external_holder_raw) {
+            throw std::runtime_error("Internal error - not external holder?");
         }
         // Is this valid?
         handle h(reinterpret_cast<PyObject*>(inst));

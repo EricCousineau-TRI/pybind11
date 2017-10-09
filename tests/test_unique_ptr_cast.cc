@@ -161,6 +161,29 @@ unique_ptr<Base> check_new() {
     return make_unique<Base>(10);
 }
 
+class BaseContainer {
+ public:
+  Base* add(unique_ptr<Base> in) {
+    Base* out = in.get();
+    bases_.emplace_back(std::move(in));
+    return out;
+  }
+  vector<Base*> list() const {
+    vector<Base*> out;
+    for (auto& ptr : bases_)
+      out.push_back(ptr.get());
+    return out;
+  }
+  vector<unique_ptr<Base>>& mutable_list() {
+    return bases_;
+  }
+  vector<unique_ptr<Base>> release_list() {
+    return std::move(bases_);
+  }
+ private:
+  vector<unique_ptr<Base>> bases_;
+};
+
 void terminal_func(unique_ptr<Base> ptr) {
   cout << "Value: " << ptr->value() << endl;
   ptr.reset();  // This will destroy the instance.
@@ -171,6 +194,13 @@ PYBIND11_MODULE(_move, m) {
   py::class_<Base, PyBase>(m, "Base")
     .def(py::init<int>())
     .def("value", &Base::value);
+
+  py::class_<BaseContainer>(m, "BaseContainer")
+      .def(py::init<>())
+      .def("add", &BaseContainer::add)
+      .def("list", &BaseContainer::list)
+//      .def("mutable_list", &BaseContainer::mutable_list)
+      .def("release_list", &BaseContainer::release_list);
 
   py::class_<Child, PyChild, Base>(m, "Child")
       .def(py::init<int>())
@@ -333,6 +363,23 @@ del obj
 )");
 }
 
+void check_container() {
+  cout << "\n[ check_container ]\n";
+  py::exec(R"(
+c = m.BaseContainer()
+b1 = c.add([m.PyExtChildB(30)])
+b2 = c.add([m.Base(10)])
+
+print(b1.value())
+print(b2.value())
+
+del b1
+del b2
+
+del c
+)");
+}
+
 void check_terminal() {
     cout << "\n[ check_terminal ]\n";
     py::exec(R"(
@@ -348,13 +395,14 @@ int main() {
     custom_init_move(m);
     py::globals()["m"] = m;
 
-    check_pass_thru();
-    check_pure_cpp_simple();
-    check_pure_cpp();
-    check_py_child();
-    check_casting();
-    check_casting_without_explicit_base();
-    check_terminal();
+//    check_pass_thru();
+//    check_pure_cpp_simple();
+//    check_pure_cpp();
+//    check_py_child();
+//    check_casting();
+//    check_casting_without_explicit_base();
+//    check_terminal();
+    check_container();
   }
 
   cout << "[ Done ]" << endl;
