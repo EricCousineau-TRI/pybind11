@@ -491,7 +491,7 @@ enum class LoadType {
 typedef type_info* base_ptr_t;
 typedef const std::vector<base_ptr_t> bases_t;
 
-LoadType determine_load_type(handle src, const type_info* typeinfo,
+inline LoadType determine_load_type(handle src, const type_info* typeinfo,
                              const bases_t** out_bases = nullptr,
                              base_ptr_t* out_base = nullptr) {
     // Null out inputs.
@@ -1873,14 +1873,19 @@ template <typename T>
 std::true_type is_unique_ptr(const std::unique_ptr<T>&);
 std::false_type is_unique_ptr(...);
 
+template <typename... Args>
+void unused(Args&&...);
+
 template <typename T>
 void do_prepare_caster(detail::make_caster<T>& conv, object&& obj, std::true_type) {
+    unused(conv, obj);
     // Multiple options complicate the interface.
 //    conv.take_object(std::move(obj));
 }
 
 template <typename T>
 void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::true_type) {
+    unused(conv, h);
 //    std::cout << "Stealing reference!" << std::endl;
 //    object obj = reinterpret_steal<object>(h);
 //    // Caster (move_only_holder_caster) will check that this is a unique reference.
@@ -1888,7 +1893,9 @@ void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::true_type) {
 }
 
 template <typename T>
-void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::false_type) {}
+void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::false_type) {
+    unused(conv, h);
+}
 
 
 
