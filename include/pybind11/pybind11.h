@@ -1197,6 +1197,8 @@ public:
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();
+        // TODO(eric.cousineau): Should relax this to not require a holder be constructed,
+        // only that the holder itself be default (unique_ptr<>).
         if (inst->owned || v_h.holder_constructed()) {
             throw std::runtime_error("Derived Python object should live in C++");
         }

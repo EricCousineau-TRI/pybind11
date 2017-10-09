@@ -585,6 +585,8 @@ public:
                         if (!inst->reclaim_from_cpp) {
                             throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
                         }
+                        // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
+                        // Need to think of a desirable workflow - and if there is possible interop.
                         if (!existing_holder) {
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
