@@ -199,7 +199,7 @@ PYBIND11_MODULE(_move, m) {
       .def(py::init<>())
       .def("add", &BaseContainer::add, py::return_value_policy::reference)
       .def("list", &BaseContainer::list)
-//      .def("mutable_list", &BaseContainer::mutable_list)
+//      .def("mutable_list", &BaseContainer::mutable_list)  // Not supported (as expected)
       .def("release_list", &BaseContainer::release_list);
 
   py::class_<Child, PyChild, Base>(m, "Child")
@@ -386,6 +386,23 @@ del b2
 
 print("Delete container")
 del c
+
+print("Make new container")
+c = m.BaseContainer()
+b1 = c.add([m.PyExtChildB(30)])
+b2 = c.add([m.Base(10)])
+print("Delete references - have to be strict...")
+del b1
+del b2
+print("Release to list")
+li = c.release_list()
+del c
+print("List: {}".format(li))
+for x in li:
+    print("value: {}".format(x.value()))
+    # del x
+print("Delete list")
+del li
 )");
 }
 

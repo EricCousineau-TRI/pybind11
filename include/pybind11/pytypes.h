@@ -1329,12 +1329,13 @@ class trampoline : public Base {
   }
 
   /// To be used by `move_only_holder_caster`.
-  object release_cpp_lifetime() {
+  object release_cpp_lifetime(bool on_destruct = false) {
       if (!lives_in_cpp()) {
           throw std::runtime_error("Instance does not live in C++");
       }
       // Remove existing reference.
-      check("exiting C++");
+      if (!on_destruct)
+          check("exiting C++");
       object tmp = std::move(patient_);
       assert(!patient_);
       return tmp;
@@ -1366,11 +1367,11 @@ class trampoline : public Base {
       if (lives_in_cpp()) {
           // Ensure that we still are the unique one, such that the Python classes
           // destructor will be called.
-          check("being destructed");
+          check("being destructed", false);
           // Release object.
           // TODO(eric.cousineau): Ensure that destructor is called instantly!!!
           // Can we attach a listener to ensure that `dealloc` is called?
-          release_cpp_lifetime();
+          release_cpp_lifetime(true);
       }
   }
 
@@ -1382,9 +1383,13 @@ class trampoline : public Base {
   }
 
   // Throw an error if this stuff is not unique.
-  void check(const std::string& context) {
+  void check(const std::string& context, bool do_throw = true) {
       if (patient_.ref_count() != 1) {
-          throw std::runtime_error("When " + context + ", ref_count != 1");
+          std::string msg = "When " + context + ", ref_count != 1";
+          if (do_throw)
+              throw std::runtime_error(msg);
+          else
+              std::cerr << "ERROR: " << msg << std::endl;
       }
   }
 
