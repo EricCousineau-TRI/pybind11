@@ -1874,7 +1874,7 @@ std::true_type is_unique_ptr(const std::unique_ptr<T>&);
 std::false_type is_unique_ptr(...);
 
 template <typename... Args>
-void unused(Args&&...);
+void unused(Args&&...) {}
 
 template <typename T>
 void do_prepare_caster(detail::make_caster<T>& conv, object&& obj, std::true_type) {
