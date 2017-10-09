@@ -1,4 +1,4 @@
-// Purpose: Base what avenues might be possible for creating instances in Python
+// Purpose: Test what avenues might be possible for creating instances in Python
 // to then be owned in C++.
 
 #include <cstddef>
@@ -265,8 +265,8 @@ void check_pure_cpp_simple() {
   cout << "\n[ check_pure_cpp_simple ]\n";
   py::exec(R"(
 def create_obj():
-    return [move.SimpleType(256)]
-obj = move.check_creation_simple(create_obj)
+    return [m.SimpleType(256)]
+obj = m.check_creation_simple(create_obj)
 print(obj.value())
 del obj  # Calling `del` since scoping isn't as tight here???
 )");
@@ -276,8 +276,8 @@ void check_pure_cpp() {
   cout << "\n[ check_pure_cpp ]\n";
   py::exec(R"(
 def create_obj():
-    return [move.Base(10)]
-obj = move.check_creation(create_obj)
+    return [m.Base(10)]
+obj = m.check_creation(create_obj)
 print(obj.value())
 del obj
 )");
@@ -287,11 +287,11 @@ void check_pass_thru() {
     cout << "\n[ check_pure_cpp ]\n";
 
     py::exec(R"(
-obj = move.check_cast_pass_thru([move.Base(20)])
+obj = m.check_cast_pass_thru([m.Base(20)])
 print(obj.value())
 del obj
 
-obj = move.check_clone([move.Base(30)])
+obj = m.check_clone([m.Base(30)])
 print(obj.value())
 del obj
 )");
@@ -302,8 +302,8 @@ void check_py_child() {
   cout << "\n[ check_py_child ]\n";
   py::exec(R"(
 def create_obj():
-    return [move.PyExtBase(20)]
-obj = move.check_creation(create_obj)
+    return [m.PyExtBase(20)]
+obj = m.check_creation(create_obj)
 print(obj.value())
 del obj
 )");
@@ -314,8 +314,8 @@ void check_casting() {
   cout << "\n[ check_casting ]\n";
   py::exec(R"(
 def create_obj():
-    return [move.PyExtChild(30)]
-obj = move.check_creation(create_obj)
+    return [m.PyExtChild(30)]
+obj = m.check_creation(create_obj)
 print(obj.value())
 del obj
 )");
@@ -326,8 +326,8 @@ void check_casting_without_explicit_base() {
   cout << "\n[ check_casting_without_explicit_base ]\n";
   py::exec(R"(
 def create_obj():
-    return [move.PyExtChildB(30)]
-obj = move.check_creation(create_obj)
+    return [m.PyExtChildB(30)]
+obj = m.check_creation(create_obj)
 print(obj.value())
 del obj
 )");
@@ -336,7 +336,7 @@ del obj
 void check_terminal() {
     cout << "\n[ check_terminal ]\n";
     py::exec(R"(
-move.terminal_func([move.PyExtBase(20)])
+m.terminal_func([m.PyExtBase(20)])
 )");
 }
 
@@ -346,7 +346,7 @@ int main() {
 
     py::module m("_move");
     custom_init_move(m);
-    py::globals()["move"] = m;
+    py::globals()["m"] = m;
 
 //    check_pass_thru();
 //    check_pure_cpp_simple();
