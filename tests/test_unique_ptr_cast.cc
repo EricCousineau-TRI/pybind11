@@ -161,6 +161,12 @@ unique_ptr<Base> check_new() {
     return make_unique<Base>(10);
 }
 
+void terminal_func(unique_ptr<Base> ptr) {
+  cout << "Value: " << ptr->value() << endl;
+  ptr.reset();  // This will destroy the instance.
+  cout << "Destroyed in C++" << endl;
+}
+
 PYBIND11_MODULE(_move, m) {
   py::class_<Base, PyBase>(m, "Base")
     .def(py::init<int>())
@@ -179,6 +185,7 @@ PYBIND11_MODULE(_move, m) {
   m.def("check_cast_pass_thru", &check_cast_pass_thru);
   m.def("check_clone", &check_clone);
   m.def("check_new", &check_new);
+  m.def("terminal_func", &terminal_func);
 
   // Make sure this setup doesn't botch the usage of `shared_ptr`, compile or run-time.
   class SharedClass {};
@@ -288,41 +295,6 @@ obj = move.check_clone([move.Base(30)])
 print(obj.value())
 del obj
 )");
-
-    if (false) {
-
-    auto m = py::globals()["move"];
-    auto base_py_type = m.attr("Base");
-    py::object func = m.attr("check_cast_pass_thru");
-    py::object obj = base_py_type(10);
-    py::handle h = obj.release();
-    cout << "ref_count: " << h.ref_count() << endl;
-    py::object pass = func(h);  // Does NOT work. Too many references, due to argument packing?
-
-    // ISSUE: For some reason, when packing the argument list, the unique reference lives just within
-    // the `simple_collector`, forwarded as a `py::tuple`.
-    // When the function call returns, then that object goes out of scope, causing destruction.
-//    py::object pass = func(make_unique<Base>(10));  // Rely on casting.
-
-    int value = pass.attr("value")().cast<int>();
-    cout << "Value: " << value << endl;
-
-    }
-
-//    py::dict locals;
-//    py::exec(R"(
-//obj = move.check_cast_pass_thru(move.Base(10))
-//# print(move.check_clone(move.Base(20)).value())
-//)", py::globals(), locals);
-//    // MEMORY LEAK
-//    py::exec(R"(
-//print("Locals: {}".format(locals()))
-//print("Globals: {}".format(globals()))
-//)", py::globals(), locals);
-//    py::exec(R"(
-//print("instance: {}".format(obj))
-//print("Obj: {}".format(obj.value()))
-//)", py::globals(), locals);
 }
 
 void check_py_child() {
@@ -361,6 +333,13 @@ del obj
 )");
 }
 
+void check_terminal() {
+    cout << "\n[ check_terminal ]\n";
+    py::exec(R"(
+move.terminal_func([move.Base(20)])
+)");
+}
+
 int main() {
   {
     py::scoped_interpreter guard{};
@@ -375,6 +354,7 @@ int main() {
     check_py_child();
     check_casting();
     check_casting_without_explicit_base();
+    check_terminal();
   }
 
   cout << "[ Done ]" << endl;
