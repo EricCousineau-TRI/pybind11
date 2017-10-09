@@ -79,8 +79,8 @@ class ChildB : public Base {
 // Trampoline class.
 class PyBase : public py::trampoline<Base> {
  public:
-  typedef py::trampoline<Base> Base;
-  using Base::Base;
+  typedef py::trampoline<Base> TBase;
+  using TBase::TBase;
   ~PyBase() {
     cout << "PyBase::~PyBase()" << endl;
   }
@@ -348,12 +348,12 @@ int main() {
     custom_init_move(m);
     py::globals()["move"] = m;
 
-    check_pass_thru();
-    check_pure_cpp_simple();
-    check_pure_cpp();
-    check_py_child();
-    check_casting();
-    check_casting_without_explicit_base();
+//    check_pass_thru();
+//    check_pure_cpp_simple();
+//    check_pure_cpp();
+//    check_py_child();
+//    check_casting();
+//    check_casting_without_explicit_base();
     check_terminal();
   }
 
