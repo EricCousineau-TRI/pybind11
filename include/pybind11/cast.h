@@ -585,6 +585,9 @@ public:
                         if (!inst->reclaim_from_cpp) {
                             throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
                         }
+                        if (!existing_holder) {
+                            throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
+                        }
                         return inst->reclaim_from_cpp(inst, const_cast<void*>(existing_holder)).release();
                     } else {
                         return handle((PyObject *) it_i->second).inc_ref();

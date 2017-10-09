@@ -197,7 +197,7 @@ PYBIND11_MODULE(_move, m) {
 
   py::class_<BaseContainer>(m, "BaseContainer")
       .def(py::init<>())
-      .def("add", &BaseContainer::add)
+      .def("add", &BaseContainer::add, py::return_value_policy::reference)
       .def("list", &BaseContainer::list)
 //      .def("mutable_list", &BaseContainer::mutable_list)
       .def("release_list", &BaseContainer::release_list);
@@ -366,16 +366,25 @@ del obj
 void check_container() {
   cout << "\n[ check_container ]\n";
   py::exec(R"(
+print("Create container")
 c = m.BaseContainer()
-b1 = c.add([m.PyExtChildB(30)])
-b2 = c.add([m.Base(10)])
-
+print("Create instance")
+b1m = [m.PyExtChildB(30)]
+print("Add instance")
+b1 = c.add(b1m)
+print("Create instance 2")
+b2m = [m.Base(10)]
+print("Add instance 2")
+b2 = c.add(b2m)
+print("Print values")
 print(b1.value())
 print(b2.value())
 
+print("Delete references")
 del b1
 del b2
 
+print("Delete container")
 del c
 )");
 }
