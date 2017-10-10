@@ -7,6 +7,17 @@ cc_binary(
         "//python:pybind11_include",
     ],
 )
+
+cc_binary(
+    name = "test_shared_ptr_owner",
+    srcs = [
+        "test_shared_ptr_owner.cc",
+    ],
+    deps = [
+        "//python:pybind11_include",
+    ],
+)
+
 cc_binary(
     name = "test_ref_count",
     srcs = [

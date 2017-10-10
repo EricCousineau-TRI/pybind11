@@ -574,7 +574,11 @@ public:
         for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
-                    if (policy == return_value_policy::automatic || policy == return_value_policy::take_ownership) {
+                    bool try_to_reclaim = false;
+                    if (instance_type->default_holder) {
+                        try_to_reclaim = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
+                    }
+                    if (try_to_reclaim) {
                         // If this object has already been registered, but we wish to take ownership of it,
                         // then use the `has_cpp_release` mechanisms to reclaim ownership.
                         // @note This should be the sole occurrence of this registered object when releasing back.
@@ -1462,7 +1466,10 @@ public:
     using base::typeinfo;
     using base::value;
 
-    bool load(handle src, bool convert) {
+    handle src;
+
+    bool load(handle src_in, bool convert) {
+        src = src_in;
         return base::template load_impl<copyable_holder_caster<type, holder_type>>(src, convert);
     }
 
@@ -1494,7 +1501,7 @@ protected:
 
     bool load_value(value_and_holder &&v_h, LoadType load_type) {
         holder_type& v_holder = v_h.holder<holder_type>();
-        if (v_holder.use_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
+        if (src.ref_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
             std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion." << std::endl;
         }
         if (v_h.holder_constructed()) {
