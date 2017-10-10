@@ -1492,10 +1492,14 @@ protected:
             throw cast_error("Unable to load a custom holder type from a default-holder instance");
     }
 
-    bool load_value(value_and_holder &&v_h, LoadType) {
+    bool load_value(value_and_holder &&v_h, LoadType load_type) {
+        holder_type& v_holder = v_h.holder<holder_type>();
+        if (v_holder.use_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
+            std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion." << std::endl;
+        }
         if (v_h.holder_constructed()) {
             value = v_h.value_ptr();
-            holder = v_h.holder<holder_type>();
+            holder = v_holder;
             return true;
         } else {
             throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
