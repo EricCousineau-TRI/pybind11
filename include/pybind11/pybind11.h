@@ -1093,6 +1093,7 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                     // Attempt to reverse Py_Dealloc...
                     _Py_NewReference(obj.ptr());
                     // TODO: Remove from `gc` set?
+                    PyObject_GC_UnTrack(obj.ptr());
                     // Release to C++.
                     holder_type* null_holder = nullptr;
                     release_info.release_to_cpp(v_h.inst, detail::holder_erased(null_holder), std::move(obj));
@@ -1156,6 +1157,7 @@ public:
         release_info.can_derive_from_trampoline = has_trampoline;
         release_info.release_to_cpp = release_to_cpp;
         release_info.holder_type_id = holder_type_id;
+        release_info.is_gc = is_gc;
 
         set_operator_new<type>(&record);
 
@@ -1537,6 +1539,12 @@ private:
             v_h.set_instance_registered();
         }
         init_holder(inst, v_h, (const holder_type *) holder_ptr, v_h.value_ptr<type>());
+    }
+
+
+    static int is_gc(PyObject *self) {
+        // Reflect PyObject_IS_GC(...)
+        return PyType_IS_GC(Py_TYPE(self));
     }
 
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.

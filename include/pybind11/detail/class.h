@@ -367,6 +367,15 @@ extern "C" inline void pybind11_object_dealloc(PyObject *self) {
         Py_DECREF(type);
 }
 
+extern "C" inline int pybind11_object_is_gc(PyObject *self) {
+    auto instance = reinterpret_cast<detail::instance *>(self);
+    for (auto& v_h : values_and_holders(instance)) {
+        if (v_h.type)
+            return v_h.type->release_info.is_gc(self);
+    }
+    throw std::runtime_error("Bad");
+}
+
 /** Create the type which can be used as a common base for all classes.  This is
     needed in order to satisfy Python's requirements for multiple inheritance.
     Return value: New reference. */
@@ -396,6 +405,7 @@ inline PyObject *make_object_base_type(PyTypeObject *metaclass) {
     type->tp_new = pybind11_object_new;
     type->tp_init = pybind11_object_init;
     type->tp_dealloc = pybind11_object_dealloc;
+    type->tp_is_gc = pybind11_object_is_gc;
 
     /* Support weak references (needed for the keep_alive feature) */
     type->tp_weaklistoffset = offsetof(instance, weakrefs);

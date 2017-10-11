@@ -125,30 +125,36 @@ class Child(m.A):
     print("Child.value()") # (extra = {})".format(self.extra))
     return 10 * m.A.value(self)
 )""");
+//
+//  py::exec(R"""(
+//factory = lambda: m.create_instance()
+//obj = m.check_creation(factory, False)
+//print(obj.value())
+//del obj
+//)""");
+//
+//  py::exec(R"""(
+//print("---")
+//c = Child(30)
+//factory = lambda: c
+//obj = m.check_creation(factory, False)
+//print("-- Python value --")
+//print(obj.value())
+//del obj
+//del factory
+//del c
+//)""");
+//
+//  py::exec(R"""(
+//print("---")
+//factory = lambda: Child(10)
+//obj = m.check_creation(factory, False)
+//print("-- Python value --")
+//print(obj.value())
+//del obj
+//)""");
 
   py::exec(R"""(
-factory = lambda: m.create_instance()
-obj = m.check_creation(factory, False)
-print(obj.value())
-del obj
-
-print("---")
-c = Child(30)
-factory = lambda: c
-obj = m.check_creation(factory, False)
-print("-- Python value --")
-print(obj.value())
-del obj
-del factory
-del c
-
-print("---")
-factory = lambda: Child(10)
-obj = m.check_creation(factory, False)
-print("-- Python value --")
-print(obj.value())
-del obj
-
 print("---")
 c = m.AContainer()
 # Pass back through to reclaim
@@ -163,7 +169,7 @@ print(li[0].value())
 print("Remove container(s)")
 del c
 del li
-)""", py::globals());
+)""");
 
   cout << "Done" << endl;
 

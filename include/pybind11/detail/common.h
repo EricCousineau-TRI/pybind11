@@ -506,6 +506,8 @@ struct instance {
 
         // The holder that is contained by this class.
         HolderTypeId holder_type_id = HolderTypeId::Unknown;
+
+        int (*is_gc)(PyObject* self) = nullptr;
     };
     /// If the instance is a Python-derived type that is owned in C++, then this method
     /// will permit the instance to be reclaimed back by Python.
