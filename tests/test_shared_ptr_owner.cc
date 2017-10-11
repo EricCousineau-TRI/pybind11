@@ -125,13 +125,13 @@ class Child(m.A):
     print("Child.value()") # (extra = {})".format(self.extra))
     return 10 * m.A.value(self)
 )""");
-//
-//  py::exec(R"""(
-//factory = lambda: m.create_instance()
-//obj = m.check_creation(factory, False)
-//print(obj.value())
-//del obj
-//)""");
+
+  py::exec(R"""(
+factory = lambda: m.create_instance()
+obj = m.check_creation(factory, False)
+print(obj.value())
+del obj
+)""");
 //
 //  py::exec(R"""(
 //print("---")

@@ -1094,6 +1094,8 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                     _Py_NewReference(obj.ptr());
                     // TODO: Remove from `gc` set?
                     PyObject_GC_UnTrack(obj.ptr());
+                    // TODO: Issue is that __main__'s refcount != 0 when GC is running through...
+                    // How to decrease that count?
                     // Release to C++.
                     holder_type* null_holder = nullptr;
                     release_info.release_to_cpp(v_h.inst, detail::holder_erased(null_holder), std::move(obj));
