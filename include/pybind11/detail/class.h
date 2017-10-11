@@ -316,6 +316,9 @@ inline bool clear_instance(PyObject *self) {
                 bool keep_going = v_h.type->dealloc(v_h);
                 if (!keep_going) {
                     // Need to re-register instance...
+                    // HACK: Since _Py_Dealloc is called, we must reverse this.
+                    // This is normally not important in release mode, but is important
+                    // for debug mode, where this has more meaningful side effects.
                     register_instance(instance, v_h.value_ptr(), v_h.type);
                     return false;
                 }

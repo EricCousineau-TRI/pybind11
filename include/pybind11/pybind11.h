@@ -1088,8 +1088,12 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                 const auto& release_info = lowest_type->release_info;
                 if (release_info.can_derive_from_trampoline) {
                     std::cout << "Attempting to interrupt" << std::endl;
-                    // Increase reference count.
+                    // Increase reference count
                     object obj = reinterpret_borrow<object>(src);
+                    // Attempt to reverse Py_Dealloc...
+                    _Py_NewReference(obj.ptr());
+                    // TODO: Remove from `gc` set?
+                    // Release to C++.
                     holder_type* null_holder = nullptr;
                     release_info.release_to_cpp(v_h.inst, detail::holder_erased(null_holder), std::move(obj));
                     return false;
