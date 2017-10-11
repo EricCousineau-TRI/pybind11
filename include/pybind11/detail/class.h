@@ -234,6 +234,28 @@ inline bool deregister_instance(instance *self, void *valptr, const type_info *t
 
 extern "C" inline void pybind11_object_dealloc(PyObject *self);
 
+
+
+extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
+    // This is for non-pybind11 object types...
+    handle src(self);
+    // Get closest pybind11 object type.
+    const type_info *lowest_type = get_lowest_type(src);
+    auto& release_info = lowest_type->release_info;
+    auto& dealloc_wrapper = release_info.dealloc_wrapper;
+    PyTypeObject *py_type = Py_TYPE(self);
+    dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = dealloc_wrapper.get_orig(py_type);
+    std::cout << "Using custom dealloc" << std::endl;
+    // Temporarily shim in original destructor.
+    py_type->tp_dealloc = tp_dealloc_orig;
+    // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
+    // we don't collide? Or does it matter???
+    // If it's Python derived -> Python derived -> C++
+    tp_dealloc_orig(self);
+    // Restore - TODO: Exception-proof with RAII???
+    py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
+}
+
 /// Instance creation function for all pybind11 types. It allocates the internal instance layout for
 /// holding C++ objects and holders.  Allocation is done lazily (the first time the instance is cast
 /// to a reference or pointer), and initialization is done by an `__init__` function.
@@ -254,8 +276,17 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
     inst->owned = true;
 
     // Check tp_dealloc
-    if (type->tp_dealloc != pybind11_object_dealloc)
+    dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = type->tp_dealloc;
+    if (tp_dealloc_orig != pybind11_object_dealloc) {
         std::cout << "Have non-pybind11 pure type" << std::endl;
+        const type_info *lowest_type = get_lowest_type(handle(self));
+        auto& release_info = lowest_type->release_info;
+        auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
+        // Now replace.
+        dealloc_wrapper.set_wrapper(non_pybind11_object_dealloc_wrapper);
+        dealloc_wrapper.add(type, tp_dealloc_orig);
+        type->tp_dealloc = dealloc_wrapper.get_wrapper();
+    }
 
     return self;
 }
