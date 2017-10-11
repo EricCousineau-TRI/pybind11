@@ -371,7 +371,7 @@ extern "C" inline int pybind11_object_is_gc(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
     for (auto& v_h : values_and_holders(instance)) {
         if (v_h.type)
-            return v_h.type->release_info.is_gc(self);
+            return v_h.type->release_info.is_gc(instance);
     }
     throw std::runtime_error("Bad");
 }

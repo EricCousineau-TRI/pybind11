@@ -1541,10 +1541,20 @@ private:
         init_holder(inst, v_h, (const holder_type *) holder_ptr, v_h.value_ptr<type>());
     }
 
-
-    static int is_gc(PyObject *self) {
-        // Reflect PyObject_IS_GC(...)
+    static int is_gc_default(PyObject *self) {
+        // See `PyObject_IS_GC(...)` - assuming `PY_TYPE(o)->tp_is_gc == NULL`
         return PyType_IS_GC(Py_TYPE(self));
+    }
+
+    static int is_gc(detail::instance *inst) {
+        // Should this not have been destroyed??? Won't this be invalid access???
+        if (inst->reclaim_from_cpp) {
+            std::cout << "Skipping GC since this is owned by C++" << std::endl;
+            return 0;
+        } else {
+            PyObject *self = (PyObject*)inst;
+            return is_gc_default(self);
+        }
     }
 
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.
