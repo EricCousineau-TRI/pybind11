@@ -589,7 +589,7 @@ public:
                                 if (!inst->simple_holder_constructed) {
                                     if (inst->owned)
                                         throw std::runtime_error("Internal error?");
-                                    std::cout << "Reclaiming shared_ptr\n";
+//                                    std::cout << "Reclaiming shared_ptr\n";
                                     try_to_reclaim = true;
                                 }
                             }
@@ -1526,12 +1526,15 @@ protected:
         bool do_release_to_cpp = false;
         const type_info* lowest_type = nullptr;
         if (src.ref_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
-            std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion." << std::endl;
             // Go ahead and release ownership to C++, if able.
             auto* py_type = (PyTypeObject*)src.get_type().ptr();
             lowest_type = detail::get_type_info(py_type);
             if (lowest_type->release_info.can_derive_from_trampoline) {
                 do_release_to_cpp = true;
+            } else {
+                std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion. "
+                    << "Please consider having your base class extend from pybind11::trampoline<>."
+                    << std::endl;
             }
         }
 
