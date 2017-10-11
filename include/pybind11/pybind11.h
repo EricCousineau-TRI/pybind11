@@ -1487,6 +1487,15 @@ private:
 
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.
     static void dealloc(detail::value_and_holder &v_h) {
+        // TODO(eric.cousineau): If this is a shared_ptr<>, ths instance is owned, and
+        // use_count() > 1, then that means we have a separate living C++ instance...
+        // ... Is there anyway to interrupt a Python object's destruction?
+        // ... If not, then a new Python instance should be made, and ownership should be
+        // claimed in that mechanism, if possible...
+
+        // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
+        // C++ and Python, with it being owned by C++. Check this.
+
         if (v_h.holder_constructed()) {
             v_h.holder<holder_type>().~holder_type();
             v_h.set_holder_constructed(false);
