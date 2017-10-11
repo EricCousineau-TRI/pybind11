@@ -1060,6 +1060,34 @@ struct trampoline_interface_impl<type, false> {
     }
 };
 
+template <detail::HolderTypeId holder_type_id>
+struct holder_check_impl {
+    template <typename holder_type>
+    static void check_destruct(const detail::value_and_holder &v_h) {
+        // Noop by default.
+    }
+};
+
+template <>
+struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
+    template <typename holder_type>
+    static void check_destruct(const detail::value_and_holder &v_h) {
+        const holder_type& h = v_h.holder<holder_type>();
+        handle src((PyObject*)v_h.inst);
+        const detail::type_info *lowest_type = get_lowest_type(src, false);
+        if (!lowest_type)
+            // We have multiple inheritance, skip.
+            return;
+        auto load_type = detail::determine_load_type(src, lowest_type);
+        // Check use_count(), assuming that we have an accurate count (no competing threads?)
+        if (load_type == detail::LoadType::DerivedCppSinglePySingle) {
+            if (h.use_count() > 1) {
+                std::cout << "SharedPtr holder has use_count() > 1 on destruction for a Python-derived class." << std::endl;
+            }
+        }
+    }
+};
+
 template <typename type_, typename... options>
 class class_ : public detail::generic_type {
     template <typename T> using is_holder = detail::is_holder_type<type_, T>;
@@ -1495,8 +1523,9 @@ private:
 
         // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
         // C++ and Python, with it being owned by C++. Check this.
-
+        using holder_check = holder_check_impl<holder_type_id>;
         if (v_h.holder_constructed()) {
+            holder_check::template check_destruct<holder_type>(v_h);
             v_h.holder<holder_type>().~holder_type();
             v_h.set_holder_constructed(false);
         }

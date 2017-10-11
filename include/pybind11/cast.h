@@ -156,12 +156,16 @@ inline const std::vector<detail::type_info *> &all_type_info(PyTypeObject *type)
  * ancestors are pybind11-registered.  Throws an exception if there are multiple bases--use
  * `all_type_info` instead if you want to support multiple bases.
  */
-PYBIND11_NOINLINE inline detail::type_info* get_type_info(PyTypeObject *type) {
+PYBIND11_NOINLINE inline detail::type_info* get_type_info(PyTypeObject *type, bool do_throw = true) {
     auto &bases = all_type_info(type);
     if (bases.size() == 0)
         return nullptr;
-    if (bases.size() > 1)
-        pybind11_fail("pybind11::detail::get_type_info: type has multiple pybind11-registered bases");
+    if (bases.size() > 1) {
+        if (do_throw)
+            pybind11_fail("pybind11::detail::get_type_info: type has multiple pybind11-registered bases");
+        else
+            return nullptr;
+    }
     return bases.front();
 }
 
@@ -1473,6 +1477,12 @@ struct holder_helper {
       return p.release();
     }
 };
+
+const detail::type_info* get_lowest_type(handle src, bool do_throw = true) {
+    auto* py_type = (PyTypeObject*)src.get_type().ptr();
+    return detail::get_type_info(py_type, do_throw);
+}
+
 
 /// Type caster for holder types like std::shared_ptr, etc.
 template <typename type, typename holder_type>
