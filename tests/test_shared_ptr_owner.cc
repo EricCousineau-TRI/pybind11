@@ -165,11 +165,11 @@ Child.__init__(10)
 Child.value()
 PyA::value()
 100
-WARNING! Python-derived C++ instance will soon lose Python portion.
-Child.__del__
 -- Python value --
+Child.value()
 PyA::value()
-10
+100
+Child.__del__
 PyA::~PyA()
 A::~A()
 Done
