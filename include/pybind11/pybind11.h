@@ -1063,15 +1063,16 @@ struct trampoline_interface_impl<type, false> {
 template <detail::HolderTypeId holder_type_id>
 struct holder_check_impl {
     template <typename holder_type>
-    static void check_destruct(const detail::value_and_holder &v_h) {
+    static bool check_destruct(const detail::value_and_holder &v_h) {
         // Noop by default.
+        return true;
     }
 };
 
 template <>
 struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
     template <typename holder_type>
-    static void check_destruct(const detail::value_and_holder &v_h) {
+    static bool check_destruct(const detail::value_and_holder &v_h) {
         const holder_type& h = v_h.holder<holder_type>();
         handle src((PyObject*)v_h.inst);
         const detail::type_info *lowest_type = get_lowest_type(src, false);
@@ -1083,8 +1084,19 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
         if (load_type == detail::LoadType::DerivedCppSinglePySingle) {
             if (h.use_count() > 1) {
                 std::cout << "SharedPtr holder has use_count() > 1 on destruction for a Python-derived class." << std::endl;
+                // Increase reference count
+                const auto& release_info = lowest_type->release_info;
+                if (release_info.can_derive_from_trampoline) {
+                    std::cout << "Attempting to interrupt" << std::endl;
+                    // Increase reference count.
+                    object obj = reinterpret_borrow<object>(src);
+                    holder_type* null_holder = nullptr;
+                    release_info.release_to_cpp(v_h.inst, detail::holder_erased(null_holder), std::move(obj));
+                    return false;
+                }
             }
         }
+        return true;
     }
 };
 
@@ -1204,9 +1216,20 @@ public:
                 throw std::runtime_error("Unsupported load type (multiple inheritance)");
             }
         }
+        bool permit_null_holder = external_holder_raw.type_id() == detail::HolderTypeId::SharedPtr;
+        bool transfer_holder = true;
         holder_type& holder = v_h.holder<holder_type>();
-        holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
-        external_holder = std::move(holder);
+        if (permit_null_holder && !external_holder_raw.ptr()) {
+            if (holder.use_count() == 1)
+                // TODO(eric.cousineau): This may not hold true if we pass temporaries???
+                // Or if we've copied a `holder` in copyable_holder_caster...
+                throw std::runtime_error("Internal error: Should have non-null external_holder if use_count() == 1");
+            transfer_holder = false;
+        }
+        if (transfer_holder) {
+            holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
+            external_holder = std::move(holder);
+        }
         holder.~holder_type();
         v_h.set_holder_constructed(false);
         inst->owned = false;
@@ -1265,7 +1288,6 @@ public:
                 throw std::runtime_error("Unsupported load type");
             }
         }
-        assert(obj.ref_count() == 1);
         inst->owned = true;
         return obj;
     }
@@ -1514,7 +1536,7 @@ private:
     }
 
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.
-    static void dealloc(detail::value_and_holder &v_h) {
+    static bool dealloc(detail::value_and_holder &v_h) {
         // TODO(eric.cousineau): If this is a shared_ptr<>, ths instance is owned, and
         // use_count() > 1, then that means we have a separate living C++ instance...
         // ... Is there anyway to interrupt a Python object's destruction?
@@ -1525,7 +1547,9 @@ private:
         // C++ and Python, with it being owned by C++. Check this.
         using holder_check = holder_check_impl<holder_type_id>;
         if (v_h.holder_constructed()) {
-            holder_check::template check_destruct<holder_type>(v_h);
+            bool keep_going = holder_check::template check_destruct<holder_type>(v_h);
+            if (!keep_going)
+                return false;
             v_h.holder<holder_type>().~holder_type();
             v_h.set_holder_constructed(false);
         }
@@ -1536,6 +1560,7 @@ private:
             detail::call_operator_delete(v_h.value_ptr<type>(), v_h.type->type_size);
         }
         v_h.value_ptr() = nullptr;
+        return true;
     }
 
     static detail::function_record *get_function_record(handle h) {

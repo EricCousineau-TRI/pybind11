@@ -300,7 +300,7 @@ inline void clear_patients(PyObject *self) {
 
 /// Clears all internal data from the instance and removes it from registered instances in
 /// preparation for deallocation.
-inline void clear_instance(PyObject *self) {
+inline bool clear_instance(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
 
     // Deallocate any values/holders, if present:
@@ -313,7 +313,12 @@ inline void clear_instance(PyObject *self) {
                 pybind11_fail("pybind11_object_dealloc(): Tried to deallocate unregistered instance!");
 
             if (instance->owned || v_h.holder_constructed()) {
-                v_h.type->dealloc(v_h);
+                bool keep_going = v_h.type->dealloc(v_h);
+                if (!keep_going) {
+                    // Need to re-register instance...
+                    register_instance(instance, v_h.value_ptr(), v_h.type);
+                    return false;
+                }
             }
         }
     }
@@ -329,12 +334,21 @@ inline void clear_instance(PyObject *self) {
 
     if (instance->has_patients)
         clear_patients(self);
+    return true;
 }
 
 /// Instance destructor function for all pybind11 types. It calls `type_info.dealloc`
 /// to destroy the C++ object itself, while the rest is Python bookkeeping.
 extern "C" inline void pybind11_object_dealloc(PyObject *self) {
-    clear_instance(self);
+    bool keep_going = clear_instance(self);
+    if (!keep_going) {
+        // TODO(eric.cousineau): Cancel out the effects of _Py_Dealloc?
+        // TODO(eric.cousineau): Is there a way to ignore this if the interpreter
+        // is cleaning up???
+        assert(Py_REFCNT(self) == 1);
+        std::cout << "Interrupting destruction" << std::endl;
+        return;
+    }
 
     auto type = Py_TYPE(self);
     type->tp_free(self);

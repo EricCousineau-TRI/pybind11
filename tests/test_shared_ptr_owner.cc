@@ -214,10 +214,14 @@ PyA::value()
 200
 Child.__del__
 SharedPtr holder has use_count() > 1 on destruction for a Python-derived class.
+Attempting to interrupt
+Interrupting destruction
 -- Python value 2 --
+Child.value()
 PyA::value()
-20
+200
 Remove container(s)
+Child.__del__
 PyA::~PyA()
 A::~A()
 Done
