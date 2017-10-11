@@ -257,7 +257,16 @@ class raii_restore {
     T original_;
 };
 
-extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
+void pybind11_revive_object(PyObject* self) {
+    // Attempt to reverse _Py_Dealloc.
+    // Ensure that our ref count is now 1, before _Py_NewReference overwrites it.
+    // This way, we don't magically lose (or gain) references.
+    assert(Py_REFCNT(self) == 1);
+    _Py_NewReference(self);
+}
+
+// Deallocation for Python subclasses that derive from Pybind11 classes.
+extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
     // This is for non-pybind11 object types...
     detail::instance* inst = (detail::instance*)self;
     handle src(self);
@@ -270,6 +279,10 @@ extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
     std::cout << "Using custom dealloc" << std::endl;
 
     // Temporarily shim in original destructor.
+    // TODO(eric.cousineau): Potential issue: This may cause problems if destructing an object
+    // frees up a chain of other objects, and at some point, the original type's destructor gets
+    // called. Solution is to mark instances to detect / prevent recursion...
+    // ... But that's not possible, because Python uses identity checks...
     raii_restore<dealloc_wrapper_t::tp_dealloc_t> tp_dealloc_shim(
         &py_type->tp_dealloc, tp_dealloc_orig);
     // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
@@ -281,14 +294,7 @@ extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
         tp_dealloc_orig(self);
     } else {
         std::cout << "Skipping destruction" << std::endl;
-        // Attempt to reverse Py_Dealloc...
-        // Ensure that our ref count is now 1, before _Py_NewReference overwrites it.
-        assert(src.ref_count() == 1);
-        _Py_NewReference(self);
-        // TODO: Remove from `gc` set?
-        // PyObject_GC_UnTrack(obj.ptr());
-        // TODO: Issue is that __main__'s refcount != 0 when GC is running through...
-        // How to decrease that count?
+        pybind11_revive_object(self);
     }
 }
 
@@ -319,7 +325,7 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
         auto& release_info = lowest_type->release_info;
         auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
         // Now replace.
-        dealloc_wrapper.set_wrapper(non_pybind11_object_dealloc_wrapper);
+        dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
         dealloc_wrapper.add(type, tp_dealloc_orig);
         type->tp_dealloc = dealloc_wrapper.get_wrapper();
     }

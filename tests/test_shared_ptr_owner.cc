@@ -112,7 +112,7 @@ int main(int, char**) {
   cout << "Eval" << endl;
 
   py::exec(R"""(
-class Child(m.A):
+class ChildParent(m.A):
   def __init__(self, value):
     m.A.__init__(self, value)
     self.extra = [value * 2]
@@ -122,8 +122,19 @@ class Child(m.A):
     print("Child.__del__")
   def value(self):
     # TODO(eric.cousineau): Fix this...
-    print("Child.value()") # (extra = {})".format(self.extra))
+    print("Child.value() (extra = {})".format(self.extra))
     return 10 * m.A.value(self)
+
+class Child(ChildParent):
+  def __init__(self, value):
+    ChildParent.__init__(self, value)
+    self.sub_extra = [value * 3]
+  def __del__(self):
+    self.debug_hook()
+  def value(self):
+    print("Sub-Child.value() (sub_extra = {})".format(self.sub_extra))
+    return 10 * ChildParent.value(self)
+
 )""");
 
 //  py::exec(R"""(
