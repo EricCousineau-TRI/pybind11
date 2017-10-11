@@ -1160,6 +1160,7 @@ public:
         release_info.release_to_cpp = release_to_cpp;
         release_info.holder_type_id = holder_type_id;
         release_info.is_gc = is_gc;
+        release_info.check_destruct = allow_destruct;
 
         set_operator_new<type>(&record);
 
@@ -1183,6 +1184,13 @@ public:
     }
 
     typedef trampoline_interface_impl<type, has_trampoline> trampoline_interface;
+
+    static bool allow_destruct(detail::value_and_holder& v_h) {
+        // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
+        // C++ and Python, with it being owned by C++. Check this.
+        using holder_check = holder_check_impl<holder_type_id>;
+        return holder_check::template check_destruct<holder_type>(v_h);
+    }
 
     static void release_to_cpp(detail::instance* inst, detail::holder_erased external_holder_raw, object&& obj) {
         using detail::LoadType;
@@ -1567,13 +1575,7 @@ private:
         // ... If not, then a new Python instance should be made, and ownership should be
         // claimed in that mechanism, if possible...
 
-        // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
-        // C++ and Python, with it being owned by C++. Check this.
-        using holder_check = holder_check_impl<holder_type_id>;
         if (v_h.holder_constructed()) {
-            bool keep_going = holder_check::template check_destruct<holder_type>(v_h);
-            if (!keep_going)
-                return false;
             v_h.holder<holder_type>().~holder_type();
             v_h.set_holder_constructed(false);
         }
