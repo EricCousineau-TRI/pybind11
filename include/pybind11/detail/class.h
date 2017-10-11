@@ -273,7 +273,12 @@ extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
     // Get closest pybind11 object type.
     const type_info *lowest_type = get_lowest_type(src);
     auto& release_info = lowest_type->release_info;
-    auto& dealloc_wrapper = release_info.dealloc_wrapper;
+    auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
+    if (dealloc_wrapper.is_destructing(self)) {
+        std::cout << "Superfluous call" << std::endl;
+        return;
+    }
+    dealloc_wrapper.mark_destructing(self);
     PyTypeObject *py_type = Py_TYPE(self);
     dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = dealloc_wrapper.get_orig(py_type);
     std::cout << "Using custom dealloc" << std::endl;
@@ -283,8 +288,9 @@ extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
     // frees up a chain of other objects, and at some point, the original type's destructor gets
     // called. Solution is to mark instances to detect / prevent recursion...
     // ... But that's not possible, because Python uses identity checks...
-    raii_restore<dealloc_wrapper_t::tp_dealloc_t> tp_dealloc_shim(
-        &py_type->tp_dealloc, tp_dealloc_orig);
+//    raii_restore<dealloc_wrapper_t::tp_dealloc_t> tp_dealloc_shim(
+//        &py_type->tp_dealloc, tp_dealloc_orig);
+
     // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
     // we don't collide? Or does it matter???
     // If it's Python derived -> Python derived -> C++
@@ -296,6 +302,7 @@ extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
         std::cout << "Skipping destruction" << std::endl;
         pybind11_revive_object(self);
     }
+    dealloc_wrapper.unmark_destructing(self);
 }
 
 /// Instance creation function for all pybind11 types. It allocates the internal instance layout for

@@ -457,19 +457,20 @@ struct type_info;
 struct value_and_holder;
 
 struct dealloc_wrapper_t {
-  typedef PyTypeObject *obj_t;
+  typedef PyTypeObject *type_t;
   typedef void (*tp_dealloc_t)(PyObject*);
+  typedef PyObject *obj_t;
 
   void set_wrapper(tp_dealloc_t wrapper) {
       wrapper_ = wrapper;
   }
-  void add(obj_t tp, tp_dealloc_t orig) {
+  void add(type_t tp, tp_dealloc_t orig) {
       assert(wrapper_);
       assert(orig != wrapper_);
       assert(mapping_.find(tp) == mapping_.end());
       mapping_[tp] = orig;
   }
-  tp_dealloc_t get_orig(obj_t tp) const {
+  tp_dealloc_t get_orig(type_t tp) const {
       assert(tp->tp_dealloc == wrapper_);
       return mapping_.at(tp);
   }
@@ -478,9 +479,27 @@ struct dealloc_wrapper_t {
       return wrapper_;
   }
 
+  void mark_destructing(obj_t op) {
+      assert(!is_destructing(op));
+      destructing_[op] = true;
+  }
+
+  void unmark_destructing(obj_t op) {
+      destructing_.at(op) = false;
+  }
+
+  bool is_destructing(obj_t op) {
+      auto iter = destructing_.find(op);
+      if (iter == destructing_.end())
+          return false;
+      else
+          return iter->second;
+  }
+
  private:
   // PyTypeObject*  ->  original tp_dealloc_t
-  std::unordered_map<obj_t, tp_dealloc_t> mapping_;
+  std::unordered_map<type_t, tp_dealloc_t> mapping_;
+  std::unordered_map<obj_t, bool> destructing_;
   tp_dealloc_t wrapper_{nullptr};
 };
 
