@@ -40,6 +40,19 @@ class A {
   int value_{};
 };
 
+class AContainer {
+ public:
+    shared_ptr<A> add(shared_ptr<A> a) {
+      as_.push_back(a);
+      return as_.back();
+    }
+    vector<shared_ptr<A>> release_list() {
+      return std::move(as_);
+    }
+ private:
+    vector<shared_ptr<A>> as_;
+};
+
 unique_ptr<A> create_instance() {
   return make_unique<A>(50);
 }
@@ -71,6 +84,11 @@ PYBIND11_MODULE(_ownership, m) {
     .def(py::init<int>())
     .def("value", &A::value)
     .def("debug_hook", &A::debug_hook);
+
+  py::class_<AContainer, shared_ptr<AContainer>>(m, "AContainer")
+    .def(py::init<>())
+    .def("add", &AContainer::add)
+    .def("release_list", &AContainer::release_list);
 
   m.def("create_instance", &create_instance);
   m.def("check_creation", &check_creation);
@@ -128,6 +146,21 @@ obj = m.check_creation(factory, False)
 print("-- Python value --")
 print(obj.value())
 del obj
+
+print("---")
+c = m.AContainer()
+# Pass back through to reclaim
+out = c.add(Child(20))
+# See what happens if the value is destructed
+print("-- Python value 1 --")
+print(out.value())
+del out
+li = c.release_list()
+print("-- Python value 2 --")
+print(li[0].value())
+print("Remove container(s)")
+del c
+del li
 )""", py::globals());
 
   cout << "Done" << endl;
@@ -170,6 +203,21 @@ Child.value()
 PyA::value()
 100
 Child.__del__
+PyA::~PyA()
+A::~A()
+---
+A::A(20)
+Child.__init__(20)
+-- Python value 1 --
+Child.value()
+PyA::value()
+200
+Child.__del__
+SharedPtr holder has use_count() > 1 on destruction for a Python-derived class.
+-- Python value 2 --
+PyA::value()
+20
+Remove container(s)
 PyA::~PyA()
 A::~A()
 Done
