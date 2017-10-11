@@ -1505,7 +1505,9 @@ public:
     explicit operator holder_type&() { return holder; }
     #endif
 
-    static handle cast(const holder_type &src, return_value_policy, handle) {
+    // Risk increasing the `shared_ptr` ref count temporarily to maintain writeable
+    // semantics without too much `const_cast<>` ooginess.
+    static handle cast(holder_type &&src, return_value_policy, handle) {
         const auto *ptr = holder_helper<holder_type>::get(src);
         return type_caster_base<type>::cast_holder(ptr, holder_erased(&src));
     }

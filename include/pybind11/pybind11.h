@@ -1031,9 +1031,7 @@ struct trampoline_interface_impl {
                 "pybind11::trampoline<downcast_type>");
         }
         // Let the external holder take ownership, but keep instance registered.
-        handle h = obj;
         tr->use_cpp_lifetime(std::move(obj), holder_type_id);
-        assert(h.ref_count() == 1);
     }
 
     static object release_cpp_lifetime(type* cppobj) {
