@@ -294,6 +294,11 @@ extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
     // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
     // we don't collide? Or does it matter???
     // If it's Python derived -> Python derived -> C++
+
+    // Alternative: Looks like `type->tp_del` has some things that can def ref count...
+
+    // TODO(eric.cousineau): Alternative: Hook into object's `__del__`? But how to stop execution?
+
     auto v_h = inst->get_value_and_holder(lowest_type);
     holder_erased holder(v_h.holder_ptr(), release_info.holder_type_id);
     if (release_info.allow_destruct(inst, holder)) {
