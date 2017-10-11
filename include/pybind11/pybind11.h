@@ -1093,7 +1093,7 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                     // Attempt to reverse Py_Dealloc...
                     _Py_NewReference(obj.ptr());
                     // TODO: Remove from `gc` set?
-                    PyObject_GC_UnTrack(obj.ptr());
+//                    PyObject_GC_UnTrack(obj.ptr());
                     // TODO: Issue is that __main__'s refcount != 0 when GC is running through...
                     // How to decrease that count?
                     // Release to C++.

@@ -232,6 +232,8 @@ inline bool deregister_instance(instance *self, void *valptr, const type_info *t
     return ret;
 }
 
+extern "C" inline void pybind11_object_dealloc(PyObject *self);
+
 /// Instance creation function for all pybind11 types. It allocates the internal instance layout for
 /// holding C++ objects and holders.  Allocation is done lazily (the first time the instance is cast
 /// to a reference or pointer), and initialization is done by an `__init__` function.
@@ -250,6 +252,10 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
     inst->allocate_layout();
 
     inst->owned = true;
+
+    // Check tp_dealloc
+    if (type->tp_dealloc != pybind11_object_dealloc)
+        std::cout << "Have non-pybind11 pure type" << std::endl;
 
     return self;
 }
