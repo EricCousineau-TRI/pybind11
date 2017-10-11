@@ -1567,6 +1567,11 @@ private:
             // Is there a way to check if `__del__` is an assigned method? (Rather than a class method?)
             handle h_type((PyObject*)py_type);
             handle old_dtor = getattr(h_type, "__del__", none());
+            const std::string flag = "__has_pybind_del";
+            if (getattr(self, flag, false).cast<bool>()) {
+                std::cout << "Already has override set" << std::endl;
+                throw std::runtime_error("Not implemented");
+            }
             std::function<void()> new_dtor = [self, inst, old_dtor]() {
                 // Purposely do NOT capture `object` to refcount low.
                 if (allow_destruct(inst, holder)) {
@@ -1578,10 +1583,12 @@ private:
             };
             // Replace with an instance-bound method... Will this cause problems?
             object new_dtor_py = cast(new_dtor);
-            // Now replace.
-            dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
-            dealloc_wrapper.add(py_type, tp_dealloc_orig);
-            py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
+            setattr(self, "__del__", new_dtor_py);
+            setattr(self, flag, true);
+//            // Now replace.
+//            dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
+//            dealloc_wrapper.add(py_type, tp_dealloc_orig);
+//            py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
 
 
         }
