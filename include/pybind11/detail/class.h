@@ -345,6 +345,8 @@ extern "C" inline void pybind11_object_dealloc(PyObject *self) {
         // TODO(eric.cousineau): Cancel out the effects of _Py_Dealloc?
         // TODO(eric.cousineau): Is there a way to ignore this if the interpreter
         // is cleaning up???
+        // TODO(eric.cousineau): Is there a way to install an override on the existing
+        // `type->tp_dealloc`? (Looking at the details below..)
         assert(Py_REFCNT(self) == 1);
         std::cout << "Interrupting destruction" << std::endl;
         return;
