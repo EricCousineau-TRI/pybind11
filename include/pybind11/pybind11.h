@@ -1078,7 +1078,7 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
         const detail::type_info *lowest_type = get_lowest_type(src, false);
         if (!lowest_type)
             // We have multiple inheritance, skip.
-            return;
+            return true;
         auto load_type = detail::determine_load_type(src, lowest_type);
         // Check use_count(), assuming that we have an accurate count (no competing threads?)
         if (load_type == detail::LoadType::DerivedCppSinglePySingle) {

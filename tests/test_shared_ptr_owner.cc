@@ -115,12 +115,13 @@ int main(int, char**) {
 class Child(m.A):
   def __init__(self, value):
     m.A.__init__(self, value)
+    self.extra = [value * 2]
     print("Child.__init__({})".format(value))
   def __del__(self):
     m.A.debug_hook(self)
     print("Child.__del__")
   def value(self):
-    print("Child.value()")
+    print("Child.value() (extra = {})".format(self.extra))
     return 10 * m.A.value(self)
 )""");
 
