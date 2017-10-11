@@ -1077,6 +1077,7 @@ public:
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
     constexpr static bool has_trampoline = std::is_base_of<trampoline<type>, type_alias>::value;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
+    constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 
     static_assert(detail::all_of<is_valid_class_option<options>...>::value,
             "Unknown/invalid class_ template parameters provided");
@@ -1112,6 +1113,7 @@ public:
             auto& release_info = record.release_info;
             release_info.can_derive_from_trampoline = has_trampoline;
             release_info.release_to_cpp = release_to_cpp;
+            release_info.holder_type_id = holder_type_id;
         }
 
         set_operator_new<type>(&record);
@@ -1137,7 +1139,7 @@ public:
 
     typedef trampoline_interface_impl<type, has_trampoline> trampoline_interface;
 
-    static void release_to_cpp(detail::instance* inst, void* external_holder_raw, object&& obj) {
+    static void release_to_cpp(detail::instance* inst, void* external_holder_raw, detail::HolderTypeId external_holder_type_id, object&& obj) {
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();
@@ -1193,7 +1195,7 @@ public:
         }
     }
 
-    static object reclaim_from_cpp(detail::instance* inst, void* external_holder_raw) {
+    static object reclaim_from_cpp(detail::instance* inst, void* external_holder_raw, detail::HolderTypeId external_holder_type_id) {
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();

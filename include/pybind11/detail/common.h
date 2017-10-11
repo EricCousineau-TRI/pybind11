@@ -375,6 +375,25 @@ constexpr size_t instance_simple_holder_in_ptrs() {
     return size_in_ptrs(sizeof(std::shared_ptr<int>));
 }
 
+enum class HolderTypeId {
+    Unknown,
+    UniquePtr,
+    SharedPtr,
+};
+template <typename holder_type, typename SFINAE = void>
+struct get_holder_type_id {
+    static constexpr HolderTypeId value = HolderTypeId::Unknown;
+};
+template <typename T>
+struct get_holder_type_id<std::shared_ptr<T>, void> {
+    static constexpr HolderTypeId value = HolderTypeId::SharedPtr;
+};
+template <typename T, typename Deleter>
+struct get_holder_type_id<std::unique_ptr<T, Deleter>, void> {
+    // TODO(eric.cousineau): Should this only specialize for `std::default_deleter`?
+    static constexpr HolderTypeId value = HolderTypeId::UniquePtr;
+};
+
 // Forward declarations
 struct type_info;
 struct value_and_holder;
@@ -424,10 +443,26 @@ struct instance {
     bool simple_instance_registered : 1;
     /// If true, get_internals().patients has an entry for this object
     bool has_patients : 1;
+
+    typedef void (*release_to_cpp_t)(instance* inst, void* external_holder, HolderTypeId holder_type_id, object&& obj);
+    typedef object (*reclaim_from_cpp_t)(instance* inst, void* external_holder, HolderTypeId holder_type_id);
+
+    struct type_release_info_t {
+        // Release an instance to C++ for pure C++ instances or Python-derived classes.
+        release_to_cpp_t release_to_cpp = nullptr;
+
+        // For classes wrapped in `trampoline<>`. See `move_only_holder_caster` for more info.
+        // Pure / direct C++ objects do not need any fancy releasing mechanisms. They are simply
+        // unwrapped and passed back.
+        bool can_derive_from_trampoline = false;
+
+        // The holder that is contained by this class.
+        HolderTypeId holder_type_id = HolderTypeId::Unknown;
+    };
     /// If the instance is a Python-derived type that is owned in C++, then this method
     /// will permit the instance to be reclaimed back by Python.
     // TODO(eric.cousineau): This may not be necessary. See note in `type_caster_generic::cast`.
-    object (*reclaim_from_cpp)(instance* inst, void* external_holder) = nullptr;
+    reclaim_from_cpp_t reclaim_from_cpp = nullptr;
 
     /// Initializes all of the above type/values/holders data (but not the instance values themselves)
     void allocate_layout();

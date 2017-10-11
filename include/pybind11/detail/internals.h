@@ -109,15 +109,7 @@ struct type_info {
     /* true if this is a type registered with py::module_local */
     bool module_local : 1;
 
-    struct release_info_t {
-      // Release an instance to C++ for pure C++ instances or Python-derived classes.
-      void (*release_to_cpp)(instance* inst, void* external_holder, object&& obj) = nullptr;
-      // For classes wrapped in `trampoline<>`. See `move_only_holder_caster` for more info.
-      // Pure / direct C++ objects do not need any fancy releasing mechanisms. They are simply
-      // unwrapped and passed back.
-      bool can_derive_from_trampoline = false;
-    };
-    release_info_t release_info;
+    instance::type_release_info_t release_info;
 };
 
 /// Tracks the `internals` and `type_info` ABI version independent of the main library version

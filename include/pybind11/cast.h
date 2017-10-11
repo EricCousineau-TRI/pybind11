@@ -562,7 +562,8 @@ public:
                                          const detail::type_info *tinfo,
                                          void *(*copy_constructor)(const void *),
                                          void *(*move_constructor)(const void *),
-                                         const void *existing_holder = nullptr) {
+                                         const void *existing_holder = nullptr,
+                                         HolderTypeId existing_holder_type_id = HolderTypeId::Unknown) {
         if (!tinfo) // no type info: error will be set already
             return handle();
 
@@ -575,7 +576,7 @@ public:
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
                     bool try_to_reclaim = false;
-                    if (instance_type->default_holder) {
+                    if (instance_type->release_info.holder_type_id == detail::HolderTypeId::UniquePtr) {
                         try_to_reclaim = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
                     }
                     if (try_to_reclaim) {
@@ -594,7 +595,7 @@ public:
                         if (!existing_holder) {
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
-                        return inst->reclaim_from_cpp(inst, const_cast<void*>(existing_holder)).release();
+                        return inst->reclaim_from_cpp(inst, const_cast<void*>(existing_holder), existing_holder_type_id).release();
                     } else {
                         return handle((PyObject *) it_i->second).inc_ref();
                     }
@@ -905,11 +906,11 @@ public:
             make_copy_constructor(src), make_move_constructor(src));
     }
 
-    static handle cast_holder(const itype *src, const void *holder) {
+    static handle cast_holder(const itype *src, const void *holder, HolderTypeId holder_type_id) {
         auto st = src_and_type(src);
         return type_caster_generic::cast(
             st.first, return_value_policy::take_ownership, {}, st.second,
-            nullptr, nullptr, holder);
+            nullptr, nullptr, holder, holder_type_id);
     }
 
     template <typename T> using cast_op_type = cast_op_type<T>;
@@ -1487,7 +1488,7 @@ public:
 
     static handle cast(const holder_type &src, return_value_policy, handle) {
         const auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, &src);
+        return type_caster_base<type>::cast_holder(ptr, &src, holder_type_id);
     }
 
   // TODO(eric.cousineau): Define cast_op_type???
@@ -1538,6 +1539,7 @@ protected:
 
 
     holder_type holder;
+    constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 };
 
 /// Specialize for the common std::shared_ptr, so users don't need to
@@ -1571,7 +1573,7 @@ struct move_only_holder_caster : type_caster_base<type> {
         // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
         // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
         auto *ptr = holder_helper<holder_type>::get(std::move(src));
-        return type_caster_base<type>::cast_holder(ptr, nullptr);
+        return type_caster_base<type>::cast_holder(ptr, nullptr, holder_type_id);
     }
 
 //    void take_object(object&& obj) {
@@ -1700,7 +1702,7 @@ protected:
         auto& release_info = lowest_type->release_info;
         if (!release_info.release_to_cpp)
             throw std::runtime_error("No release mechanism in lowest type?");
-        release_info.release_to_cpp(v_h.inst, &holder, std::move(obj_exclusive));
+        release_info.release_to_cpp(v_h.inst, &holder, holder_type_id, std::move(obj_exclusive));
         return true;
     }
 
@@ -1734,6 +1736,7 @@ protected:
 //    }
 
     holder_type holder;
+    constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 };
 
 template <typename type, typename deleter>

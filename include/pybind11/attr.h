@@ -227,7 +227,7 @@ struct type_record {
     void (*dealloc)(detail::value_and_holder &) = nullptr;
 
     /// See `type_info::has_cpp_release`.
-    type_info::release_info_t release_info;
+    instance::type_release_info_t release_info;
 
     /// List of base classes of the newly created type
     list bases;
