@@ -1543,6 +1543,48 @@ private:
             v_h.set_instance_registered();
         }
         init_holder(inst, v_h, (const holder_type *) holder_ptr, v_h.value_ptr<type>());
+
+        // TODO(eric.cousineau): Inject override of __del__ for intercepting C++ stuff
+        handle self((PyObject*)inst);
+        PyTypeObject *py_type = Py_TYPE(self.ptr());
+
+        using namespace detail;
+        dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = py_type->tp_dealloc;
+        bool is_non_pybind = tp_dealloc_orig != pybind11_object_dealloc;
+
+        // Check tp_dealloc
+        if (is_non_pybind) {
+            std::cout << "Have non-pybind11 type" << std::endl;
+            if (!py_type->tp_del) {
+                std::cout << "Has empty __del__ slot" << std::endl;
+            }
+            const type_info *lowest_type = get_lowest_type(self);
+            auto& release_info = lowest_type->release_info;
+            auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
+
+            // Get non-instance-bound method (analogous `tp_del`)
+            // TODO(eric.cousineau): Would instance-bound method make a needless cyclic reference?
+            // Is there a way to check if `__del__` is an assigned method? (Rather than a class method?)
+            handle h_type((PyObject*)py_type);
+            handle old_dtor = getattr(h_type, "__del__", none());
+            std::function<void()> new_dtor = [self, inst, old_dtor]() {
+                // Purposely do NOT capture `object` to refcount low.
+                if (allow_destruct(inst, holder)) {
+                    // Call the old destructor.
+                    old_dtor(self);
+                } else {
+                    // ... This should have been kept alive???
+                }
+            };
+            // Replace with an instance-bound method... Will this cause problems?
+            object new_dtor_py = cast(new_dtor);
+            // Now replace.
+            dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
+            dealloc_wrapper.add(py_type, tp_dealloc_orig);
+            py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
+
+
+        }
     }
 
     static int is_gc_default(PyObject *self) {

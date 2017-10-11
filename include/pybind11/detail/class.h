@@ -322,25 +322,13 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
         type->tp_basicsize = instance_size;
     }
 #endif
+
     PyObject *self = type->tp_alloc(type, 0);
     auto inst = reinterpret_cast<instance *>(self);
     // Allocate the value/holder internals:
     inst->allocate_layout();
 
     inst->owned = true;
-
-    // Check tp_dealloc
-    dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = type->tp_dealloc;
-    if (tp_dealloc_orig != pybind11_object_dealloc) {
-        std::cout << "Have non-pybind11 pure type" << std::endl;
-        const type_info *lowest_type = get_lowest_type(handle(self));
-        auto& release_info = lowest_type->release_info;
-        auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
-        // Now replace.
-        dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
-        dealloc_wrapper.add(type, tp_dealloc_orig);
-        type->tp_dealloc = dealloc_wrapper.get_wrapper();
-    }
 
     return self;
 }
