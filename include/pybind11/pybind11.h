@@ -1139,7 +1139,7 @@ public:
 
     typedef trampoline_interface_impl<type, has_trampoline> trampoline_interface;
 
-    static void release_to_cpp(detail::instance* inst, void* external_holder_raw, detail::HolderTypeId external_holder_type_id, object&& obj) {
+    static void release_to_cpp(detail::instance* inst, detail::holder_erased external_holder_raw, object&& obj) {
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();
@@ -1180,7 +1180,7 @@ public:
             }
         }
         holder_type& holder = v_h.holder<holder_type>();
-        holder_type& external_holder = *reinterpret_cast<holder_type*&>(external_holder_raw);
+        holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
         external_holder = std::move(holder);
         holder.~holder_type();
         v_h.set_holder_constructed(false);
@@ -1195,7 +1195,7 @@ public:
         }
     }
 
-    static object reclaim_from_cpp(detail::instance* inst, void* external_holder_raw, detail::HolderTypeId external_holder_type_id) {
+    static object reclaim_from_cpp(detail::instance* inst, detail::holder_erased external_holder_raw) {
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();
@@ -1214,7 +1214,7 @@ public:
             // TODO(eric.cousineau): Consider releasing a raw pointer, to make it easier for
             // interop with purely raw pointers? Nah, just rely on release.
             holder_type& holder = v_h.holder<holder_type>();
-            holder_type& external_holder = *reinterpret_cast<holder_type*&>(external_holder_raw);
+            holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
             new (&holder) holder_type(std::move(external_holder));
             v_h.set_holder_constructed(true);
 

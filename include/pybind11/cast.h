@@ -562,8 +562,7 @@ public:
                                          const detail::type_info *tinfo,
                                          void *(*copy_constructor)(const void *),
                                          void *(*move_constructor)(const void *),
-                                         const void *existing_holder = nullptr,
-                                         HolderTypeId existing_holder_type_id = HolderTypeId::Unknown) {
+                                         holder_erased existing_holder = {}) {
         if (!tinfo) // no type info: error will be set already
             return handle();
 
@@ -595,7 +594,7 @@ public:
                         if (!existing_holder) {
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
-                        return inst->reclaim_from_cpp(inst, const_cast<void*>(existing_holder), existing_holder_type_id).release();
+                        return inst->reclaim_from_cpp(inst, existing_holder).release();
                     } else {
                         return handle((PyObject *) it_i->second).inc_ref();
                     }
@@ -651,7 +650,8 @@ public:
                 throw cast_error("unhandled return_value_policy: should not happen!");
         }
 
-        tinfo->init_instance(wrapper, existing_holder);
+        // TODO(eric.cousineau): Propagate `holder_erased` through this chain.
+        tinfo->init_instance(wrapper, existing_holder.ptr());
 
         return inst.release();
     }
@@ -906,11 +906,11 @@ public:
             make_copy_constructor(src), make_move_constructor(src));
     }
 
-    static handle cast_holder(const itype *src, const void *holder, HolderTypeId holder_type_id) {
+    static handle cast_holder(const itype *src, holder_erased holder) {
         auto st = src_and_type(src);
         return type_caster_generic::cast(
             st.first, return_value_policy::take_ownership, {}, st.second,
-            nullptr, nullptr, holder, holder_type_id);
+            nullptr, nullptr, holder);
     }
 
     template <typename T> using cast_op_type = cast_op_type<T>;
@@ -1488,7 +1488,7 @@ public:
 
     static handle cast(const holder_type &src, return_value_policy, handle) {
         const auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, &src, holder_type_id);
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(&src));
     }
 
   // TODO(eric.cousineau): Define cast_op_type???
@@ -1573,7 +1573,7 @@ struct move_only_holder_caster : type_caster_base<type> {
         // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
         // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
         auto *ptr = holder_helper<holder_type>::get(std::move(src));
-        return type_caster_base<type>::cast_holder(ptr, nullptr, holder_type_id);
+        return type_caster_base<type>::cast_holder(ptr, holder_erased{});
     }
 
 //    void take_object(object&& obj) {

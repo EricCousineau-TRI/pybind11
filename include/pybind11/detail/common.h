@@ -394,6 +394,54 @@ struct get_holder_type_id<std::unique_ptr<T, Deleter>, void> {
     static constexpr HolderTypeId value = HolderTypeId::UniquePtr;
 };
 
+class holder_erased {
+ public:
+    holder_erased() = default;
+    holder_erased(const holder_erased&) = default;
+    holder_erased& operator=(const holder_erased&) = default;
+
+    template <typename holder_type>
+    holder_erased(const holder_type* holder)
+        : ptr_(const_cast<holder_type*>(holder)),
+          type_id_(get_holder_type_id<holder_type>::value),
+          is_const_(true) {}
+
+    template <typename holder_type>
+    holder_erased(holder_type* holder)
+        : holder_erased(static_cast<const holder_type*>(holder)) {
+          is_const_ = false;
+    }
+
+    void* ptr() const { return ptr_; }
+    HolderTypeId type_id() const { return type_id_; }
+
+    template <typename holder_type>
+    holder_type& mutable_cast() const {
+        if (is_const_)
+            throw std::runtime_error("Trying to mutate const reference?");
+        return do_cast<holder_type>();
+    }
+
+    template <typename holder_type>
+    const holder_type& cast() const {
+        return do_cast<holder_type>();
+    }
+
+    operator bool() const { return ptr_; }
+ private:
+    template <typename holder_type>
+    holder_type& do_cast() const {
+        if (type_id_ != get_holder_type_id<holder_type>::value) {
+            throw std::runtime_error("Mismatch on holder type.");
+        }
+        return *reinterpret_cast<holder_type*>(ptr_);
+    }
+
+    void* ptr_{};
+    HolderTypeId type_id_{HolderTypeId::Unknown};
+    bool is_const_{true};
+};
+
 // Forward declarations
 struct type_info;
 struct value_and_holder;
@@ -444,8 +492,8 @@ struct instance {
     /// If true, get_internals().patients has an entry for this object
     bool has_patients : 1;
 
-    typedef void (*release_to_cpp_t)(instance* inst, void* external_holder, HolderTypeId holder_type_id, object&& obj);
-    typedef object (*reclaim_from_cpp_t)(instance* inst, void* external_holder, HolderTypeId holder_type_id);
+    typedef void (*release_to_cpp_t)(instance* inst, holder_erased external_holder, object&& obj);
+    typedef object (*reclaim_from_cpp_t)(instance* inst, holder_erased external_holder);
 
     struct type_release_info_t {
         // Release an instance to C++ for pure C++ instances or Python-derived classes.
