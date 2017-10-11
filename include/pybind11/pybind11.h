@@ -1108,13 +1108,12 @@ public:
         record.init_instance = init_instance;
         record.dealloc = dealloc;
         record.default_holder = std::is_same<holder_type, std::unique_ptr<type>>::value;
-        if (record.default_holder) {
-            // TODO(eric.cousineau): Determine how to permit releasing without a trampoline...
-            auto& release_info = record.release_info;
-            release_info.can_derive_from_trampoline = has_trampoline;
-            release_info.release_to_cpp = release_to_cpp;
-            release_info.holder_type_id = holder_type_id;
-        }
+
+        // TODO(eric.cousineau): Determine if it is possible to permit releasing without a trampoline...
+        auto& release_info = record.release_info;
+        release_info.can_derive_from_trampoline = has_trampoline;
+        release_info.release_to_cpp = release_to_cpp;
+        release_info.holder_type_id = holder_type_id;
 
         set_operator_new<type>(&record);
 

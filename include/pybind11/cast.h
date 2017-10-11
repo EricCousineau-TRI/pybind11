@@ -574,9 +574,27 @@ public:
         for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
+                    instance* const inst = it_i->second;
+                    const bool take_ownership = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
+
                     bool try_to_reclaim = false;
-                    if (instance_type->release_info.holder_type_id == detail::HolderTypeId::UniquePtr) {
-                        try_to_reclaim = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
+                    switch (instance_type->release_info.holder_type_id) {
+                        case detail::HolderTypeId::UniquePtr: {
+                            try_to_reclaim = take_ownership;
+                            break;
+                        }
+                        case detail::HolderTypeId::SharedPtr: {
+                            if (take_ownership) {
+                                // Only try to reclaim the object if (a) it is not owned and (b) has no holder.
+                                if (!inst->simple_holder_constructed) {
+                                    if (inst->owned)
+                                        throw std::runtime_error("Internal error?");
+                                    std::cout << "Reclaiming shared_ptr\n";
+                                    try_to_reclaim = true;
+                                }
+                            }
+                            break;
+                        }
                     }
                     if (try_to_reclaim) {
                         // If this object has already been registered, but we wish to take ownership of it,
@@ -585,13 +603,14 @@ public:
                         // @note This code path should not be invoked for pure C++
                         // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
                         // See `move_only_holder_caster::load_value`.
-                        instance* inst = it_i->second;
                         if (!inst->reclaim_from_cpp) {
                             throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
                         }
                         // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
                         // Need to think of a desirable workflow - and if there is possible interop.
                         if (!existing_holder) {
+                            // TODO(eric.cousineau): Did I mess this up with #1139?
+                            // May want to conditionally pass the `unique_ptr<>`, now that `holder_erased` exists.
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
                         return inst->reclaim_from_cpp(inst, existing_holder).release();
@@ -1502,13 +1521,22 @@ protected:
 
     bool load_value(value_and_holder &&v_h, LoadType load_type) {
         holder_type& v_holder = v_h.holder<holder_type>();
+        bool do_release_to_cpp = false;
+        const type_info* lowest_type = nullptr;
         if (src.ref_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
             std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion." << std::endl;
+            // Go ahead and release ownership to C++, if able.
+            auto* py_type = (PyTypeObject*)src.get_type().ptr();
+            lowest_type = detail::get_type_info(py_type);
+            if (lowest_type->release_info.can_derive_from_trampoline) {
+                do_release_to_cpp = true;
+            }
         }
+
         if (v_h.holder_constructed()) {
             value = v_h.value_ptr();
+            // Don't need to worry about double-counting the shared_ptr stuff.
             holder = v_holder;
-            return true;
         } else {
             throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
 #if defined(NDEBUG)
@@ -1517,6 +1545,17 @@ protected:
                              "of type '" + type_id<holder_type>() + "''");
 #endif
         }
+
+        // Release *after* we already have
+        if (do_release_to_cpp) {
+            assert(v_h.inst->owned);
+            assert(lowest_type->release_info.release_to_cpp);
+            // Increase reference count to pass to release mechanism.
+            object obj = reinterpret_borrow<object>(src);
+            lowest_type->release_info.release_to_cpp(v_h.inst, &holder, std::move(obj));
+        }
+
+        return true;
     }
 
     template <typename T = holder_type, detail::enable_if_t<!std::is_constructible<T, const T &, type*>::value, int> = 0>
@@ -1702,7 +1741,7 @@ protected:
         auto& release_info = lowest_type->release_info;
         if (!release_info.release_to_cpp)
             throw std::runtime_error("No release mechanism in lowest type?");
-        release_info.release_to_cpp(v_h.inst, &holder, holder_type_id, std::move(obj_exclusive));
+        release_info.release_to_cpp(v_h.inst, &holder, std::move(obj_exclusive));
         return true;
     }
 
