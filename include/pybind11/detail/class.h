@@ -234,10 +234,32 @@ inline bool deregister_instance(instance *self, void *valptr, const type_info *t
 
 extern "C" inline void pybind11_object_dealloc(PyObject *self);
 
-
+template <typename T>
+class raii_restore {
+ public:
+    raii_restore(T* ptr, const T& tmp)
+        : ptr_(ptr),
+          original_(*ptr_) {
+        assert(ptr_);
+        *ptr_ = tmp;
+    }
+    raii_restore(raii_restore&& rhs)
+        : ptr_(rhs.ptr_),
+          original_(std::move(rhs.original_)) {
+        rhs.ptr_ = nullptr;
+    }
+    ~raii_restore() {
+        if (ptr_)
+            *ptr_ = original_;
+    }
+ private:
+    T* ptr_{};
+    T original_;
+};
 
 extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
     // This is for non-pybind11 object types...
+    detail::instance* inst = (detail::instance*)self;
     handle src(self);
     // Get closest pybind11 object type.
     const type_info *lowest_type = get_lowest_type(src);
@@ -246,14 +268,28 @@ extern "C" inline void non_pybind11_object_dealloc_wrapper(PyObject* self) {
     PyTypeObject *py_type = Py_TYPE(self);
     dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = dealloc_wrapper.get_orig(py_type);
     std::cout << "Using custom dealloc" << std::endl;
+
     // Temporarily shim in original destructor.
-    py_type->tp_dealloc = tp_dealloc_orig;
+    raii_restore<dealloc_wrapper_t::tp_dealloc_t> tp_dealloc_shim(
+        &py_type->tp_dealloc, tp_dealloc_orig);
     // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
     // we don't collide? Or does it matter???
     // If it's Python derived -> Python derived -> C++
-    tp_dealloc_orig(self);
-    // Restore - TODO: Exception-proof with RAII???
-    py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
+    auto v_h = inst->get_value_and_holder(lowest_type);
+    holder_erased holder(v_h.holder_ptr(), release_info.holder_type_id);
+    if (release_info.allow_destruct(inst, holder)) {
+        tp_dealloc_orig(self);
+    } else {
+        std::cout << "Skipping destruction" << std::endl;
+        // Attempt to reverse Py_Dealloc...
+        // Ensure that our ref count is now 1, before _Py_NewReference overwrites it.
+        assert(src.ref_count() == 1);
+        _Py_NewReference(self);
+        // TODO: Remove from `gc` set?
+        // PyObject_GC_UnTrack(obj.ptr());
+        // TODO: Issue is that __main__'s refcount != 0 when GC is running through...
+        // How to decrease that count?
+    }
 }
 
 /// Instance creation function for all pybind11 types. It allocates the internal instance layout for

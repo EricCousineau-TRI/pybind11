@@ -412,6 +412,16 @@ class holder_erased {
           is_const_ = false;
     }
 
+    holder_erased(const void* ptr, HolderTypeId type_id)
+        : ptr_(const_cast<void*>(ptr)),
+          type_id_(type_id),
+          is_const_(true) {}
+
+    holder_erased(void* ptr, HolderTypeId type_id)
+          : ptr_(ptr),
+            type_id_(type_id),
+            is_const_(false) {}
+
     void* ptr() const { return ptr_; }
     HolderTypeId type_id() const { return type_id_; }
 
@@ -522,7 +532,7 @@ struct instance {
 
     typedef void (*release_to_cpp_t)(instance* inst, holder_erased external_holder, object&& obj);
     typedef object (*reclaim_from_cpp_t)(instance* inst, holder_erased external_holder);
-    typedef bool (*check_destruct_t)(instance* inst);
+    typedef bool (*check_destruct_t)(instance* inst, holder_erased external_holder);
 
     struct type_release_info_t {
       // Release an instance to C++ for pure C++ instances or Python-derived classes.
@@ -540,7 +550,7 @@ struct instance {
 
       dealloc_wrapper_t dealloc_wrapper;
 
-      check_destruct_t check_destruct = nullptr;
+      check_destruct_t allow_destruct = nullptr;
     };
     /// If the instance is a Python-derived type that is owned in C++, then this method
     /// will permit the instance to be reclaimed back by Python.

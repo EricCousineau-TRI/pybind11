@@ -1063,7 +1063,7 @@ struct trampoline_interface_impl<type, false> {
 template <detail::HolderTypeId holder_type_id>
 struct holder_check_impl {
     template <typename holder_type>
-    static bool check_destruct(const detail::value_and_holder &v_h) {
+    static bool check_destruct(...) {
         // Noop by default.
         return true;
     }
@@ -1072,9 +1072,9 @@ struct holder_check_impl {
 template <>
 struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
     template <typename holder_type>
-    static bool check_destruct(const detail::value_and_holder &v_h) {
-        const holder_type& h = v_h.holder<holder_type>();
-        handle src((PyObject*)v_h.inst);
+    static bool check_destruct(detail::instance* inst, detail::holder_erased holder_raw) {
+        const holder_type& h = holder_raw.cast<holder_type>();
+        handle src((PyObject*)inst);
         const detail::type_info *lowest_type = get_lowest_type(src, false);
         if (!lowest_type)
             // We have multiple inheritance, skip.
@@ -1090,15 +1090,9 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                     std::cout << "Attempting to interrupt" << std::endl;
                     // Increase reference count
                     object obj = reinterpret_borrow<object>(src);
-                    // Attempt to reverse Py_Dealloc...
-                    _Py_NewReference(obj.ptr());
-                    // TODO: Remove from `gc` set?
-//                    PyObject_GC_UnTrack(obj.ptr());
-                    // TODO: Issue is that __main__'s refcount != 0 when GC is running through...
-                    // How to decrease that count?
                     // Release to C++.
                     holder_type* null_holder = nullptr;
-                    release_info.release_to_cpp(v_h.inst, detail::holder_erased(null_holder), std::move(obj));
+                    release_info.release_to_cpp(inst, detail::holder_erased(null_holder), std::move(obj));
                     return false;
                 }
             }
@@ -1160,7 +1154,7 @@ public:
         release_info.release_to_cpp = release_to_cpp;
         release_info.holder_type_id = holder_type_id;
         release_info.is_gc = is_gc;
-        release_info.check_destruct = allow_destruct;
+        release_info.allow_destruct = allow_destruct;
 
         set_operator_new<type>(&record);
 
@@ -1185,11 +1179,11 @@ public:
 
     typedef trampoline_interface_impl<type, has_trampoline> trampoline_interface;
 
-    static bool allow_destruct(detail::value_and_holder& v_h) {
+    static bool allow_destruct(detail::instance* inst, detail::holder_erased holder) {
         // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
         // C++ and Python, with it being owned by C++. Check this.
         using holder_check = holder_check_impl<holder_type_id>;
-        return holder_check::template check_destruct<holder_type>(v_h);
+        return holder_check::template check_destruct<holder_type>(inst, holder);
     }
 
     static void release_to_cpp(detail::instance* inst, detail::holder_erased external_holder_raw, object&& obj) {
