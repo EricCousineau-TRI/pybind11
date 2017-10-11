@@ -1181,7 +1181,7 @@ public:
         auto v_h = inst->get_value_and_holder();
         auto* tinfo = get_type_info();
         if (!inst->owned || !v_h.holder_constructed()) {
-            throw std::runtime_error("Python-extended C++ object should not be owned by pybind11");
+            throw std::runtime_error("Python-extended C++ object should be owned by pybind11 when attempting to release to C++");
         }
         LoadType load_type = determine_load_type(obj, tinfo);
         switch (load_type) {

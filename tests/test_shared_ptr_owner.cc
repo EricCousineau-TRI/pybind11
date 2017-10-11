@@ -121,7 +121,8 @@ class Child(m.A):
     m.A.debug_hook(self)
     print("Child.__del__")
   def value(self):
-    print("Child.value() (extra = {})".format(self.extra))
+    # TODO(eric.cousineau): Fix this...
+    print("Child.value()") # (extra = {})".format(self.extra))
     return 10 * m.A.value(self)
 )""");
 
