@@ -1320,10 +1320,11 @@ class trampoline : public Base {
 
   /// To be used by `move_only_holder_caster`.
   // TODO(eric.cousineau): Make this private to ensure contract?
-  void use_cpp_lifetime(object&& patient) {
+  void use_cpp_lifetime(object&& patient, detail::HolderTypeId holder_type_id) {
       if (lives_in_cpp()) {
           throw std::runtime_error("Instance already lives in C++");
       }
+      holder_type_id_ = holder_type_id;
       patient_ = std::move(patient);
       check("entering C++");
   }
@@ -1378,22 +1379,25 @@ class trampoline : public Base {
  private:
   bool lives_in_cpp() const {
       // NOTE: This is *false* if, for whatever reason, the trampoline class is
-      // constructed in C++... Meh.
+      // constructed in C++... Meh. Not gonna worry about that situation.
       return static_cast<bool>(patient_);
   }
 
   // Throw an error if this stuff is not unique.
   void check(const std::string& context, bool do_throw = true) {
-      if (patient_.ref_count() != 1) {
-          std::string msg = "When " + context + ", ref_count != 1";
-          if (do_throw)
-              throw std::runtime_error(msg);
-          else
-              std::cerr << "ERROR: " << msg << std::endl;
+      if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
+          if (patient_.ref_count() != 1) {
+              std::string msg = "When " + context + ", ref_count != 1";
+              if (do_throw)
+                  throw std::runtime_error(msg);
+              else
+                  std::cerr << "ERROR: " << msg << std::endl;
+          }
       }
   }
 
   object patient_;
+  detail::HolderTypeId holder_type_id_{detail::HolderTypeId::Unknown};
 };
 
 

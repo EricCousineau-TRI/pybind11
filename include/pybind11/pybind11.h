@@ -1019,7 +1019,7 @@ auto method_adaptor(Return (Class::*pmf)(Args...) const) -> Return (Derived::*)(
 
 template <typename type, bool compatible>
 struct trampoline_interface_impl {
-    static void use_cpp_lifetime(type* cppobj, object&& obj) {
+    static void use_cpp_lifetime(type* cppobj, object&& obj, detail::HolderTypeId holder_type_id) {
         auto* tr = dynamic_cast<trampoline<type>*>(cppobj);
         if (tr == nullptr) {
             // This has been invoked at too high of a level; should use a
@@ -1032,7 +1032,7 @@ struct trampoline_interface_impl {
         }
         // Let the external holder take ownership, but keep instance registered.
         handle h = obj;
-        tr->use_cpp_lifetime(std::move(obj));
+        tr->use_cpp_lifetime(std::move(obj), holder_type_id);
         assert(h.ref_count() == 1);
     }
 
@@ -1052,7 +1052,7 @@ struct trampoline_interface_impl {
 
 template <typename type>
 struct trampoline_interface_impl<type, false> {
-    static void use_cpp_lifetime(type*, object&&) {
+    static void use_cpp_lifetime(type*, object&&, detail::HolderTypeId) {
         // This should be captured by runtime flag.
         // TODO(eric.cousineau): Runtime flag may not be necessary.
         throw std::runtime_error("Internal error?");
@@ -1171,7 +1171,7 @@ public:
                         "pybind11::trampoline<>.");
                 }
                 auto* cppobj = reinterpret_cast<type*>(v_h.value_ptr());
-                trampoline_interface::use_cpp_lifetime(cppobj, std::move(obj));
+                trampoline_interface::use_cpp_lifetime(cppobj, std::move(obj), holder_type_id);
                 break;
             }
             default: {
