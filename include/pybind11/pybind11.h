@@ -1568,29 +1568,36 @@ private:
             handle h_type((PyObject*)py_type);
             handle old_dtor = getattr(h_type, "__del__", none());
             const std::string flag = "__has_pybind_del";
-            if (getattr(self, flag, false).cast<bool>()) {
+            if (getattr(self, flag.c_str(), pybind11::cast(false)).cast<bool>()) {
                 std::cout << "Already has override set" << std::endl;
                 throw std::runtime_error("Not implemented");
             }
-            std::function<void()> new_dtor = [self, inst, old_dtor]() {
+            holder_type& holder = v_h.holder<holder_type>();
+            // The holder will not change address during the lifetime of this object,
+            // as it will always live in the instance (for `simple_holder` types).
+            holder_erased holder_raw(&holder);
+            std::function<void()> new_dtor = [self, inst, old_dtor, holder_raw]() {
+                // This should be called when the item is *actually* being deleted
+                // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
+                assert(self.ref_count() == 0);
                 // Purposely do NOT capture `object` to refcount low.
-                if (allow_destruct(inst, holder)) {
+                if (allow_destruct(inst, holder_raw)) {
                     // Call the old destructor.
                     old_dtor(self);
                 } else {
-                    // ... This should have been kept alive???
+                    // This should have been kept alive.
+                    assert(self.ref_count() == 1);
                 }
             };
             // Replace with an instance-bound method... Will this cause problems?
-            object new_dtor_py = cast(new_dtor);
+            object new_dtor_py = pybind11::cast(new_dtor);
             setattr(self, "__del__", new_dtor_py);
-            setattr(self, flag, true);
+            setattr(self, flag.c_str(), pybind11::cast(true));
 //            // Now replace.
 //            dealloc_wrapper.set_wrapper(pybind11_object_dealloc_derived_wrapper);
 //            dealloc_wrapper.add(py_type, tp_dealloc_orig);
 //            py_type->tp_dealloc = dealloc_wrapper.get_wrapper();
-
-
+            std::cout << "Replacing dtor with pybind11 dtor" << std::endl;
         }
     }
 
