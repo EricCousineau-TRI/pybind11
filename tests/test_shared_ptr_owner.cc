@@ -141,9 +141,16 @@ print("Attempt to reassign class-level __del__")
 del_orig = Child.__del__
 def del_new(self):
     print("wrapped!")
+    print(del_orig)
     del_orig(self)
 Child.__del__ = del_new  # This works if we override `py_type->tp_del`?
 print("Done")
+
+print("One more time")
+obj = Child(10)
+obj.__del__ = lambda: del_new(obj)
+print("Done again")
+del obj
 )""");
 
 //  py::exec(R"""(
