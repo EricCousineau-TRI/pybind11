@@ -261,6 +261,13 @@ void pybind11_revive_object(PyObject* self) {
     // Attempt to reverse _Py_Dealloc.
     // Ensure that our ref count is now 1, before _Py_NewReference overwrites it.
     // This way, we don't magically lose (or gain) references.
+    // @see Python 2.7 Source Code, `typeobject.c`, `slot_tp_del(...)`,
+    // comment regarding "__del__ resurrected it".
+
+    // It'd be nice to just override __del__ itself, but because `pybind11` makes
+    // this a read-only __slot__, we must use this hackery.
+
+    // TODO(eric.cousineau): Consider enabling __del__ to be writeable, if possible.
     assert(Py_REFCNT(self) == 1);
     _Py_NewReference(self);
 }
@@ -305,6 +312,48 @@ extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
         tp_dealloc_orig(self);
     } else {
         std::cout << "Skipping destruction" << std::endl;
+        pybind11_revive_object(self);
+    }
+    dealloc_wrapper.unmark_destructing(self);
+}
+
+// Destructor for Python subclasses that derive from Pybind11 classes.
+extern "C" inline void pybind11_object_del_derived_wrapper(PyObject *self) {
+    // This is for non-pybind11 object types...
+    detail::instance* inst = (detail::instance*)self;
+    handle src(self);
+    // Get closest pybind11 object type.
+    const type_info *lowest_type = get_lowest_type(src);
+    auto& release_info = lowest_type->release_info;
+    auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
+    if (dealloc_wrapper.is_destructing(self)) {
+        std::cout << "Superfluous call to custom __del__" << std::endl;
+        return;
+    }
+    dealloc_wrapper.mark_destructing(self);
+    PyTypeObject *py_type = Py_TYPE(self);
+    dealloc_wrapper_t::tp_dealloc_t tp_del_orig = dealloc_wrapper.get_orig(py_type);
+    std::cout << "Using custom __del__" << std::endl;
+
+    // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
+    // we don't collide? Or does it matter???
+    // If it's Python derived -> Python derived -> C++
+
+    // Alternative: Looks like `type->tp_del` has some things that can def ref count...
+
+    // TODO(eric.cousineau): Alternative: Hook into object's `__del__`? But how to stop execution?
+
+    auto v_h = inst->get_value_and_holder(lowest_type);
+    holder_erased holder(v_h.holder_ptr(), release_info.holder_type_id);
+
+    // This should be called when the item is *actually* being deleted
+    // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
+    assert(Py_REFCNT(self) == 0);
+    if (release_info.allow_destruct(inst, holder)) {
+        tp_del_orig(self);
+    } else {
+        std::cout << "Ressurect object" << std::endl;
+        assert(Py_REFCNT(self) == 1);
         pybind11_revive_object(self);
     }
     dealloc_wrapper.unmark_destructing(self);

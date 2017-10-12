@@ -129,14 +129,16 @@ class Child(ChildParent):
   def __init__(self, value):
     ChildParent.__init__(self, value)
     self.sub_extra = [value * 3]
-#  def __del__(self):
-#    self.debug_hook()
+  def __del__(self):
+    print("Sub-Child.__del__")
+    ChildParent.__del__(self)
+    self.debug_hook()
   def value(self):
     print("Sub-Child.value() (sub_extra = {})".format(self.sub_extra))
     return 10 * ChildParent.value(self)
 
-print("Attempt to reassign class-level __del__")
-Child.__del__ = lambda: 2
+# print("Attempt to reassign class-level __del__")
+# Child.__del__ = lambda: 2  # This works if we override `py_type->tp_del`?
 
 )""");
 

@@ -471,7 +471,7 @@ struct dealloc_wrapper_t {
       mapping_[tp] = orig;
   }
   tp_dealloc_t get_orig(type_t tp) const {
-      assert(tp->tp_dealloc == wrapper_);
+      assert(tp->tp_del == wrapper_);
       return mapping_.at(tp);
   }
   tp_dealloc_t get_wrapper() const {
