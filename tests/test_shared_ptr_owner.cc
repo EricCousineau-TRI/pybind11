@@ -143,7 +143,7 @@ def del_new(self):
     print("wrapped!")
     del_orig(self)
 Child.__del__ = del_new  # This works if we override `py_type->tp_del`?
-
+print("Done")
 )""");
 
 //  py::exec(R"""(
