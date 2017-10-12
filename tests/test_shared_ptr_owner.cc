@@ -137,8 +137,12 @@ class Child(ChildParent):
     print("Sub-Child.value() (sub_extra = {})".format(self.sub_extra))
     return 10 * ChildParent.value(self)
 
-# print("Attempt to reassign class-level __del__")
-# Child.__del__ = lambda: 2  # This works if we override `py_type->tp_del`?
+print("Attempt to reassign class-level __del__")
+del_orig = Child.__del__
+def del_new(self):
+    print("wrapped!")
+    del_orig(self)
+Child.__del__ = del_new  # This works if we override `py_type->tp_del`?
 
 )""");
 
