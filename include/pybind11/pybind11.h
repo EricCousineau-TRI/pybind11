@@ -1192,11 +1192,21 @@ public:
         detail::instance* inst = (detail::instance*)self.ptr();
         const detail::type_info *lowest_type = detail::get_lowest_type(self);
         auto& release_info = lowest_type->release_info;
-        assert(self.ref_count() == 0);
+        // The references are as follows:
+        //   1. When Python calls __del__ via tp_del (default slot)
+        //   2. When Python gets the instance-bound __del__ method.
+        // TODO(eric.cousineau): Confirm this ^
+        //   3. When pybind11 gets the argument
+        int orig_count = self.ref_count();
+        assert(orig_count == 3);
         std::cout << "Using custom __del__" << std::endl;
 
         auto v_h = inst->get_value_and_holder(lowest_type);
         detail::holder_erased holder_raw(v_h.holder_ptr(), release_info.holder_type_id);
+
+        // TODO(eric.cousineau): Ensure that this does not prevent destruction if
+        // the Python interpreter is finalizing...
+        // Is there a way to do this without a custom handler?
 
         // Purposely do NOT capture `object` to refcount low.
         // TODO(eric.cousineau): `allow_destruct` should be registered in `type_info`.
@@ -1205,8 +1215,8 @@ public:
             // Call the old destructor.
             del_orig(self);
         } else {
-            // This should have been kept alive.
-            assert(self.ref_count() == 1);
+            // This should have been kept alive by an increment in number of references.
+            assert(self.ref_count() == orig_count + 1);
         }
     }
 
@@ -1616,7 +1626,7 @@ private:
                   del_wrapped(h_self, del_orig);
                 };
                 // Replace with an Python-instance-unbound function.
-                object new_dtor_py = cpp_function(del_new);
+                object new_dtor_py = cpp_function(del_new, is_method(h_type));
                 setattr(h_type, "__del__", new_dtor_py);
                 setattr(h_type, flag.c_str(), pybind11::cast(true));
 
