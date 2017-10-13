@@ -600,6 +600,10 @@ public:
                             }
                             break;
                         }
+                        default: {
+                            // Otherwise, do not try any reclaiming.
+                            break;
+                        }
                     }
                     if (try_to_reclaim) {
                         // If this object has already been registered, but we wish to take ownership of it,
@@ -1471,7 +1475,7 @@ struct holder_helper {
     static auto get(const T &p) -> decltype(p.get()) { return p.get(); }
 };
 
-const detail::type_info* get_lowest_type(handle src, bool do_throw = true) {
+inline const detail::type_info* get_lowest_type(handle src, bool do_throw = true) {
     auto* py_type = (PyTypeObject*)src.get_type().ptr();
     return detail::get_type_info(py_type, do_throw);
 }

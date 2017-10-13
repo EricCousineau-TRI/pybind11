@@ -49,6 +49,9 @@
 
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 
+template <typename... Args>
+void unused(Args&&...) {}
+
 /// Wraps an arbitrary C++ function/method/lambda function/.. into a callable Python object
 class cpp_function : public function {
 public:
@@ -1074,6 +1077,7 @@ struct holder_check_impl {
     template <typename holder_type>
     static bool attempt_holder_transfer(holder_type& holder, detail::holder_erased external_holder_raw) {
         // Only called when holder types are different.
+        unused(holder, external_holder_raw);
         throw std::runtime_error("Unable to transfer between holders of different types");
     }
 };
@@ -1138,9 +1142,6 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
           }
       }
 };
-
-template <typename... Args>
-void unused(Args&&...) {}
 
 template <typename type_, typename... options>
 class class_ : public detail::generic_type {
