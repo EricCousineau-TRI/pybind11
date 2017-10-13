@@ -614,8 +614,6 @@ public:
                         // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
                         // Need to think of a desirable workflow - and if there is possible interop.
                         if (!existing_holder) {
-                            // TODO(eric.cousineau): Did I mess this up with #1139?
-                            // May want to conditionally pass the `unique_ptr<>`, now that `holder_erased` exists.
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
                         return inst->reclaim_from_cpp(inst, existing_holder).release();
@@ -1471,12 +1469,6 @@ template <typename... Ts> class type_caster<std::tuple<Ts...>>
 template <typename T>
 struct holder_helper {
     static auto get(const T &p) -> decltype(p.get()) { return p.get(); }
-
-    // Specialize move-only holder semantics to address #1138.
-    template <typename U = T>
-    static auto get(T &&p, enable_if_t<!is_copy_constructible<U>::value>* = nullptr) -> decltype(p.get()) {
-      return p.release();
-    }
 };
 
 const detail::type_info* get_lowest_type(handle src, bool do_throw = true) {

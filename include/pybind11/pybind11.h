@@ -1060,7 +1060,7 @@ struct wrapper_interface_impl<type, false> {
     }
 };
 
-template <detail::HolderTypeId holder_type_id>
+template <detail::HolderTypeId holder_type_id = detail::HolderTypeId::Unknown>
 struct holder_check_impl {
     template <typename holder_type>
     static bool check_destruct(...) {
@@ -1079,7 +1079,7 @@ struct holder_check_impl {
 };
 
 template <>
-struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
+struct holder_check_impl<detail::HolderTypeId::SharedPtr> : public holder_check_impl<detail::HolderTypeId::Unknown> {
     template <typename holder_type>
     static bool check_destruct(detail::instance* inst, detail::holder_erased holder_raw) {
         const holder_type& h = holder_raw.cast<holder_type>();
@@ -1119,15 +1119,19 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
         else
             return true;
     }
+};
 
+
+template <>
+struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_impl<detail::HolderTypeId::Unknown> {
       template <typename holder_type>
       static bool attempt_holder_transfer(holder_type& holder, detail::holder_erased external_holder_raw) {
-          // Only accept unique_ptr from `external_holder_raw`.
-          if (external_holder_raw.type_id() == detail::HolderTypeId::UniquePtr) {
-              using T = decltype(*holder.get());
-              auto& external_holder = external_holder_raw.cast<std::unique_ptr<T>>();
-              // Transfer.
-              holder = std::move(external_holder);
+          // Only accept shared_ptr from `external_holder_raw`.
+          if (external_holder_raw.type_id() == detail::HolderTypeId::SharedPtr) {
+              using T = typename holder_type::element_type;
+              auto& external_holder = external_holder_raw.mutable_cast<std::shared_ptr<T>>();
+              // Transfer to external.
+              external_holder = std::move(holder);
               return true;
           } else {
               return false;
@@ -1306,7 +1310,7 @@ public:
                 external_holder = std::move(holder);
             } else {
                 // Only allow unique_ptr<> -> shared_ptr<>
-                holder_check::attempt_holder_transfer(external_holder_raw, &holder);
+                holder_check::attempt_holder_transfer(holder, external_holder_raw);
             }
         }
         holder.~holder_type();
