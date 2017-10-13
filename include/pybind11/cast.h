@@ -1618,8 +1618,8 @@ struct move_only_holder_caster : type_caster_base<type> {
         // Move `src` so that `holder_helper<>::get()` can call `release` if need be.
         // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
         // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
-        auto *ptr = holder_helper<holder_type>::get(std::move(src));
-        return type_caster_base<type>::cast_holder(ptr, holder_erased{});
+        auto *ptr = holder_helper<holder_type>::get(src);
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(&src));
     }
 
   // Disable these?

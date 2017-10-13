@@ -1071,6 +1071,11 @@ struct holder_check_impl {
     static bool allow_null_external_holder(const holder_type&) {
         return false;
     }
+    template <typename holder_type>
+    static bool attempt_holder_transfer(holder_type& holder, detail::holder_erased external_holder_raw) {
+        // Only called when holder types are different.
+        throw std::runtime_error("Unable to transfer between holders of different types");
+    }
 };
 
 template <>
@@ -1114,6 +1119,11 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
         else
             return true;
     }
+
+      template <typename holder_type>
+      static bool attempt_holder_transfer(holder_type& holder, detail::holder_erased external_holder_raw) {
+          throw std::runtime_error("Not implemented");
+      }
 };
 
 template <typename type_, typename... options>
@@ -1282,8 +1292,13 @@ public:
                 throw std::runtime_error("Internal error: Null external holder");
         }
         if (transfer_holder) {
-            holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
-            external_holder = std::move(holder);
+            if (external_holder_raw.type_id() == holder_type_id) {
+                holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
+                external_holder = std::move(holder);
+            } else {
+                // Only allow unique_ptr<> -> shared_ptr<>
+                holder_check::attempt_holder_transfer(external_holder_raw, &holder);
+            }
         }
         holder.~holder_type();
         v_h.set_holder_constructed(false);
