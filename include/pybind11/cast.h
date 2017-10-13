@@ -1639,18 +1639,16 @@ struct move_only_holder_caster : type_caster_base<type> {
     }
 
   // Disable these?
-  explicit operator type*() { return this->value; }
-  explicit operator type&() { return *(this->value); }
+//  explicit operator type*() { return this->value; }
+//  explicit operator type&() { return *(this->value); }
 
-  explicit operator holder_type*() { return &holder; }
+//  explicit operator holder_type*() { return &holder; }
 
-  // Workaround for Intel compiler bug
-  // see pybind11 issue 94
-  #if defined(__ICC) || defined(__INTEL_COMPILER)
-  operator holder_type&() { return holder; }
-  #else
-  explicit operator holder_type&() { return holder; }
-  #endif
+  // Force rvalue.
+  template <typename T>
+  using cast_op_type = holder_type&&;
+
+  explicit operator holder_type&&() { return std::move(holder); }
 
     object extract_from_container(handle src) {
         // See if this is a supported `move` container.
@@ -2152,7 +2150,7 @@ private:
 
     template <typename Return, typename Func, size_t... Is, typename Guard>
     Return call_impl(Func &&f, index_sequence<Is...>, Guard &&) {
-        return std::forward<Func>(f)(std::forward<Args>(cast_op<Args>(std::move(std::get<Is>(argcasters))))...);
+        return std::forward<Func>(f)(cast_op<Args>(std::move(std::get<Is>(argcasters)))...);
     }
 
     std::tuple<make_caster<Args>...> argcasters;
