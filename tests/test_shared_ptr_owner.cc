@@ -137,6 +137,7 @@ class Child(ChildParent):
     print("Sub-Child.value() (sub_extra = {})".format(self.sub_extra))
     return 10 * ChildParent.value(self)
 
+"""
 print("Attempt to reassign class-level __del__")
 del_orig = Child.__del__
 def del_new(self):
@@ -151,6 +152,7 @@ obj = Child(10)
 obj.__del__ = lambda: del_new(obj)
 print("Done again")
 del obj
+"""
 )""");
 
 //  py::exec(R"""(
@@ -190,6 +192,7 @@ out = c.add(Child(20))
 print("-- Python value 1 --")
 print(out.value())
 del out
+print("Get list")
 li = c.release_list()
 print("-- Python value 2 --")
 print(li[0].value())

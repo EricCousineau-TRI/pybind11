@@ -1186,6 +1186,30 @@ public:
         return holder_check::template check_destruct<holder_type>(inst, holder);
     }
 
+    static void del_wrapped(handle self, object del_orig) {
+        // This should be called when the item is *actually* being deleted
+        // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
+        detail::instance* inst = (detail::instance*)self.ptr();
+        const detail::type_info *lowest_type = detail::get_lowest_type(self);
+        auto& release_info = lowest_type->release_info;
+        assert(self.ref_count() == 0);
+        std::cout << "Using custom __del__" << std::endl;
+
+        auto v_h = inst->get_value_and_holder(lowest_type);
+        detail::holder_erased holder_raw(v_h.holder_ptr(), release_info.holder_type_id);
+
+        // Purposely do NOT capture `object` to refcount low.
+        // TODO(eric.cousineau): `allow_destruct` should be registered in `type_info`.
+        // Right now, this doesn't really type-erase anything...
+        if (allow_destruct(inst, holder_raw)) {
+            // Call the old destructor.
+            del_orig(self);
+        } else {
+            // This should have been kept alive.
+            assert(self.ref_count() == 1);
+        }
+    }
+
     static void release_to_cpp(detail::instance* inst, detail::holder_erased external_holder_raw, object&& obj) {
         using detail::LoadType;
         auto v_h = inst->get_value_and_holder();
@@ -1563,51 +1587,44 @@ private:
 
             // TODO(eric.cousineau): Consider moving this outside of this class,
             // to potentially enable multiple inheritance.
-            bool has_pybind11_del_override = tp_del_orig == tp_del_wrapper;
+
+            handle h_type((PyObject*)py_type);
+//            bool has_pybind11_del_override = tp_del_orig == tp_del_wrapper;
+            bool has_pybind11_del_override = false;
+            const std::string flag = "__has_pybind_del";
+            if (getattr(h_type, flag.c_str(), pybind11::cast(false)).cast<bool>()) {
+                has_pybind11_del_override = true;
+                std::cout << "Already has override set" << std::endl;
+            }
 
             if (!has_pybind11_del_override) {
                 const type_info *lowest_type = get_lowest_type(self);
                 auto& release_info = lowest_type->release_info;
                 auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
-//
-//                // Get non-instance-bound method (analogous `tp_del`)
-//                // TODO(eric.cousineau): Would instance-bound method make a needless cyclic reference?
-//                // Is there a way to check if `__del__` is an assigned method? (Rather than a class method?)
-//                handle h_type((PyObject*)py_type);
-//                handle old_dtor = getattr(h_type, "__del__", none());
-//                const std::string flag = "__has_pybind_del";
-//                if (getattr(self, flag.c_str(), pybind11::cast(false)).cast<bool>()) {
-//                    std::cout << "Already has override set" << std::endl;
-//                    throw std::runtime_error("Not implemented");
-//                }
-//                holder_type& holder = v_h.holder<holder_type>();
-//                // The holder will not change address during the lifetime of this object,
-//                // as it will always live in the instance (for `simple_holder` types).
-//                holder_erased holder_raw(&holder);
-//                std::function<void()> new_dtor = [self, inst, old_dtor, holder_raw]() {
-//                    // This should be called when the item is *actually* being deleted
-//                    // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
-//                    assert(self.ref_count() == 0);
-//                    // Purposely do NOT capture `object` to refcount low.
-//                    if (allow_destruct(inst, holder_raw)) {
-//                        // Call the old destructor.
-//                        old_dtor(self);
-//                    } else {
-//                        // This should have been kept alive.
-//                        assert(self.ref_count() == 1);
-//                    }
-//                };
-//                // Replace with an instance-bound method... Will this cause problems?
-//                object new_dtor_py = pybind11::cast(new_dtor);
-//                setattr(self, "__del__", new_dtor_py);
-//                setattr(self, flag.c_str(), pybind11::cast(true));
-//                }
 
-                // Now replace.
-                dealloc_wrapper.set_wrapper(tp_del_wrapper);
-                // TODO(eric.cousineau): Could `tp_del` ever be NULL?
-                dealloc_wrapper.add(py_type, tp_del_orig);
-                py_type->tp_del = dealloc_wrapper.get_wrapper();
+                // Get non-instance-bound method (analogous `tp_del`)
+                // TODO(eric.cousineau): Would instance-bound method make a needless cyclic reference?
+                // Is there a way to check if `__del__` is an assigned method? (Rather than a class method?)
+                object del_orig = getattr(h_type, "__del__", none());
+                holder_type& holder = v_h.holder<holder_type>();
+                // The holder will not change address during the lifetime of this object,
+                // as it will always live in the instance (for `simple_holder` types).
+                holder_erased holder_raw(&holder);
+                // NOTE: This is NOT tied to this particular type.
+                auto del_new = [del_orig](handle h_self) {
+                  // TODO(eric.cousineau): Make this global, not tied to this type.
+                  del_wrapped(h_self, del_orig);
+                };
+                // Replace with an Python-instance-unbound function.
+                object new_dtor_py = cpp_function(del_new);
+                setattr(h_type, "__del__", new_dtor_py);
+                setattr(h_type, flag.c_str(), pybind11::cast(true));
+
+//                // Now replace.
+//                dealloc_wrapper.set_wrapper(tp_del_wrapper);
+//                // TODO(eric.cousineau): Could `tp_del` ever be NULL?
+//                dealloc_wrapper.add(py_type, tp_del_orig);
+//                py_type->tp_del = dealloc_wrapper.get_wrapper();
                 std::cout << "Replacing dtor with pybind11 dtor" << std::endl;
             } else {
                 std::cout << "Already has custom del" << std::endl;
