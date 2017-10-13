@@ -67,7 +67,7 @@ shared_ptr<A> check_creation(py::function py_factory, bool do_copy) {
 
 class PyA : public py::wrapper<A> {
  public:
-  using py::wrapper<A>::trampoline;
+  using py::wrapper<A>::wrapper;
   ~PyA() {
     cout << "PyA::~PyA()" << endl;
   }

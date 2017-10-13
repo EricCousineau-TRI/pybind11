@@ -1569,6 +1569,7 @@ private:
     /// optional pointer to an existing holder to use; if not specified and the instance is
     /// `.owned`, a new holder will be constructed to manage the value pointer.
     static void init_instance(detail::instance *inst, const void *holder_ptr) {
+        using namespace detail;
         auto v_h = inst->get_value_and_holder(detail::get_type_info(typeid(type)));
         if (!v_h.instance_registered()) {
             register_instance(inst, v_h.value_ptr(), v_h.type);
@@ -1581,7 +1582,7 @@ private:
         PyTypeObject *py_type = Py_TYPE(self.ptr());
 
         // Use hacky Python-style inheritance check.
-        bool is_py_derived = py_type->tp_dealloc != pybind11_object_dealloc;
+        bool is_py_derived = py_type->tp_dealloc != detail::pybind11_object_dealloc;
         // Check tp_dealloc
         if (is_py_derived) {
             std::cout << "Have non-pybind11 type" << std::endl;
@@ -1600,7 +1601,6 @@ private:
             if (!has_pybind11_del_override) {
                 const type_info *lowest_type = get_lowest_type(self);
                 auto& release_info = lowest_type->release_info;
-                auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
 
                 // Get non-instance-bound method (analogous `tp_del`)
                 // TODO(eric.cousineau): Would instance-bound method make a needless cyclic reference?
