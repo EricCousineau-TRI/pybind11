@@ -1632,33 +1632,26 @@ private:
 
             handle h_type((PyObject*)py_type);
             bool has_pybind11_del_override = false;
-            const std::string flag = "__has_pybind_del";
-            if (getattr(h_type, flag.c_str(), pybind11::cast(false)).cast<bool>()) {
-                has_pybind11_del_override = true;
-                std::cout << "Already has override set" << std::endl;
-            }
-
-            if (!has_pybind11_del_override) {
-                const type_info *lowest_type = get_lowest_type(self);
-                auto& release_info = lowest_type->release_info;
-
+            const std::string orig_field = "_pybind11_del_orig";
+            object del_orig = getattr(h_type, orig_field.c_str(), none());
+            if (!del_orig) {
                 // Get non-instance-bound method (analogous `tp_del`)
-                // TODO(eric.cousineau): Would instance-bound method make a needless cyclic reference?
-                // Is there a way to check if `__del__` is an assigned method? (Rather than a class method?)
-                object del_orig = getattr(h_type, "__del__", none());
+                // Is there a way to check if `__del__` is an instance-assigned method? (Rather than a class method?)
+                del_orig = getattr(h_type, "__del__", none());
                 holder_type& holder = v_h.holder<holder_type>();
                 // The holder will not change address during the lifetime of this object,
                 // as it will always live in the instance (for `simple_holder` types).
                 holder_erased holder_raw(&holder);
                 // NOTE: This is NOT tied to this particular type.
-                auto del_new = [del_orig](handle h_self) {
+                auto del_new = [orig_field](handle h_self) {
                   // TODO(eric.cousineau): Make this global, not tied to this type.
+                  object del_orig = getattr(h_self, orig_field.c_str());
                   del_wrapped(h_self, del_orig);
                 };
                 // Replace with an Python-instance-unbound function.
                 object new_dtor_py = cpp_function(del_new, is_method(h_type));
                 setattr(h_type, "__del__", new_dtor_py);
-                setattr(h_type, flag.c_str(), pybind11::cast(true));
+                setattr(h_type, orig_field.c_str(), del_orig);
                 std::cout << "Replacing dtor with pybind11 dtor" << std::endl;
             } else {
                 std::cout << "Already has custom del" << std::endl;
