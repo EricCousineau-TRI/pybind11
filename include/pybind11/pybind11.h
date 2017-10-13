@@ -1619,19 +1619,18 @@ private:
 
         // TODO(eric.cousineau): Inject override of __del__ for intercepting C++ stuff
         handle self((PyObject*)inst);
-        PyTypeObject *py_type = Py_TYPE(self.ptr());
+        handle h_type = self.get_type();
 
         // Use hacky Python-style inheritance check.
+        PyTypeObject *py_type = (PyTypeObject*)h_type.ptr();
         bool is_py_derived = py_type->tp_dealloc != detail::pybind11_object_dealloc;
+
         // Check tp_dealloc
         if (is_py_derived) {
             std::cout << "Have non-pybind11 type" << std::endl;
 
             // TODO(eric.cousineau): Consider moving this outside of this class,
             // to potentially enable multiple inheritance.
-
-            handle h_type((PyObject*)py_type);
-            bool has_pybind11_del_override = false;
             const std::string orig_field = "_pybind11_del_orig";
             object del_orig = getattr(h_type, orig_field.c_str(), none());
             if (!del_orig) {
