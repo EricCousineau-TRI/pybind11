@@ -1122,7 +1122,16 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
 
       template <typename holder_type>
       static bool attempt_holder_transfer(holder_type& holder, detail::holder_erased external_holder_raw) {
-          throw std::runtime_error("Not implemented");
+          // Only accept unique_ptr from `external_holder_raw`.
+          if (external_holder_raw.type_id() == detail::HolderTypeId::UniquePtr) {
+              using T = decltype(*holder.get());
+              auto& external_holder = external_holder_raw.cast<std::unique_ptr<T>>();
+              // Transfer.
+              holder = std::move(external_holder);
+              return true;
+          } else {
+              return false;
+          }
       }
 };
 
