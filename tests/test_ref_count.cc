@@ -46,7 +46,7 @@ py::handle check(py::handle py_in) {
 }
 
 PYBIND11_MODULE(_move, m) {
-  // Make sure this also still works with non-virtual, non-trampoline types.
+  // Make sure this also still works with non-virtual, non-wrapper types.
   py::class_<SimpleType>(m, "SimpleType")
       .def(py::init<int>())
       .def("value", &SimpleType::value);

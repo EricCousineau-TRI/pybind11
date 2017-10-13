@@ -557,10 +557,10 @@ struct instance {
       // Release an instance to C++ for pure C++ instances or Python-derived classes.
       release_to_cpp_t release_to_cpp = nullptr;
 
-      // For classes wrapped in `trampoline<>`. See `move_only_holder_caster` for more info.
+      // For classes wrapped in `wrapper<>`. See `move_only_holder_caster` for more info.
       // Pure / direct C++ objects do not need any fancy releasing mechanisms. They are simply
       // unwrapped and passed back.
-      bool can_derive_from_trampoline = false;
+      bool can_derive_from_wrapper = false;
 
       // The holder that is contained by this class.
       HolderTypeId holder_type_id = HolderTypeId::Unknown;

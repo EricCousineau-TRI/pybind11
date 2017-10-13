@@ -74,9 +74,9 @@ def test_override(capture, msg):
 
 
 def test_alias_delay_initialization1(capture):
-    """`A` only initializes its trampoline class when we inherit from it
+    """`A` only initializes its wrapper class when we inherit from it
 
-    If we just create and use an A instance directly, the trampoline initialization is
+    If we just create and use an A instance directly, the wrapper initialization is
     bypassed and we only initialize an A() instead (for performance reasons).
     """
     class B(m.A):
@@ -112,7 +112,7 @@ def test_alias_delay_initialization2(capture):
     """`A2`, unlike the above, is configured to always initialize the alias
 
     While the extra initialization and extra class layer has small virtual dispatch
-    performance penalty, it also allows us to do more things with the trampoline
+    performance penalty, it also allows us to do more things with the wrapper
     class such as defining local variables and performing construction/destruction.
     """
     class B2(m.A2):

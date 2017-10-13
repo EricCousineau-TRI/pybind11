@@ -1307,14 +1307,14 @@ inline iterator iter(handle obj) {
 /// If the object lives purely in C++, then there should only be one reference to
 /// this data.
 template <typename Base>
-class trampoline : public Base {
+class wrapper : public Base {
  protected:
     using Base::Base;
 
  public:
   // TODO(eric.cousineau): Complain if this is not virtual? (and remove `virtual` specifier in dtor?)
 
-  virtual ~trampoline() {
+  virtual ~wrapper() {
       delete_py_if_in_cpp();
   }
 
@@ -1343,15 +1343,15 @@ class trampoline : public Base {
   }
 
  protected:
-    /// Call this if, for whatever reason, your C++ trampoline class `Base` has a non-trivial
+    /// Call this if, for whatever reason, your C++ wrapper class `Base` has a non-trivial
     /// destructor that needs to keep information available to the Python-extended class.
-    /// In this case, you want to delete the Python object *before* you do any work in your trampoline class.
+    /// In this case, you want to delete the Python object *before* you do any work in your wrapper class.
     ///
-    /// As an example, say you have `Base`, and `PyBase` is your trampoline class which extends `trampoline<Base>`.
+    /// As an example, say you have `Base`, and `PyBase` is your wrapper class which extends `wrapper<Base>`.
     /// By default, if the instance is owned in C++ and deleted, then the destructor order will be:
     ///    ~PyBase()
     ///       do_stuff()
-    ///    ~trampoline<Base>()
+    ///    ~wrapper<Base>()
     ///       delete_py_if_in_cpp()
     ///           PyChild.__del__ - ERROR: Should have been called before `do_stuff()
     ///    ~Base()
@@ -1360,7 +1360,7 @@ class trampoline : public Base {
     ///       delete_py_if_in_cpp()
     ///           PyChild.__del__ - GOOD: Workzzz. Called before `do_stuff()`.
     ///       do_stuff()
-    ///    ~trampoline<Base>()
+    ///    ~wrapper<Base>()
     ///       delete_py_if_in_cpp() - No-op. Python object has been released.
     ///    ~Base()
     // TODO(eric.cousineau): Verify this with an example workflow.
@@ -1378,7 +1378,7 @@ class trampoline : public Base {
 
  private:
   bool lives_in_cpp() const {
-      // NOTE: This is *false* if, for whatever reason, the trampoline class is
+      // NOTE: This is *false* if, for whatever reason, the wrapper class is
       // constructed in C++... Meh. Not gonna worry about that situation.
       return static_cast<bool>(patient_);
   }

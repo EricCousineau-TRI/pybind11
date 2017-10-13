@@ -1018,24 +1018,24 @@ auto method_adaptor(Return (Class::*pmf)(Args...) const) -> Return (Derived::*)(
 
 
 template <typename type, bool compatible>
-struct trampoline_interface_impl {
+struct wrapper_interface_impl {
     static void use_cpp_lifetime(type* cppobj, object&& obj, detail::HolderTypeId holder_type_id) {
-        auto* tr = dynamic_cast<trampoline<type>*>(cppobj);
+        auto* tr = dynamic_cast<wrapper<type>*>(cppobj);
         if (tr == nullptr) {
             // This has been invoked at too high of a level; should use a
             // downcast class's `release_to_cpp` mechanism (if it supports it).
             throw std::runtime_error(
-                "Attempting to release to C++ using pybind11::trampoline<> "
+                "Attempting to release to C++ using pybind11::wrapper<> "
                 "at too high of a level. Use a class type lower in the hierarchy, such that "
                 "the Python-derived instance actually is part of the lineage of "
-                "pybind11::trampoline<downcast_type>");
+                "pybind11::wrapper<downcast_type>");
         }
         // Let the external holder take ownership, but keep instance registered.
         tr->use_cpp_lifetime(std::move(obj), holder_type_id);
     }
 
     static object release_cpp_lifetime(type* cppobj) {
-        auto* tr = dynamic_cast<trampoline<type>*>(cppobj);
+        auto* tr = dynamic_cast<wrapper<type>*>(cppobj);
         if (tr == nullptr) {
             // This shouldn't happen here...
             throw std::runtime_error("Internal error?");
@@ -1043,13 +1043,13 @@ struct trampoline_interface_impl {
         // Return newly created object.
         return tr->release_cpp_lifetime();
     }
-    static trampoline<type>* run(type* value, std::false_type) {
+    static wrapper<type>* run(type* value, std::false_type) {
         return nullptr;
     }
 };
 
 template <typename type>
-struct trampoline_interface_impl<type, false> {
+struct wrapper_interface_impl<type, false> {
     static void use_cpp_lifetime(type*, object&&, detail::HolderTypeId) {
         // This should be captured by runtime flag.
         // TODO(eric.cousineau): Runtime flag may not be necessary.
@@ -1086,7 +1086,7 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
                 std::cout << "SharedPtr holder has use_count() > 1 on destruction for a Python-derived class." << std::endl;
                 // Increase reference count
                 const auto& release_info = lowest_type->release_info;
-                if (release_info.can_derive_from_trampoline) {
+                if (release_info.can_derive_from_wrapper) {
                     std::cout << "Attempting to interrupt" << std::endl;
                     // Increase reference count
                     object obj = reinterpret_borrow<object>(src);
@@ -1114,7 +1114,7 @@ public:
     using type = type_;
     using type_alias = detail::exactly_one_t<is_subtype, void, options...>;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
-    constexpr static bool has_trampoline = std::is_base_of<trampoline<type>, type_alias>::value;
+    constexpr static bool has_wrapper = std::is_base_of<wrapper<type>, type_alias>::value;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
     constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 
@@ -1148,9 +1148,9 @@ public:
         record.dealloc = dealloc;
         record.default_holder = std::is_same<holder_type, std::unique_ptr<type>>::value;
 
-        // TODO(eric.cousineau): Determine if it is possible to permit releasing without a trampoline...
+        // TODO(eric.cousineau): Determine if it is possible to permit releasing without a wrapper...
         auto& release_info = record.release_info;
-        release_info.can_derive_from_trampoline = has_trampoline;
+        release_info.can_derive_from_wrapper = has_wrapper;
         release_info.release_to_cpp = release_to_cpp;
         release_info.holder_type_id = holder_type_id;
         release_info.is_gc = is_gc;
@@ -1177,7 +1177,7 @@ public:
         return detail::get_type_info(id);
     }
 
-    typedef trampoline_interface_impl<type, has_trampoline> trampoline_interface;
+    typedef wrapper_interface_impl<type, has_wrapper> wrapper_interface;
 
     static bool allow_destruct(detail::instance* inst, detail::holder_erased holder) {
         // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
@@ -1234,7 +1234,7 @@ public:
                 // then the registered instance for this object should be destroyed, and this
                 // should become a pure C++ object, without any ties to `pybind11`.
                 // Also, even if this instance is of a class derived from a Base that has a
-                // trampoline-wrapper alias, we do not need to worry about not being in the correct
+                // wrapper-wrapper alias, we do not need to worry about not being in the correct
                 // hierarchy, since we will simply release from it.
 
                 // TODO(eric.cousineau): Presently, there is no support for a consistent use of weak references.
@@ -1245,15 +1245,15 @@ public:
                 break;
             }
             case LoadType::DerivedCppSinglePySingle: {
-                if (!tinfo->release_info.can_derive_from_trampoline) {
+                if (!tinfo->release_info.can_derive_from_wrapper) {
                     throw std::runtime_error(
-                        "Python-extended C++ class does not inherit from pybind11::trampoline<>, "
+                        "Python-extended C++ class does not inherit from pybind11::wrapper<>, "
                         "so lifetime cannot be attached to a C++ representation of the objection. "
                         "To fix this, ensure registered type has an alias which extends "
-                        "pybind11::trampoline<>.");
+                        "pybind11::wrapper<>.");
                 }
                 auto* cppobj = reinterpret_cast<type*>(v_h.value_ptr());
-                trampoline_interface::use_cpp_lifetime(cppobj, std::move(obj), holder_type_id);
+                wrapper_interface::use_cpp_lifetime(cppobj, std::move(obj), holder_type_id);
                 break;
             }
             default: {
@@ -1277,7 +1277,7 @@ public:
         holder.~holder_type();
         v_h.set_holder_constructed(false);
         inst->owned = false;
-        // Register this type's reclamation procedure, since it's trampoline may have the contained object.
+        // Register this type's reclamation procedure, since it's wrapper may have the contained object.
         inst->reclaim_from_cpp = reclaim_from_cpp;
 
         handle h = obj;
@@ -1325,7 +1325,7 @@ public:
             }
             case LoadType::DerivedCppSinglePySingle: {
                 auto* cppobj = reinterpret_cast<type*>(v_h.value_ptr());
-                obj = trampoline_interface::release_cpp_lifetime(cppobj);
+                obj = wrapper_interface::release_cpp_lifetime(cppobj);
                 break;
             }
             default: {

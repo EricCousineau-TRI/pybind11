@@ -73,13 +73,13 @@ class ChildB : public Base {
   }
 };
 
-// TODO(eric.cousineau): Add converter for `is_base<T, trampoline<T>>`, only for
+// TODO(eric.cousineau): Add converter for `is_base<T, wrapper<T>>`, only for
 // `cast` (C++ to Python) to handle swapping lifetime control.
 
 // Trampoline class.
-class PyBase : public py::trampoline<Base> {
+class PyBase : public py::wrapper<Base> {
  public:
-  typedef py::trampoline<Base> TBase;
+  typedef py::wrapper<Base> TBase;
   using TBase::TBase;
   ~PyBase() {
     cout << "PyBase::~PyBase()" << endl;
@@ -88,9 +88,9 @@ class PyBase : public py::trampoline<Base> {
     PYBIND11_OVERLOAD(int, Base, value);
   }
 };
-class PyChild : public py::trampoline<Child> {
+class PyChild : public py::wrapper<Child> {
  public:
-  typedef py::trampoline<Child> Base;
+  typedef py::wrapper<Child> Base;
   using Base::Base;
   ~PyChild() {
     cout << "PyChild::~PyChild()" << endl;
@@ -99,9 +99,9 @@ class PyChild : public py::trampoline<Child> {
     PYBIND11_OVERLOAD(int, Child, value);
   }
 };
-class PyChildB : public py::trampoline<ChildB> {
+class PyChildB : public py::wrapper<ChildB> {
  public:
-  typedef py::trampoline<ChildB> Base;
+  typedef py::wrapper<ChildB> Base;
   using Base::Base;
   ~PyChildB() {
     cout << "PyChildB::~PyChildB()" << endl;
@@ -116,7 +116,7 @@ unique_ptr<Base> check_creation(py::function create_obj) {
 //  Base* in_test = py::cast<Base*>(obj);
   // Base a terminal pointer.
   // NOTE: This yields a different destructor order.
-  // However, the trampoline class destructors should NOT interfere with nominal
+  // However, the wrapper class destructors should NOT interfere with nominal
   // Python destruction.
   cout << "---\n";
   unique_ptr<Base> fin = py::cast<unique_ptr<Base>>(create_obj());
@@ -221,7 +221,7 @@ PYBIND11_MODULE(_move, m) {
   class SharedClass {};
   py::class_<SharedClass, shared_ptr<SharedClass>>(m, "SharedClass");
 
-  // Make sure this also still works with non-virtual, non-trampoline types.
+  // Make sure this also still works with non-virtual, non-wrapper types.
   py::class_<SimpleType>(m, "SimpleType")
       .def(py::init<int>())
       .def("value", &SimpleType::value);
