@@ -1139,6 +1139,9 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
       }
 };
 
+template <typename... Args>
+void unused(Args&&...) {}
+
 template <typename type_, typename... options>
 class class_ : public detail::generic_type {
     template <typename T> using is_holder = detail::is_holder_type<type_, T>;
@@ -1234,6 +1237,7 @@ public:
         // TODO(eric.cousineau): Confirm this ^
         //   3. When pybind11 gets the argument
         int orig_count = self.ref_count();
+        unused(orig_count);  // Suppress release build warnings.
         assert(orig_count == 3);
         std::cout << "Using custom __del__" << std::endl;
 
