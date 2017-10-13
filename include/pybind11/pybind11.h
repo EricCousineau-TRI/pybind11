@@ -1067,6 +1067,10 @@ struct holder_check_impl {
         // Noop by default.
         return true;
     }
+    template <typename holder_type>
+    static bool allow_null_external_holder(const holder_type&) {
+        return false;
+    }
 };
 
 template <>
@@ -1098,6 +1102,17 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> {
             }
         }
         return true;
+    }
+
+    template <typename holder_type>
+    static bool allow_null_external_holder(const holder_type& holder) {
+        // Called by `release_to_cpp`.
+        if (holder.use_count() == 1)
+            // TODO(eric.cousineau): This may not hold true if we pass temporaries???
+            // Or if we've copied a `holder` in copyable_holder_caster...
+            throw std::runtime_error("Internal error: Should have non-null shared_ptr<> external_holder if use_count() == 1");
+        else
+            return true;
     }
 };
 
@@ -1176,11 +1191,11 @@ public:
     }
 
     typedef wrapper_interface_impl<type, has_wrapper> wrapper_interface;
+    using holder_check = holder_check_impl<holder_type_id>;
 
     static bool allow_destruct(detail::instance* inst, detail::holder_erased holder) {
         // TODO(eric.cousineau): There should not be a case where shared_ptr<> lives in
         // C++ and Python, with it being owned by C++. Check this.
-        using holder_check = holder_check_impl<holder_type_id>;
         return holder_check::template check_destruct<holder_type>(inst, holder);
     }
 
@@ -1258,15 +1273,13 @@ public:
                 throw std::runtime_error("Unsupported load type (multiple inheritance)");
             }
         }
-        bool permit_null_holder = external_holder_raw.type_id() == detail::HolderTypeId::SharedPtr;
         bool transfer_holder = true;
         holder_type& holder = v_h.holder<holder_type>();
-        if (permit_null_holder && !external_holder_raw.ptr()) {
-            if (holder.use_count() == 1)
-                // TODO(eric.cousineau): This may not hold true if we pass temporaries???
-                // Or if we've copied a `holder` in copyable_holder_caster...
-                throw std::runtime_error("Internal error: Should have non-null external_holder if use_count() == 1");
-            transfer_holder = false;
+        if (!external_holder_raw.ptr()) {
+            if (holder_check::allow_null_external_holder(holder))
+                transfer_holder = false;
+            else
+                throw std::runtime_error("Internal error: Null external holder");
         }
         if (transfer_holder) {
             holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
@@ -1277,12 +1290,6 @@ public:
         inst->owned = false;
         // Register this type's reclamation procedure, since it's wrapper may have the contained object.
         inst->reclaim_from_cpp = reclaim_from_cpp;
-
-        handle h = obj;
-        if (obj) {
-            // Narrow scope of remaining object.
-            object obj_kill = std::move(obj);
-        }
     }
 
     static object reclaim_from_cpp(detail::instance* inst, detail::holder_erased external_holder_raw) {
