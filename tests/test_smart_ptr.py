@@ -96,7 +96,7 @@ def test_smart_ptr(capture):
     assert cstats.alive() == 0
     assert cstats.values() == ['from pointer'] * 10
     assert cstats.default_constructions == 30
-    assert cstats.copy_constructions == 12
+    assert cstats.copy_constructions == 2
     # assert cstats.move_constructions >= 0 # Doesn't invoke any
     assert cstats.copy_assignments == 30
     assert cstats.move_assignments == 0
