@@ -575,34 +575,39 @@ public:
         if (src == nullptr)
             return none().release();
 
+        const bool take_ownership = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
+        // We only come across `!existing_holder` if we are coming from `cast` and not `cast_holder`.
+        const bool is_bare_ptr = !existing_holder.ptr() && existing_holder.type_id() == HolderTypeId::Unknown;
+
         auto it_instances = get_internals().registered_instances.equal_range(src);
         for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
                     instance* const inst = it_i->second;
-                    const bool take_ownership = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
 
                     bool try_to_reclaim = false;
-                    switch (instance_type->release_info.holder_type_id) {
-                        case detail::HolderTypeId::UniquePtr: {
-                            try_to_reclaim = take_ownership;
-                            break;
-                        }
-                        case detail::HolderTypeId::SharedPtr: {
-                            if (take_ownership) {
-                                // Only try to reclaim the object if (a) it is not owned and (b) has no holder.
-                                if (!inst->simple_holder_constructed) {
-                                    if (inst->owned)
-                                        throw std::runtime_error("Internal error?");
-//                                    std::cout << "Reclaiming shared_ptr\n";
-                                    try_to_reclaim = true;
-                                }
+                    if (!is_bare_ptr) {
+                        switch (instance_type->release_info.holder_type_id) {
+                            case detail::HolderTypeId::UniquePtr: {
+                                try_to_reclaim = take_ownership;
+                                break;
                             }
-                            break;
-                        }
-                        default: {
-                            // Otherwise, do not try any reclaiming.
-                            break;
+                            case detail::HolderTypeId::SharedPtr: {
+                                if (take_ownership) {
+                                    // Only try to reclaim the object if (a) it is not owned and (b) has no holder.
+                                    if (!inst->simple_holder_constructed) {
+                                        if (inst->owned)
+                                            throw std::runtime_error("Internal error?");
+    //                                    std::cout << "Reclaiming shared_ptr\n";
+                                        try_to_reclaim = true;
+                                    }
+                                }
+                                break;
+                            }
+                            default: {
+                                // Otherwise, do not try any reclaiming.
+                                break;
+                            }
                         }
                     }
                     if (try_to_reclaim) {
@@ -610,18 +615,25 @@ public:
                         // then use the `has_cpp_release` mechanisms to reclaim ownership.
                         // @note This should be the sole occurrence of this registered object when releasing back.
                         // @note This code path should not be invoked for pure C++
-                        // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
-                        // See `move_only_holder_caster::load_value`.
-                        if (!inst->reclaim_from_cpp) {
-                            throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
-                        }
+
                         // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
                         // Need to think of a desirable workflow - and if there is possible interop.
                         if (!existing_holder) {
                             throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
                         }
+                        // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
+                        // See `move_only_holder_caster::load_value`.
+                        if (!inst->reclaim_from_cpp) {
+                            if (!existing_holder) {
+                                std::cout << "No holder" << std::endl;
+                            }
+                            throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
+                        }
                         return inst->reclaim_from_cpp(inst, existing_holder).release();
                     } else {
+                        // TODO(eric.cousineau): Should really check that ownership is consistent.
+                        // e.g. if we say to take ownership of a pointer that is passed, does not have a holder...
+                        // In the end, pybind11 would let ownership slip, and leak memory, possibly violating RAII (if someone is using that...)
                         return handle((PyObject *) it_i->second).inc_ref();
                     }
                 }
@@ -934,6 +946,9 @@ public:
 
     static handle cast_holder(const itype *src, holder_erased holder) {
         auto st = src_and_type(src);
+        if (!holder) {
+            throw std::runtime_error("Internal error: Should not have null holder");
+        }
         return type_caster_generic::cast(
             st.first, return_value_policy::take_ownership, {}, st.second,
             nullptr, nullptr, holder);
