@@ -30,7 +30,7 @@ public:
 
     // Returning a reference/pointer to a type converted from python (numbers, strings, etc.) is a
     // bit trickier, because the actual int& or std::string& or whatever only exists temporarily, so
-    // we have to handle it specially in the wrapper class (see below).
+    // we have to handle it specially in the trampoline class (see below).
     virtual const std::string &get_string1() { return str1; }
     virtual const std::string *get_string2() { return &str2; }
 
@@ -293,7 +293,7 @@ TEST_SUBMODULE(virtual_functions, m) {
 
 
 // Inheriting virtual methods.  We do two versions here: the repeat-everything version and the
-// templated wrapper versions mentioned in docs/advanced.rst.
+// templated trampoline versions mentioned in docs/advanced.rst.
 //
 // These base classes are exactly the same, but we technically need distinct
 // classes for this example code because we need to be able to bind them
@@ -344,7 +344,7 @@ class C_Tpl : public B_Tpl { C_METHODS };
 class D_Tpl : public C_Tpl { D_METHODS };
 
 
-// Inheritance approach 1: each wrapper gets every virtual method (11 in total)
+// Inheritance approach 1: each trampoline gets every virtual method (11 in total)
 class PyA_Repeat : public A_Repeat {
 public:
     using A_Repeat::A_Repeat;
@@ -373,13 +373,13 @@ public:
     double lucky_number() override { PYBIND11_OVERLOAD(double, D_Repeat, lucky_number, ); }
 };
 
-// Inheritance approach 2: templated wrapper classes.
+// Inheritance approach 2: templated trampoline classes.
 //
 // Advantages:
 // - we have only 2 (template) class and 4 method declarations (one per virtual method, plus one for
 //   any override of a pure virtual method), versus 4 classes and 6 methods (MI) or 4 classes and 11
 //   methods (repeat).
-// - Compared to MI, we also don't have to change the non-wrapper inheritance to virtual, and can
+// - Compared to MI, we also don't have to change the non-trampoline inheritance to virtual, and can
 //   properly inherit constructors.
 //
 // Disadvantage:
@@ -402,7 +402,7 @@ public:
     double lucky_number() override { PYBIND11_OVERLOAD(double, Base, lucky_number, ); }
 };
 // Since C_Tpl and D_Tpl don't declare any new virtual methods, we don't actually need these (we can
-// use PyB_Tpl<C_Tpl> and PyB_Tpl<D_Tpl> for the wrapper classes instead):
+// use PyB_Tpl<C_Tpl> and PyB_Tpl<D_Tpl> for the trampoline classes instead):
 /*
 template <class Base = C_Tpl> class PyC_Tpl : public PyB_Tpl<Base> {
 public:

@@ -1601,9 +1601,6 @@ protected:
 template <typename T>
 class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::shared_ptr<T>> { };
 
-// In `class.h`
-inline bool deregister_instance(instance *self, void *valptr, const type_info *tinfo);
-
 template <typename type, typename holder_type>
 struct move_only_holder_caster : type_caster_base<type> {
         using base = type_caster_base<type>;
@@ -1613,12 +1610,6 @@ struct move_only_holder_caster : type_caster_base<type> {
     using base::cast;
     using base::typeinfo;
     using base::value;
-
-//    ~move_only_holder_caster() {
-//        if (obj_exclusive) {
-//            std::cout << "Internal error: Caster has not released ownership?\n";
-//        }
-//    }
 
     static_assert(std::is_base_of<type_caster_base<type>, type_caster<type>>::value,
             "Holder classes are only supported for custom types");
@@ -1630,12 +1621,6 @@ struct move_only_holder_caster : type_caster_base<type> {
         auto *ptr = holder_helper<holder_type>::get(std::move(src));
         return type_caster_base<type>::cast_holder(ptr, holder_erased{});
     }
-
-//    void take_object(object&& obj) {
-//        if (obj_exclusive)
-//            throw std::runtime_error("Internal error - already have object");
-//        obj_exclusive = std::move(obj);
-//    }
 
   // Disable these?
   explicit operator type*() { return this->value; }
@@ -1701,12 +1686,6 @@ struct move_only_holder_caster : type_caster_base<type> {
     static PYBIND11_DESCR name() { return type_caster_base<type>::name(); }
 
 protected:
-//    object obj_exclusive;
-
-//    object&& release_object() {
-//        return std::move(obj_exclusive);
-//    }
-
     friend class type_caster_generic;
     void check_holder_compat() {
         if (!typeinfo->default_holder)
@@ -1761,37 +1740,7 @@ protected:
         return true;
     }
 
-//    template <typename T = holder_type>
-//    bool try_implicit_casts(handle src, bool convert) {
-//        return false;
-//    }
-//
-//    bool try_direct_conversions(handle src) {
-//        // Attempt for upcasting.
-//        // TODO(eric.cousineau): Determine if there is a way to prevent copies from being generated?
-//        // direct_conversions?
-//        const bool convert = true;  // For use with `load_impl`.
-//        for (auto &cast : typeinfo->implicit_casts) {
-//            move_only_holder_caster sub_caster(*cast.first);
-//            // Tentatively surrender access to `obj_exclusive`.
-//            sub_caster.take_object(release_object());
-//            if (sub_caster.load(src, convert)) {
-//                value = cast.second(sub_caster.value);
-//                holder.reset(dynamic_cast<type*>(sub_caster.holder.release()));
-//                if (holder == nullptr) {
-//                    throw std::runtime_error("Internal error");
-//                }
-//                return true;
-//            } else {
-//                // Give me back my object!
-//                take_object(sub_caster.release_object());
-//            }
-//        }
-//        return false;
-//    }
-
     holder_type holder;
-    constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 };
 
 template <typename type, typename deleter>
@@ -1945,45 +1894,6 @@ object cast(const T &value, return_value_policy policy = return_value_policy::au
 template <typename T> T handle::cast() const { return pybind11::cast<T>(*this); }
 template <> inline void handle::cast() const { return; }
 
-
-
-// TODO(eric.cousineau): Organize better later.
-
-// Allow dispatching to a different mechanism that allows the caster to have explicit control
-// over the object (for reference-count control) rather than the handle.
-
-template <typename T>
-std::true_type is_unique_ptr(const std::unique_ptr<T>&);
-std::false_type is_unique_ptr(...);
-
-template <typename... Args>
-void unused(Args&&...) {}
-
-template <typename T>
-void do_prepare_caster(detail::make_caster<T>& conv, object&& obj, std::true_type) {
-    unused(conv, obj);
-    // Multiple options complicate the interface.
-//    conv.take_object(std::move(obj));
-}
-
-template <typename T>
-void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::true_type) {
-    unused(conv, h);
-//    std::cout << "Stealing reference!" << std::endl;
-//    object obj = reinterpret_steal<object>(h);
-//    // Caster (move_only_holder_caster) will check that this is a unique reference.
-//    do_prepare_caster<T>(conv, std::move(obj), std::true_type{});
-}
-
-template <typename T>
-void do_prepare_caster(detail::make_caster<T>& conv, handle h, std::false_type) {
-    unused(conv, h);
-}
-
-
-
-
-
 template <typename T>
 detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
     if (obj.ref_count() > 1)
@@ -1996,17 +1906,8 @@ detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
 #endif
 
     // Move into a temporary and return that, because the reference may be a local value of `conv`
-    detail::make_caster<T> conv;
-    handle h = obj;
-    // If we have a unique ptr,
-    using is_unique_ptr_t = decltype(is_unique_ptr(std::declval<T>()));
-    do_prepare_caster<T>(conv, std::move(obj), is_unique_ptr_t{});
-    // Load up the type.
-    detail::load_type<T>(conv, h);
-    // Convert to desired type.
-    return std::move(conv.operator T&());
-//    T ret = std::move(detail::load_type<T>(obj).operator T&());
-//    return ret;
+    T ret = std::move(detail::load_type<T>(obj).operator T&());
+    return ret;
 }
 
 // Calling cast() on an rvalue calls pybind::cast with the object rvalue, which does:
@@ -2051,7 +1952,7 @@ template <typename T> enable_if_t<!cast_is_temporary_value_reference<T>::value, 
     pybind11_fail("Internal error: cast_ref fallback invoked"); }
 
 // Trampoline use: Having a pybind11::cast with an invalid reference type is going to static_assert, even
-// though if it's in dead code, so we provide a "wrapper" to pybind11::cast that only does anything in
+// though if it's in dead code, so we provide a "trampoline" to pybind11::cast that only does anything in
 // cases where pybind11::cast is valid.
 template <typename T> enable_if_t<!cast_is_temporary_value_reference<T>::value, T> cast_safe(object &&o) {
     return pybind11::cast<T>(std::move(o)); }
@@ -2064,7 +1965,6 @@ NAMESPACE_END(detail)
 template <return_value_policy policy = return_value_policy::automatic_reference,
           typename... Args> tuple make_tuple(Args&&... args_) {
     constexpr size_t size = sizeof...(Args);
-    // TODO(eric.cousineau): Is there a way to propagate stealing, if possible?
     std::array<object, size> args {
         { reinterpret_steal<object>(detail::make_caster<Args>::cast(
             std::forward<Args>(args_), policy, nullptr))... }
@@ -2186,14 +2086,6 @@ struct function_call {
 };
 
 
-template <typename T>
-bool do_caster_load(make_caster<T>& caster, handle arg, bool convert) {
-    using is_unique_ptr_t = decltype(is_unique_ptr(std::declval<T>()));
-    do_prepare_caster<T>(caster, arg, is_unique_ptr_t{});
-    return caster.load(arg, convert);
-}
-
-
 /// Helper class which loads arguments for C++ functions called from Python
 template <typename... Args>
 class argument_loader {
@@ -2236,14 +2128,7 @@ private:
 
     template <size_t... Is>
     bool load_impl_sequence(function_call &call, index_sequence<Is...>) {
-        // TODO(eric.cousineau): Based on the argcaster, need to ensure we can pass `take_ownership`.
-        // But the argument - how do we still `obj` from the argument???
-
-        // TODO(eric.cousineau): Is there a way to access a cpp_function's original reference count?
-        // Set the tuple from `simple_converter`?
-
-//        for (bool r : {std::get<Is>(argcasters).load(call.args[Is], call.args_convert[Is])...})
-        for (bool r : {do_caster_load<Args>(std::get<Is>(argcasters), call.args[Is], call.args_convert[Is])...})
+        for (bool r : {std::get<Is>(argcasters).load(call.args[Is], call.args_convert[Is])...})
             if (!r)
                 return false;
         return true;

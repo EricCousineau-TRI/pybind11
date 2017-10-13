@@ -1153,8 +1153,6 @@ public:
         release_info.can_derive_from_wrapper = has_wrapper;
         release_info.release_to_cpp = release_to_cpp;
         release_info.holder_type_id = holder_type_id;
-        release_info.is_gc = is_gc;
-        release_info.allow_destruct = allow_destruct;
 
         set_operator_new<type>(&record);
 
@@ -1582,24 +1580,16 @@ private:
         handle self((PyObject*)inst);
         PyTypeObject *py_type = Py_TYPE(self.ptr());
 
-        using namespace detail;
-        dealloc_wrapper_t::tp_dealloc_t tp_del_orig = py_type->tp_del;
-        dealloc_wrapper_t::tp_dealloc_t tp_del_wrapper = pybind11_object_del_derived_wrapper;
-
         // Use hacky Python-style inheritance check.
         bool is_py_derived = py_type->tp_dealloc != pybind11_object_dealloc;
         // Check tp_dealloc
         if (is_py_derived) {
             std::cout << "Have non-pybind11 type" << std::endl;
-            if (!py_type->tp_del) {
-                std::cout << "Has empty __del__ slot" << std::endl;
-            }
 
             // TODO(eric.cousineau): Consider moving this outside of this class,
             // to potentially enable multiple inheritance.
 
             handle h_type((PyObject*)py_type);
-//            bool has_pybind11_del_override = tp_del_orig == tp_del_wrapper;
             bool has_pybind11_del_override = false;
             const std::string flag = "__has_pybind_del";
             if (getattr(h_type, flag.c_str(), pybind11::cast(false)).cast<bool>()) {
@@ -1629,12 +1619,6 @@ private:
                 object new_dtor_py = cpp_function(del_new, is_method(h_type));
                 setattr(h_type, "__del__", new_dtor_py);
                 setattr(h_type, flag.c_str(), pybind11::cast(true));
-
-//                // Now replace.
-//                dealloc_wrapper.set_wrapper(tp_del_wrapper);
-//                // TODO(eric.cousineau): Could `tp_del` ever be NULL?
-//                dealloc_wrapper.add(py_type, tp_del_orig);
-//                py_type->tp_del = dealloc_wrapper.get_wrapper();
                 std::cout << "Replacing dtor with pybind11 dtor" << std::endl;
             } else {
                 std::cout << "Already has custom del" << std::endl;
@@ -1642,42 +1626,16 @@ private:
         }
     }
 
-    static int is_gc_default(PyObject *self) {
-        // See `PyObject_IS_GC(...)` - assuming `PY_TYPE(o)->tp_is_gc == NULL`
-        return PyType_IS_GC(Py_TYPE(self));
-    }
-
-    static int is_gc(detail::instance *inst) {
-        // Should this not have been destroyed??? Won't this be invalid access???
-        if (inst->reclaim_from_cpp) {
-            std::cout << "Skipping GC since this is owned by C++" << std::endl;
-            return 0;
-        } else {
-            PyObject *self = (PyObject*)inst;
-            return is_gc_default(self);
-        }
-    }
-
     /// Deallocates an instance; via holder, if constructed; otherwise via operator delete.
-    static bool dealloc(detail::value_and_holder &v_h) {
-        // TODO(eric.cousineau): If this is a shared_ptr<>, ths instance is owned, and
-        // use_count() > 1, then that means we have a separate living C++ instance...
-        // ... Is there anyway to interrupt a Python object's destruction?
-        // ... If not, then a new Python instance should be made, and ownership should be
-        // claimed in that mechanism, if possible...
-
+    static void dealloc(detail::value_and_holder &v_h) {
         if (v_h.holder_constructed()) {
             v_h.holder<holder_type>().~holder_type();
             v_h.set_holder_constructed(false);
         }
         else {
-            // TODO(eric.cousineau): Not destructing a PureCpp or owned DerivedPySingleCppSingle
-            // is handled by setting `inst->owned` to false, bypassing this destructor.
-            // Consider reviving / making `py_owned_in_cpp` if need be.
             detail::call_operator_delete(v_h.value_ptr<type>(), v_h.type->type_size);
         }
         v_h.value_ptr() = nullptr;
-        return true;
     }
 
     static detail::function_record *get_function_record(handle h) {
@@ -1686,7 +1644,6 @@ private:
                  : nullptr;
     }
 };
-
 
 /// Binds an existing constructor taking arguments Args...
 template <typename... Args> detail::initimpl::constructor<Args...> init() { return {}; }

@@ -224,7 +224,7 @@ struct type_record {
     void (*init_instance)(instance *, const void *) = nullptr;
 
     /// Function pointer to class_<..>::dealloc
-    bool (*dealloc)(detail::value_and_holder &) = nullptr;
+    void (*dealloc)(detail::value_and_holder &) = nullptr;
 
     /// See `type_info::has_cpp_release`.
     instance::type_release_info_t release_info;

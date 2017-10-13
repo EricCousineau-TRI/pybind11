@@ -456,63 +456,16 @@ class holder_erased {
 struct type_info;
 struct value_and_holder;
 
-struct dealloc_wrapper_t {
-  typedef PyTypeObject *type_t;
-  typedef void (*tp_dealloc_t)(PyObject*);
-  typedef PyObject *obj_t;
-
-  void set_wrapper(tp_dealloc_t wrapper) {
-      wrapper_ = wrapper;
-  }
-  void add(type_t tp, tp_dealloc_t orig) {
-      assert(wrapper_);
-      assert(orig != wrapper_);
-      assert(mapping_.find(tp) == mapping_.end());
-      mapping_[tp] = orig;
-  }
-  tp_dealloc_t get_orig(type_t tp) const {
-      assert(tp->tp_del == wrapper_);
-      return mapping_.at(tp);
-  }
-  tp_dealloc_t get_wrapper() const {
-      assert(wrapper_);
-      return wrapper_;
-  }
-
-  void mark_destructing(obj_t op) {
-      assert(!is_destructing(op));
-      destructing_[op] = true;
-  }
-
-  void unmark_destructing(obj_t op) {
-      destructing_.at(op) = false;
-  }
-
-  bool is_destructing(obj_t op) {
-      auto iter = destructing_.find(op);
-      if (iter == destructing_.end())
-          return false;
-      else
-          return iter->second;
-  }
-
- private:
-  // PyTypeObject*  ->  original tp_dealloc_t
-  std::unordered_map<type_t, tp_dealloc_t> mapping_;
-  std::unordered_map<obj_t, bool> destructing_;
-  tp_dealloc_t wrapper_{nullptr};
-};
-
 /// The 'instance' type which needs to be standard layout (need to be able to use 'offsetof')
 struct instance {
     PyObject_HEAD
     /// Storage for pointers and holder; see simple_layout, below, for a description
     union {
-      void *simple_value_holder[1 + instance_simple_holder_in_ptrs()];
-      struct {
-        void **values_and_holders;
-        uint8_t *status;
-      } nonsimple;
+        void *simple_value_holder[1 + instance_simple_holder_in_ptrs()];
+        struct {
+            void **values_and_holders;
+            uint8_t *status;
+        } nonsimple;
     };
     /// Weak references (needed for keep alive):
     PyObject *weakrefs;
@@ -551,7 +504,6 @@ struct instance {
 
     typedef void (*release_to_cpp_t)(instance* inst, holder_erased external_holder, object&& obj);
     typedef object (*reclaim_from_cpp_t)(instance* inst, holder_erased external_holder);
-    typedef bool (*check_destruct_t)(instance* inst, holder_erased external_holder);
 
     struct type_release_info_t {
       // Release an instance to C++ for pure C++ instances or Python-derived classes.
@@ -564,12 +516,6 @@ struct instance {
 
       // The holder that is contained by this class.
       HolderTypeId holder_type_id = HolderTypeId::Unknown;
-
-      int (*is_gc)(instance* self) = nullptr;
-
-      dealloc_wrapper_t dealloc_wrapper;
-
-      check_destruct_t allow_destruct = nullptr;
     };
     /// If the instance is a Python-derived type that is owned in C++, then this method
     /// will permit the instance to be reclaimed back by Python.

@@ -234,131 +234,6 @@ inline bool deregister_instance(instance *self, void *valptr, const type_info *t
 
 extern "C" inline void pybind11_object_dealloc(PyObject *self);
 
-template <typename T>
-class raii_restore {
- public:
-    raii_restore(T* ptr, const T& tmp)
-        : ptr_(ptr),
-          original_(*ptr_) {
-        assert(ptr_);
-        *ptr_ = tmp;
-    }
-    raii_restore(raii_restore&& rhs)
-        : ptr_(rhs.ptr_),
-          original_(std::move(rhs.original_)) {
-        rhs.ptr_ = nullptr;
-    }
-    ~raii_restore() {
-        if (ptr_)
-            *ptr_ = original_;
-    }
- private:
-    T* ptr_{};
-    T original_;
-};
-
-void pybind11_revive_object(PyObject* self) {
-    // Attempt to reverse _Py_Dealloc.
-    // Ensure that our ref count is now 1, before _Py_NewReference overwrites it.
-    // This way, we don't magically lose (or gain) references.
-    // @see Python 2.7 Source Code, `typeobject.c`, `slot_tp_del(...)`,
-    // comment regarding "__del__ resurrected it".
-
-    // It'd be nice to just override __del__ itself, but because `pybind11` makes
-    // this a read-only __slot__, we must use this hackery.
-
-    // TODO(eric.cousineau): Consider enabling __del__ to be writeable, if possible.
-    assert(Py_REFCNT(self) == 1);
-    _Py_NewReference(self);
-}
-
-// Deallocation for Python subclasses that derive from Pybind11 classes.
-extern "C" inline void pybind11_object_dealloc_derived_wrapper(PyObject *self) {
-    // This is for non-pybind11 object types...
-    detail::instance* inst = (detail::instance*)self;
-    handle src(self);
-    // Get closest pybind11 object type.
-    const type_info *lowest_type = get_lowest_type(src);
-    auto& release_info = lowest_type->release_info;
-    auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
-    if (dealloc_wrapper.is_destructing(self)) {
-        std::cout << "Superfluous call" << std::endl;
-        return;
-    }
-    dealloc_wrapper.mark_destructing(self);
-    PyTypeObject *py_type = Py_TYPE(self);
-    dealloc_wrapper_t::tp_dealloc_t tp_dealloc_orig = dealloc_wrapper.get_orig(py_type);
-    std::cout << "Using custom dealloc" << std::endl;
-
-    // Temporarily shim in original destructor.
-    // TODO(eric.cousineau): Potential issue: This may cause problems if destructing an object
-    // frees up a chain of other objects, and at some point, the original type's destructor gets
-    // called. Solution is to mark instances to detect / prevent recursion...
-    // ... But that's not possible, because Python uses identity checks...
-//    raii_restore<dealloc_wrapper_t::tp_dealloc_t> tp_dealloc_shim(
-//        &py_type->tp_dealloc, tp_dealloc_orig);
-
-    // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
-    // we don't collide? Or does it matter???
-    // If it's Python derived -> Python derived -> C++
-
-    // Alternative: Looks like `type->tp_del` has some things that can def ref count...
-
-    // TODO(eric.cousineau): Alternative: Hook into object's `__del__`? But how to stop execution?
-
-    auto v_h = inst->get_value_and_holder(lowest_type);
-    holder_erased holder(v_h.holder_ptr(), release_info.holder_type_id);
-    if (release_info.allow_destruct(inst, holder)) {
-        tp_dealloc_orig(self);
-    } else {
-        std::cout << "Skipping destruction" << std::endl;
-        pybind11_revive_object(self);
-    }
-    dealloc_wrapper.unmark_destructing(self);
-}
-
-// Destructor for Python subclasses that derive from Pybind11 classes.
-extern "C" inline void pybind11_object_del_derived_wrapper(PyObject *self) {
-    // This is for non-pybind11 object types...
-    detail::instance* inst = (detail::instance*)self;
-    handle src(self);
-    // Get closest pybind11 object type.
-    const type_info *lowest_type = get_lowest_type(src);
-    auto& release_info = lowest_type->release_info;
-    auto& dealloc_wrapper = const_cast<dealloc_wrapper_t&>(release_info.dealloc_wrapper);
-    if (dealloc_wrapper.is_destructing(self)) {
-        std::cout << "Superfluous call to custom __del__" << std::endl;
-        return;
-    }
-    dealloc_wrapper.mark_destructing(self);
-    PyTypeObject *py_type = Py_TYPE(self);
-    dealloc_wrapper_t::tp_dealloc_t tp_del_orig = dealloc_wrapper.get_orig(py_type);
-    std::cout << "Using custom __del__" << std::endl;
-
-    // TODO(eric.cousineau): Will this need to also stack up sub-type destructors to make sure
-    // we don't collide? Or does it matter???
-    // If it's Python derived -> Python derived -> C++
-
-    // Alternative: Looks like `type->tp_del` has some things that can def ref count...
-
-    // TODO(eric.cousineau): Alternative: Hook into object's `__del__`? But how to stop execution?
-
-    auto v_h = inst->get_value_and_holder(lowest_type);
-    holder_erased holder(v_h.holder_ptr(), release_info.holder_type_id);
-
-    // This should be called when the item is *actually* being deleted
-    // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
-    assert(Py_REFCNT(self) == 0);
-    if (release_info.allow_destruct(inst, holder)) {
-        tp_del_orig(self);
-    } else {
-        std::cout << "Ressurect object" << std::endl;
-        assert(Py_REFCNT(self) == 1);
-        pybind11_revive_object(self);
-    }
-    dealloc_wrapper.unmark_destructing(self);
-}
-
 /// Instance creation function for all pybind11 types. It allocates the internal instance layout for
 /// holding C++ objects and holders.  Allocation is done lazily (the first time the instance is cast
 /// to a reference or pointer), and initialization is done by an `__init__` function.
@@ -371,7 +246,6 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
         type->tp_basicsize = instance_size;
     }
 #endif
-
     PyObject *self = type->tp_alloc(type, 0);
     auto inst = reinterpret_cast<instance *>(self);
     // Allocate the value/holder internals:
@@ -428,7 +302,7 @@ inline void clear_patients(PyObject *self) {
 
 /// Clears all internal data from the instance and removes it from registered instances in
 /// preparation for deallocation.
-inline bool clear_instance(PyObject *self) {
+inline void clear_instance(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
 
     // Deallocate any values/holders, if present:
@@ -440,17 +314,8 @@ inline bool clear_instance(PyObject *self) {
             if (v_h.instance_registered() && !deregister_instance(instance, v_h.value_ptr(), v_h.type))
                 pybind11_fail("pybind11_object_dealloc(): Tried to deallocate unregistered instance!");
 
-            if (instance->owned || v_h.holder_constructed()) {
-                bool keep_going = v_h.type->dealloc(v_h);
-                if (!keep_going) {
-                    // Need to re-register instance...
-                    // HACK: Since _Py_Dealloc is called, we must reverse this.
-                    // This is normally not important in release mode, but is important
-                    // for debug mode, where this has more meaningful side effects.
-                    register_instance(instance, v_h.value_ptr(), v_h.type);
-                    return false;
-                }
-            }
+            if (instance->owned || v_h.holder_constructed())
+                v_h.type->dealloc(v_h);
         }
     }
     // Deallocate the value/holder layout internals:
@@ -465,23 +330,12 @@ inline bool clear_instance(PyObject *self) {
 
     if (instance->has_patients)
         clear_patients(self);
-    return true;
 }
 
 /// Instance destructor function for all pybind11 types. It calls `type_info.dealloc`
 /// to destroy the C++ object itself, while the rest is Python bookkeeping.
 extern "C" inline void pybind11_object_dealloc(PyObject *self) {
-    bool keep_going = clear_instance(self);
-    if (!keep_going) {
-        // TODO(eric.cousineau): Cancel out the effects of _Py_Dealloc?
-        // TODO(eric.cousineau): Is there a way to ignore this if the interpreter
-        // is cleaning up???
-        // TODO(eric.cousineau): Is there a way to install an override on the existing
-        // `type->tp_dealloc`? (Looking at the details below..)
-        assert(Py_REFCNT(self) == 1);
-        std::cout << "Interrupting destruction" << std::endl;
-        return;
-    }
+    clear_instance(self);
 
     auto type = Py_TYPE(self);
     type->tp_free(self);
@@ -493,15 +347,6 @@ extern "C" inline void pybind11_object_dealloc(PyObject *self) {
     auto pybind11_object_type = (PyTypeObject *) get_internals().instance_base;
     if (type->tp_dealloc == pybind11_object_type->tp_dealloc)
         Py_DECREF(type);
-}
-
-extern "C" inline int pybind11_object_is_gc(PyObject *self) {
-    auto instance = reinterpret_cast<detail::instance *>(self);
-    for (auto& v_h : values_and_holders(instance)) {
-        if (v_h.type)
-            return v_h.type->release_info.is_gc(instance);
-    }
-    throw std::runtime_error("Bad");
 }
 
 /** Create the type which can be used as a common base for all classes.  This is
@@ -533,7 +378,6 @@ inline PyObject *make_object_base_type(PyTypeObject *metaclass) {
     type->tp_new = pybind11_object_new;
     type->tp_init = pybind11_object_init;
     type->tp_dealloc = pybind11_object_dealloc;
-    type->tp_is_gc = pybind11_object_is_gc;
 
     /* Support weak references (needed for the keep_alive feature) */
     type->tp_weaklistoffset = offsetof(instance, weakrefs);
