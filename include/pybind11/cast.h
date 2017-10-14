@@ -526,6 +526,8 @@ inline LoadType determine_load_type(handle src, const type_info* typeinfo,
         // (This is essentially the same as case 2b, but because not using multiple inheritance
         // is extremely common, we handle it specially to avoid the loop iterator and type
         // pointer lookup overhead)
+        // TODO(eric.cousineau): This seems to also capture C++-registered classes as well, not just Python-derived
+        // classes.
         if (bases.size() == 1 && (no_cpp_mi || bases.front()->type == typeinfo->type)) {
             return LoadType::DerivedCppSinglePySingle;
         }
@@ -1552,11 +1554,17 @@ protected:
             // Go ahead and release ownership to C++, if able.
             auto* py_type = (PyTypeObject*)src.get_type().ptr();
             lowest_type = detail::get_type_info(py_type);
-            if (lowest_type->release_info.can_derive_from_wrapper) {
-                do_release_to_cpp = true;
-            } else {
-                std::cerr << "WARNING! Python-derived C++ instance will soon lose Python portion. "
-                    "Consider having your base class extend from pybind11::wrapper<>." << std::endl;
+            // Double-check that we did not get along C++ inheritance.
+            // TODO(eric.cousineau): Generalize this to unique_ptr<> case as well.
+            const bool is_actually_pure_cpp = lowest_type->type == py_type;
+            if (!is_actually_pure_cpp) {
+                if (lowest_type->release_info.can_derive_from_wrapper) {
+                    do_release_to_cpp = true;
+                } else {
+                    std::cerr << "WARNING! Casting to std::shared_ptr<> will cause Python subclass of pybind11 C++ instance to lose its Python portion. "
+                                 "Make your base class extend from pybind11::wrapper<> to prevent aliasing."
+                              << std::endl;
+                }
             }
         }
 
