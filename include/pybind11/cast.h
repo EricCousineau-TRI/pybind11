@@ -598,7 +598,6 @@ public:
                                     if (!inst->simple_holder_constructed) {
                                         if (inst->owned)
                                             throw std::runtime_error("Internal error?");
-    //                                    std::cout << "Reclaiming shared_ptr\n";
                                         try_to_reclaim = true;
                                     }
                                 }
@@ -619,14 +618,11 @@ public:
                         // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
                         // Need to think of a desirable workflow - and if there is possible interop.
                         if (!existing_holder) {
-                            throw std::runtime_error("No existing holder: Are you passing back a raw pointer without return_value_policy::reference?");
+                            throw std::runtime_error("Internal error: Should have non-null holder.");
                         }
                         // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
                         // See `move_only_holder_caster::load_value`.
                         if (!inst->reclaim_from_cpp) {
-                            if (!existing_holder) {
-                                std::cout << "No holder" << std::endl;
-                            }
                             throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
                         }
                         return inst->reclaim_from_cpp(inst, existing_holder).release();
@@ -1559,9 +1555,8 @@ protected:
             if (lowest_type->release_info.can_derive_from_wrapper) {
                 do_release_to_cpp = true;
             } else {
-                std::cout << "WARNING! Python-derived C++ instance will soon lose Python portion. "
-                    << "Please consider having your base class extend from pybind11::wrapper<>."
-                    << std::endl;
+                std::cerr << "WARNING! Python-derived C++ instance will soon lose Python portion. "
+                    "Consider having your base class extend from pybind11::wrapper<>." << std::endl;
             }
         }
 

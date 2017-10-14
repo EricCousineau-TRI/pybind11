@@ -11,9 +11,9 @@
 
 #include "detail/common.h"
 #include "buffer_info.h"
+#include <iostream>
 #include <utility>
 #include <type_traits>
-#include <iostream>
 
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 

@@ -10,8 +10,6 @@
 
 #pragma once
 
-#include <iostream>
-
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable: 4100) // warning C4100: Unreferenced formal parameter
@@ -1096,11 +1094,9 @@ struct holder_check_impl<detail::HolderTypeId::SharedPtr> : public holder_check_
         // Check use_count(), assuming that we have an accurate count (no competing threads?)
         if (load_type == detail::LoadType::DerivedCppSinglePySingle) {
             if (h.use_count() > 1) {
-                std::cout << "SharedPtr holder has use_count() > 1 on destruction for a Python-derived class." << std::endl;
                 // Increase reference count
                 const auto& release_info = lowest_type->release_info;
                 if (release_info.can_derive_from_wrapper) {
-                    std::cout << "Attempting to interrupt" << std::endl;
                     // Increase reference count
                     object obj = reinterpret_borrow<object>(src);
                     // Release to C++.
@@ -1240,7 +1236,6 @@ public:
         int orig_count = self.ref_count();
         unused(orig_count);  // Suppress release build warnings.
         assert(orig_count == 3);
-        std::cout << "Using custom __del__" << std::endl;
 
         auto v_h = inst->get_value_and_holder(lowest_type);
         detail::holder_erased holder_raw(v_h.holder_ptr(), release_info.holder_type_id);
@@ -1627,8 +1622,6 @@ private:
 
         // Check tp_dealloc
         if (is_py_derived) {
-            std::cout << "Have non-pybind11 type" << std::endl;
-
             // TODO(eric.cousineau): Consider moving this outside of this class,
             // to potentially enable multiple inheritance.
             const std::string orig_field = "_pybind11_del_orig";
@@ -1651,9 +1644,6 @@ private:
                 object new_dtor_py = cpp_function(del_new, is_method(h_type));
                 setattr(h_type, "__del__", new_dtor_py);
                 setattr(h_type, orig_field.c_str(), del_orig);
-                std::cout << "Replacing dtor with pybind11 dtor" << std::endl;
-            } else {
-                std::cout << "Already has custom del" << std::endl;
             }
         }
     }
