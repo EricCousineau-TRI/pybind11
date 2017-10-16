@@ -1626,7 +1626,7 @@ private:
             // to potentially enable multiple inheritance.
             const std::string orig_field = "_pybind11_del_orig";
             object del_orig = getattr(h_type, orig_field.c_str(), none());
-            if (!del_orig) {
+            if (del_orig.is(none())) {
                 // Get non-instance-bound method (analogous `tp_del`)
                 // Is there a way to check if `__del__` is an instance-assigned method? (Rather than a class method?)
                 del_orig = getattr(h_type, "__del__", none());
@@ -1637,7 +1637,7 @@ private:
                 // NOTE: This is NOT tied to this particular type.
                 auto del_new = [orig_field](handle h_self) {
                   // TODO(eric.cousineau): Make this global, not tied to this type.
-                  object del_orig = getattr(h_self, orig_field.c_str());
+                  object del_orig = getattr(h_self.get_type(), orig_field.c_str());
                   del_wrapped(h_self, del_orig);
                 };
                 // Replace with an Python-instance-unbound function.
