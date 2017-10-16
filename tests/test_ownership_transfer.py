@@ -24,17 +24,6 @@ def define_child(base_cls, stat_cls):
             return 10 * value
     return child_cls
 
-class MoveContainer(object):
-    def __init__(self, obj):
-        self._obj = obj
-    def get_weakref(self):
-        return weakref.ref(self._obj)
-    def release(self):
-        obj = self._obj
-        self._obj = None
-        assert getrefcount(obj) == 2
-        return obj
-
 
 ChildBad = define_child(m.BaseBad, m.ChildBadStats)
 Child = define_child(m.Base, m.ChildStats)
@@ -43,12 +32,13 @@ def test_shared_ptr_derived_aliasing(capture):
     # [ Bad ]
     cstats = ChildBad.get_cstats()
     # Create instance in move container to permit releasing.
-    im = MoveContainer(ChildBad(10))
-    iw = im.get_weakref()
+    obj = ChildBad(10)
+    obj_weak = weakref.ref(obj)
     # This will release the reference, the refcount will drop to zero, and Python will destroy it.
-    c = m.BaseBadContainer(im.release())
+    c = m.BaseBadContainer(obj)
+    del obj
     # We will have lost the derived Python instance - it was garbage collected.
-    assert iw() is None
+    assert obj_weak() is None
     # Check stats:
     assert cstats.alive() == 0
     # As an additional check, we will try to query the value from the container's value.
@@ -60,12 +50,13 @@ def test_shared_ptr_derived_aliasing(capture):
     # [ Good ]
     # See above for setup.
     cstats = Child.get_cstats()
-    im = MoveContainer(Child(10))
-    iw = im.get_weakref()
-    c = m.BaseContainer(im.release())
+    obj = Child(10)
+    obj_weak = weakref.ref(obj)
+    c = m.BaseContainer(obj)
+    del obj
     # assert iw() is not None
-    # assert cstats.alive() == 1
-    # assert c.get().value() == 100
+    assert cstats.alive() == 1
+    assert c.get().value() == 100
     # Destroy references (effectively in C++), and ensure that we have the desired behavior.
     del c
     assert cstats.alive() == 0
