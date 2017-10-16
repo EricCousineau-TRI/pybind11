@@ -4,29 +4,29 @@ from pybind11_tests import ConstructorStats
 from sys import getrefcount
 import weakref
 
-def define_child(base_cls, stat_cls):
-    class child_cls(base_cls):
+
+def define_child(name, BaseT, StatsT):
+    # Derived instance of `DefineBase<>` in C++.
+    # `StatsT` is meant to enable us to use `ConstructorStats` exclusively for a Python class.
+    class ChildT(BaseT):
         @staticmethod
         def get_cstats():
-            return ConstructorStats.get(stat_cls)
-
+            return ConstructorStats.get(StatsT)
         def __init__(self, value):
-            base_cls.__init__(self, value)
-            self.value = value
-            self.icstats = m.get_instance_cstats(child_cls.get_cstats(), self)
+            BaseT.__init__(self, value)
+            self.icstats = m.get_instance_cstats(ChildT.get_cstats(), self)
             self.icstats.track_created()
-
         def __del__(self):
             self.icstats.track_destroyed()
-
         def value(self):
-            print("Child.value")
-            return 10 * value
-    return child_cls
+            return 10 * BaseT.value(self)
+    ChildT.__name__ =  name
+    return ChildT
 
 
-ChildBad = define_child(m.BaseBad, m.ChildBadStats)
-Child = define_child(m.Base, m.ChildStats)
+ChildBad = define_child('ChildBad', m.BaseBad, m.ChildBadStats)
+Child = define_child('Child', m.Base, m.ChildStats)
+
 
 def test_shared_ptr_derived_aliasing(capture):
     # [ Bad ]
@@ -37,7 +37,7 @@ def test_shared_ptr_derived_aliasing(capture):
     # This will release the reference, the refcount will drop to zero, and Python will destroy it.
     c = m.BaseBadContainer(obj)
     del obj
-    # We will have lost the derived Python instance - it was garbage collected.
+    # We will have lost the derived Python instance.
     assert obj_weak() is None
     # Check stats:
     assert cstats.alive() == 0
@@ -54,12 +54,33 @@ def test_shared_ptr_derived_aliasing(capture):
     obj_weak = weakref.ref(obj)
     c = m.BaseContainer(obj)
     del obj
-    # assert iw() is not None
+    # We now still have a reference to the object. py::wrapper<> will intercept Python's
+    # attempt to destroy `obj`, is aware the `shared_ptr<>.use_count() > 1`, and will increase
+    # the ref count by transferring a new reference to `py::wrapper<>` (thus reviving the object,
+    # per Python's documentation of __del__).
+    assert obj_weak() is not None
     assert cstats.alive() == 1
     assert c.get().value() == 100
     # Destroy references (effectively in C++), and ensure that we have the desired behavior.
     del c
     assert cstats.alive() == 0
+
+    # Ensure that we can pass it from Python -> C++ -> Python, and ensure that C++ does not think
+    # that it has ownership.
+    obj = Child(20)
+    c = m.BaseContainer(obj)
+    del obj
+    assert cstats.alive() == 1
+    obj = c.get()
+    # Now that we have it in Python, there should only be 1 Python reference, since
+    # py::wrapper<> in C++ should have released its reference.
+    assert getrefcount(obj) == 2
+    del c
+    assert cstats.alive() == 1
+    assert obj.value() == 200
+    del obj
+    assert cstats.alive() == 0
+
 
 if __name__ == "__main__":
     test_shared_ptr_derived_aliasing(None)
