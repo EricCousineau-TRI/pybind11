@@ -226,6 +226,9 @@ struct type_record {
     /// Function pointer to class_<..>::dealloc
     void (*dealloc)(detail::value_and_holder &) = nullptr;
 
+    /// See `type_info::has_cpp_release`.
+    instance::type_release_info_t release_info;
+
     /// List of base classes of the newly created type
     list bases;
 

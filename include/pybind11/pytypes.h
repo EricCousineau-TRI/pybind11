@@ -11,6 +11,7 @@
 
 #include "detail/common.h"
 #include "buffer_info.h"
+#include <iostream>
 #include <utility>
 #include <type_traits>
 
@@ -1296,6 +1297,107 @@ inline iterator iter(handle obj) {
     return reinterpret_steal<iterator>(result);
 }
 /// @} python_builtins
+
+
+
+/// Trampoline class to permit attaching a derived Python object's data
+/// (namely __dict__) to an actual C++ class.
+/// If the object lives purely in C++, then there should only be one reference to
+/// this data.
+template <typename Base>
+class wrapper : public Base {
+ protected:
+    using Base::Base;
+
+ public:
+  // TODO(eric.cousineau): Complain if this is not virtual? (and remove `virtual` specifier in dtor?)
+
+  virtual ~wrapper() {
+      delete_py_if_in_cpp();
+  }
+
+  /// To be used by `move_only_holder_caster`.
+  // TODO(eric.cousineau): Make this private to ensure contract?
+  void use_cpp_lifetime(object&& patient, detail::HolderTypeId holder_type_id) {
+      if (lives_in_cpp()) {
+          throw std::runtime_error("Instance already lives in C++");
+      }
+      holder_type_id_ = holder_type_id;
+      patient_ = std::move(patient);
+      check("entering C++");
+  }
+
+  /// To be used by `move_only_holder_caster`.
+  object release_cpp_lifetime(bool on_destruct = false) {
+      if (!lives_in_cpp()) {
+          throw std::runtime_error("Instance does not live in C++");
+      }
+      // Remove existing reference.
+      if (!on_destruct)
+          check("exiting C++");
+      object tmp = std::move(patient_);
+      assert(!patient_);
+      return tmp;
+  }
+
+ protected:
+    /// Call this if, for whatever reason, your C++ wrapper class `Base` has a non-trivial
+    /// destructor that needs to keep information available to the Python-extended class.
+    /// In this case, you want to delete the Python object *before* you do any work in your wrapper class.
+    ///
+    /// As an example, say you have `Base`, and `PyBase` is your wrapper class which extends `wrapper<Base>`.
+    /// By default, if the instance is owned in C++ and deleted, then the destructor order will be:
+    ///    ~PyBase()
+    ///       do_stuff()
+    ///    ~wrapper<Base>()
+    ///       delete_py_if_in_cpp()
+    ///           PyChild.__del__ - ERROR: Should have been called before `do_stuff()
+    ///    ~Base()
+    /// If you explicitly call `delete_py_if_in_cpp()`, then you will get the desired order:
+    ///    ~PyBase()
+    ///       delete_py_if_in_cpp()
+    ///           PyChild.__del__ - GOOD: Workzzz. Called before `do_stuff()`.
+    ///       do_stuff()
+    ///    ~wrapper<Base>()
+    ///       delete_py_if_in_cpp() - No-op. Python object has been released.
+    ///    ~Base()
+    // TODO(eric.cousineau): Verify this with an example workflow.
+  void delete_py_if_in_cpp() {
+      if (lives_in_cpp()) {
+          // Ensure that we still are the unique one, such that the Python classes
+          // destructor will be called.
+          check("being destructed", false);
+          // Release object.
+          // TODO(eric.cousineau): Ensure that destructor is called instantly!!!
+          // Can we attach a listener to ensure that `dealloc` is called?
+          release_cpp_lifetime(true);
+      }
+  }
+
+ private:
+  bool lives_in_cpp() const {
+      // NOTE: This is *false* if, for whatever reason, the wrapper class is
+      // constructed in C++... Meh. Not gonna worry about that situation.
+      return static_cast<bool>(patient_);
+  }
+
+  // Throw an error if this stuff is not unique.
+  void check(const std::string& context, bool do_throw = true) {
+      if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
+          if (patient_.ref_count() != 1) {
+              std::string msg = "When " + context + ", ref_count != 1";
+              if (do_throw)
+                  throw std::runtime_error(msg);
+              else
+                  std::cerr << "ERROR: " << msg << std::endl;
+          }
+      }
+  }
+
+  object patient_;
+  detail::HolderTypeId holder_type_id_{detail::HolderTypeId::Unknown};
+};
+
 
 NAMESPACE_BEGIN(detail)
 template <typename D> iterator object_api<D>::begin() const { return iter(derived()); }

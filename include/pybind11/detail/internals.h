@@ -108,6 +108,8 @@ struct type_info {
     bool default_holder : 1;
     /* true if this is a type registered with py::module_local */
     bool module_local : 1;
+
+    instance::type_release_info_t release_info;
 };
 
 /// Tracks the `internals` and `type_info` ABI version independent of the main library version
