@@ -61,3 +61,13 @@ cc_binary(
         ":base",
     ],
 )
+
+cc_binary(
+    name = "test_ownership_transfer",
+    srcs = [
+        "test_ownership_transfer.cpp",
+    ],
+    deps = [
+        ":base",
+    ],
+)
