@@ -4,6 +4,8 @@
 #include "Eigen/Core"
 #include "unsupported/Eigen/AutoDiff"
 
+#include <pybind11/embed.h>
+
 #define ARRAY 0
 typedef Eigen::AutoDiffScalar<Eigen::VectorXd> AD;
 typedef const Eigen::Matrix<double, 2, 2> PlainMat;
@@ -91,8 +93,8 @@ struct npy_format_descriptor<AD> {
 };
 #endif
 
-PYBIND11_PLUGIN(basics) {
-		py::module m("basics", "pybind11 basics module");
+PYBIND11_MODULE(basics, m) {
+		m.doc() = "pybind11 basics module";
 
 		py::class_<AD>(m, "AutoDiffXd")
 		.def("__init__",
@@ -122,5 +124,21 @@ PYBIND11_PLUGIN(basics) {
 		.def("getSumInA", &basics::MyClass::getSumInA)
 		.def("getPlainNumpySum",[](basics::MyClass& myclass, PlainMat& x, PlainMat& y){myclass.getPlainNumpySum(x,y);})
 		;
-		return m.ptr();
+}
+
+
+int main(int argc, char** argv) {
+  std::cout << "Executing..." << std::endl;
+  {
+    py::scoped_interpreter guard{};
+    py::module m("basics");
+    pybind11_init_basics(m);
+    py::globals()["basics"] = m;
+
+    // Pass in command-line arguments?
+
+    py::eval_file("my_python.py");
+  }
+
+  return 0;
 }

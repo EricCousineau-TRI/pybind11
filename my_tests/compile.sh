@@ -1,34 +1,40 @@
+#!/bin/bash
+set -x
+
 EX_NUM=1
 WITH_AD=1
 export PYTHONPATH=/usr/bin/python2.7-dbg
 
-if [ $1 -eq 1 ]; then
+cur_dir=$(cd $(dirname $0) && pwd)
+mode=1
+
+if [ ${mode} -eq 1 ]; then
 g++ -w -g -O0 -std=c++11 -fPIC \
 	-shared -o basics.so -Wno-deprecated-declarations \
 	-Wno-strict-prototypes \
 	-fno-inline-small-functions \
-	-I/home/chaturvedi/workspace/pybind11/include \
-	-I/home/chaturvedi/workspace/eigen \
+	-I${cur_dir}/../include \
+	-I${cur_dir}/../../eigen \
 	-I/usr/include/python2.7_d \
        	`python2.7-dbg-config --cflags --ldflags` \
          ex$EX_NUM.cpp $2 $3 $4 $5
-elif [ $1 -eq 2 ]; then
+elif [ ${mode} -eq 2 ]; then
 
 g++ -w -g -O0 -std=c++11 -fPIC \
 	-shared -o basics.so -Wno-deprecated-declarations \
 	-Wno-strict-prototypes -fno-inline-small-functions \
 	-I/home/chaturvedi/workspace/pybind11-drake/include \
-	-I/home/chaturvedi/workspace/eigen \
+	-I${cur_dir}/../../eigen \
 	-I/usr/include/python2.7_d \
        	`python2.7-dbg-config --cflags --ldflags` \
          ex$EX_NUM.cpp $2 $3 $4 $5
 
-elif [ $1 -eq 3 ]; then
+elif [ ${mode} -eq 3 ]; then
 g++  -c -w -g -O0 -std=c++11 -fPIC \
 	-Wno-deprecated-declarations \
 	-Wno-strict-prototypes -fno-inline-small-functions \
-	-I/home/chaturvedi/workspace/pybind11/cmake-build-debug/install/include  \
-	-I/home/chaturvedi/workspace/eigen \
+	-I${cur_dir}/cmake-build-debug/install/include  \
+	-I${cur_dir}/../../eigen \
        	`python2.7-dbg-config --includes` \
          ex3.cpp $2 $3 $4 $5 && \
 
