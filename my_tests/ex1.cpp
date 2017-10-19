@@ -136,8 +136,15 @@ int main(int argc, char** argv) {
     py::globals()["basics"] = m;
 
     // Pass in command-line arguments?
+    std::string file = "externals/pybind11/my_tests/my_python.py";
+    py::object sys = py::module::import("sys");
+    py::list py_argv = py::list();
+    py_argv.append(file);
+    for (int i = 1; i < argc; ++i)
+      py_argv.append(argv[i]);
+    sys.attr("argv") = py_argv;
 
-    py::eval_file("my_python.py");
+    py::eval_file(file.c_str());
   }
 
   return 0;

@@ -3,6 +3,7 @@ from basics import *
 import pdb
 import sys
 
+print(sys.argv)
 WITH_AD = int(sys.argv[1])
 APPLY_PDB = 0
 WITH_ARRAY = 0
