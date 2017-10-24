@@ -1012,14 +1012,34 @@ Generally, the lifetime of an instance of a Python subclass of a ``pybind11``-bo
 
 However, if this Python-constructed instance is passed to C++ such that there are no other Python references, then C++ must keep the Python portion of the instance alive until either (a) the C++ reference is destroyed via ``delete`` or (b) the object is passed back to Python. ``pybind11`` supports both cases, but **only** when (i) the class inherits from :class:`py::wrapper`, (ii) there is only single-inheritance in the bound C++ classes, and (iii) the holder type for the class is either :class:`std::shared_ptr` (suggested) or :class:`std::unique_ptr` (default).
 
-When ``pybind11`` detects case (a), it will store a reference to the Python object in :class:`py::wrapper`, such that if the instance is deleted by C++, then it will also release the Python object (via :func:`py::wrapper::~wrapper()`). The wrapper will have a unique reference to the Python object (as any other circumstance would trigger case (b)), so the Python object should be destroyed immediately upon the instance's destruction.
+When ``pybind11`` detects case (a), it will store a reference to the Python object in :class:`py::wrapper` using :class:`py::object`, such that if the instance is deleted by C++, then it will also release the Python object (via :func:`py::wrapper::~wrapper()`). The wrapper will have a unique reference to the Python object (as any other circumstance would trigger case (b)), so the Python object should be destroyed immediately upon the instance's destruction.
 This will be a cyclic reference per Python's memory management, but this is not an issue as the memory is now managed via C++.
+
+For :class:`std::shared_ptr`, this case is detected by placing a shim :func:`__del__` method on the Python subclass when ``pybind11`` detects an instance being created. This shim will check for case (a), and if it holds, will "resurrect" since it created a new reference using :class:`py::object`.
+
+For :class:`std::unique_ptr`, this case is detected when calling `py::cast<unique_ptr<T>>`, which itself implies ownership transfer.
+
+.. seealso::
+
+    The ownership transfer semantics for :class:`std::unique_ptr` are a tad awkward, hence it is discouraged to use this if possible. Since we require unique ownership to ensure that we do not double-free memory, the instance must be passed in a wrapped mechanism.
+
+    TODO(eric.cousineau): Relax this constraint.
 
 When ``pybind11`` detects case (b) (e.g. ``py::cast()`` is called to convert a C++ instance to `py::object`) and (a) has previously occurred, such that C++ manages the lifetime of the object, then :class:`py::wrapper` will release the Python reference to allow Python to manage the lifetime of the object.
 
+.. note::
 
+    This mechanism will be generally robust against reference cycles in Python as this couples the two "portions"; however, it does **not** protect against reference cycles with :class:`std::shared_ptr`. You should take care and use :class:`std::weak_ref` or raw pointers (with care) when needed.
 
-For this example, we will build upon the above code for ``Animal`` with alias ``PyAnimal``, and the Python subclass ``Cat``. For lifetime, it is important to use a more Pythonic holder, which in this case would be :class:`std::shared_ptr`. To recap, we have the following C++ definitions:
+.. note::
+
+    There will a slight difference in destructor order if the complete instance is destroyed in C++ or in Python; however, this difference will only be a difference in ordering in when :func:`py::wrapper::~wrapper()` (and your alias destructor) is called in relation to :func:`__del__` for the subclass. For more information, see the documentation comments for :class:`py::wrapper`.
+
+For this example, we will build upon the above code for ``Animal`` with alias ``PyAnimal``, and the Python subclass ``Cat``, but will introduce a situation where C++ may have sole ownership: a container. In this case, it will be ``Cage``, which can contain or release an animal.
+
+.. note::
+
+    For lifetime, it is important to use a more Python-friendly holder, which in this case would be :class:`std::shared_ptr`, permitting an ease to share ownership.
 
 .. code-block:: cpp
 
@@ -1066,14 +1086,33 @@ And the following bindings:
             .def("release", &Cage::release);
     }
 
-.. code:: pycon
+With the following Python preface:
+
+.. code-block:: pycon
 
     >>> from examples import *
     >>> class Cat(Animal):
     ...     def go(self, n_times):
     ...             return "meow! " * n_times
     ...
-    >>> c = Cage()
-    >>> c.add(Cat())  # NOTE: Once `add` is finished, the `Cat` instance's refcount will go to zero.
+    >>> cage = Cage()
 
+Normally, if you keep the object alive in Python, then no additional instrumentation is necessary:
 
+.. code-block:: pcon
+
+    >>> cat = Cat()
+    >>> c.add(cat)  # This object lives in both Python and C++.
+    >>> c.release().go(2)
+    meow! meow! 
+
+However, if you pass an instance that Python later wishes to destroy, without :class:`py::wrapper`, we would get an error that ``go`` is not implented,
+as the `Cat` portion would have been destroyed and no longer visible for the trampoline. With the wrapper, ``pybind11`` will intercept this event and keep the Python portion alive:
+
+.. code-block:: pcon
+
+    >>> c.add(Cat())
+    >>> c.release().go(2)
+    meow! meow! 
+
+Note that both the C++ and Python portion of ``cat`` will be destroyed once ``cage`` is destroyed.
