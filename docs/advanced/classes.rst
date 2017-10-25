@@ -1101,7 +1101,7 @@ With the following Python preface:
 
 Normally, if you keep the object alive in Python, then no additional instrumentation is necessary:
 
-.. code-block:: pcon
+.. code-block:: pycon
 
     >>> cat = Cat()
     >>> c.add(cat)  # This object lives in both Python and C++.
@@ -1111,7 +1111,7 @@ Normally, if you keep the object alive in Python, then no additional instrumenta
 However, if you pass an instance that Python later wishes to destroy, without :class:`py::wrapper`, we would get an error that ``go`` is not implented,
 as the `Cat` portion would have been destroyed and no longer visible for the trampoline. With the wrapper, ``pybind11`` will intercept this event and keep the Python portion alive:
 
-.. code-block:: pcon
+.. code-block:: pycon
 
     >>> c.add(Cat())
     >>> c.release().go(2)
