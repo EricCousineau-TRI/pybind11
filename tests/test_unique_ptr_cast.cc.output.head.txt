@@ -18,7 +18,7 @@ Base::value()
 Delete references
 Delete container
 PyChildB::~PyChildB()
-WARNING: When being destructed, ref_count != 1
+PyExtChildB.__del__
 ChildB::~ChildB()
 Base::~Base()
 Base::~Base()
@@ -29,7 +29,7 @@ WARNING: When entering C++, ref_count != 1
 Base::Base(int)
 Delete references - have to be strict...
 Release to list
-List: [<_move.PyExtChildB object at 0x7fe9a9a42780>, <_move.Base object at 0x7fe9a9a50c10>]
+List: [<_move.PyExtChildB object at 0x7f837333f818>, <_move.Base object at 0x7f837334dba0>]
 PyExtChildB.value
 ChildB::value()
 Base::value()
@@ -41,7 +41,6 @@ PyExtChildB.__del__
 PyChildB::~PyChildB()
 ChildB::~ChildB()
 Base::~Base()
-PyExtChildB.__del__
 Base::~Base()
 [23597 refs]
 [ Done ]
