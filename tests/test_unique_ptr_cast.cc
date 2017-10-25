@@ -369,13 +369,13 @@ void check_container() {
 print("Create container")
 c = m.BaseContainer()
 print("Create instance")
-b1m = [m.PyExtChildB(30)]
+b1 = m.PyExtChildB(30)
 print("Add instance")
-b1 = c.add(b1m)
+b1 = c.add(b1)
 print("Create instance 2")
-b2m = [m.Base(10)]
+b2 = m.Base(10)
 print("Add instance 2")
-b2 = c.add(b2m)
+b2 = c.add(b2)
 print("Print values")
 print(b1.value())
 print(b2.value())
@@ -389,8 +389,8 @@ del c
 
 print("Make new container")
 c = m.BaseContainer()
-b1 = c.add([m.PyExtChildB(30)])
-b2 = c.add([m.Base(10)])
+b1 = c.add(m.PyExtChildB(30))
+b2 = c.add(m.Base(10))
 print("Delete references - have to be strict...")
 del b1
 del b2
