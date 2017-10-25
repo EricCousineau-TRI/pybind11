@@ -1002,7 +1002,7 @@ described trampoline:
 ..    ``.def("foo", static_cast<int (A::*)() const>(&Publicist::foo));``
 ..    where ``int (A::*)() const`` is the type of ``A::foo``.
 
-.. _virtual_inheritance_lifetime::
+.. _virtual_inheritance_lifetime:
 
 Virtual Inheritance and Lifetime
 ================================
@@ -1011,6 +1011,10 @@ When an instance of a Python subclass of a ``pybind11``-bound C++ class is insta
 Generally, the lifetime of an instance of a Python subclass of a ``pybind11``-bound C++ class will note pose an issue as long as the instance is owned in Python - that is, you can call virtual methods from C++ or Python and have the correct behavior.
 
 However, if this Python-constructed instance is passed to C++ such that there are no other Python references, then C++ must keep the Python portion of the instance alive until either (a) the C++ reference is destroyed via ``delete`` or (b) the object is passed back to Python. ``pybind11`` supports both cases, but **only** when (i) the class inherits from :class:`py::wrapper`, (ii) there is only single-inheritance in the bound C++ classes, and (iii) the holder type for the class is either :class:`std::shared_ptr` (suggested) or :class:`std::unique_ptr` (default).
+
+.. seealso::
+
+    :ref:`holders` has more information regaring holders and how general ownership transfer should function.
 
 When ``pybind11`` detects case (a), it will store a reference to the Python object in :class:`py::wrapper` using :class:`py::object`, such that if the instance is deleted by C++, then it will also release the Python object (via :func:`py::wrapper::~wrapper()`). The wrapper will have a unique reference to the Python object (as any other circumstance would trigger case (b)), so the Python object should be destroyed immediately upon the instance's destruction.
 This will be a cyclic reference per Python's memory management, but this is not an issue as the memory is now managed via C++.
@@ -1021,9 +1025,7 @@ For :class:`std::unique_ptr`, this case is detected when calling `py::cast<uniqu
 
 .. seealso::
 
-    The ownership transfer semantics for :class:`std::unique_ptr` are a tad awkward, hence it is discouraged to use this if possible. Since we require unique ownership to ensure that we do not double-free memory, the instance must be passed in a wrapped mechanism.
-
-    TODO(eric.cousineau): Relax this constraint.
+    See :ref:`unique_ptr_ownership` for information about how ownership can be transferred via a cast or argument involving ``unique_ptr<Type>``.
 
 When ``pybind11`` detects case (b) (e.g. ``py::cast()`` is called to convert a C++ instance to `py::object`) and (a) has previously occurred, such that C++ manages the lifetime of the object, then :class:`py::wrapper` will release the Python reference to allow Python to manage the lifetime of the object.
 
@@ -1099,7 +1101,7 @@ With the following Python preface:
 
 Normally, if you keep the object alive in Python, then no additional instrumentation is necessary:
 
-.. code-block:: pcon
+.. code-block:: pycon
 
     >>> cat = Cat()
     >>> c.add(cat)  # This object lives in both Python and C++.
@@ -1109,7 +1111,7 @@ Normally, if you keep the object alive in Python, then no additional instrumenta
 However, if you pass an instance that Python later wishes to destroy, without :class:`py::wrapper`, we would get an error that ``go`` is not implented,
 as the `Cat` portion would have been destroyed and no longer visible for the trampoline. With the wrapper, ``pybind11`` will intercept this event and keep the Python portion alive:
 
-.. code-block:: pcon
+.. code-block:: pycon
 
     >>> c.add(Cat())
     >>> c.release().go(2)

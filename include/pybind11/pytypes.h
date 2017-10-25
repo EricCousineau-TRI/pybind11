@@ -1316,7 +1316,7 @@ class wrapper : public Base {
       delete_py_if_in_cpp();
   }
 
-  /// To be used by `move_only_holder_caster`.
+  /// To be used by the holder casters, by means of `wrapper_interface<>`.
   // TODO(eric.cousineau): Make this private to ensure contract?
   void use_cpp_lifetime(object&& patient, detail::HolderTypeId holder_type_id) {
       if (lives_in_cpp()) {
@@ -1324,7 +1324,6 @@ class wrapper : public Base {
       }
       holder_type_id_ = holder_type_id;
       patient_ = std::move(patient);
-      check("entering C++");
   }
 
   /// To be used by `move_only_holder_caster`.
@@ -1333,8 +1332,6 @@ class wrapper : public Base {
           throw std::runtime_error("Instance does not live in C++");
       }
       // Remove existing reference.
-      if (!on_destruct)
-          check("exiting C++");
       object tmp = std::move(patient_);
       assert(!patient_);
       return tmp;
@@ -1366,7 +1363,19 @@ class wrapper : public Base {
       if (lives_in_cpp()) {
           // Ensure that we still are the unique one, such that the Python classes
           // destructor will be called.
-          check("being destructed", false);
+#ifdef PYBIND11_WARN_DANGLING_UNIQUE_PYREF
+          if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
+              if (patient_.ref_count() != 1) {
+                  // TODO(eric.cousineau): Add Python class name
+                  std::string class_name = patient_.get_type().str();
+                  std::cerr
+                      << "WARNING(pybind11): When destroying Python subclass (" << class_name << "), "
+                      << "of a pybind11 class using a unique_ptr holder in C++, "
+                      << "ref_count == " << patient_.ref_count() << " != 1, which may cause undefined behavior." << std::endl
+                      << "  Please consider reviewing your code to trim existing references, or use a move-compatible container." << std::endl;
+              }
+          }
+#endif  // PYBIND11_WARN_DANGLING_UNIQUE_HOLDER
           // Release object.
           // TODO(eric.cousineau): Ensure that destructor is called instantly!!!
           // Can we attach a listener to ensure that `dealloc` is called?
@@ -1379,19 +1388,6 @@ class wrapper : public Base {
       // NOTE: This is *false* if, for whatever reason, the wrapper class is
       // constructed in C++... Meh. Not gonna worry about that situation.
       return static_cast<bool>(patient_);
-  }
-
-  // Throw an error if this stuff is not unique.
-  void check(const std::string& context, bool do_throw = true) {
-      if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
-          if (patient_.ref_count() != 1) {
-              std::string msg = "When " + context + ", ref_count != 1";
-              if (do_throw)
-                  throw std::runtime_error(msg);
-              else
-                  std::cerr << "ERROR: " << msg << std::endl;
-          }
-      }
   }
 
   object patient_;
