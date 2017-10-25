@@ -1,3 +1,5 @@
+.. _holders:
+
 Smart pointers and holders
 ##########################
 
@@ -25,10 +27,14 @@ instances wrapped in C++11 unique pointers, like so
 
     m.def("create_example", &create_example);
 
-In other words, there is nothing special that needs to be done. While returning
-unique pointers in this way is allowed, it is also *possible* as function
-arguments, or use :func:``py::cast<unique_ptr<Type>>``.
-For instance, the following function signature can be processed by pybind11.
+In other words, there is nothing special that needs to be done.
+
+Transferring ownership
+----------------------
+
+It is also *possible* to pass ``std::unique_ptr<Type>`` as a function
+argument, or use :func:``py::cast<unique_ptr<Type>>``.
+For instance, the following function signature can be processed by pybind11:
 
 .. code-block:: cpp
 
@@ -37,24 +43,81 @@ For instance, the following function signature can be processed by pybind11.
 The above signature does imply that Python needs to give up ownership of an
 object that is passed to this function. There are two ways to do this:
 
-  1. Simply pass the object in. The reference count of the object can be greater than one (non-unique) when passing the object in. **However**, you *must* ensure that the object has only **one** reference when C++ (which owns the C++ object).
+.. _unique_ptr_ownership::
 
-      .. warning::
+1.  Simply pass the object in. The reference count of the object can be greater than one (non-unique) when passing the object in. **However**, you *must* ensure that the object has only **one** reference when C++ (which owns the C++ object).
 
-          To expand on this. when transferring ownership for :class:`std::unique_ptr`, this means that Pybind11 no longer owns the reference, which means that if C++ lets the :class:``std::unqiue_ptr`` destruct but if there is a dangling reference in Python, then you will encounter undefined behavior.
+    .. warning::
 
-      .. note::
+        To expand on this. when transferring ownership for :class:`std::unique_ptr`, this means that Pybind11 no longer owns the reference, which means that if C++ lets the :class:``std::unique_ptr`` destruct but if there is a dangling reference in Python, then you will encounter undefined behavior.
 
-          For polymorphic types that inherit from :class:``py::wrapper``, ``pybind11`` *can* warn about these situations.
-          You may enable this behavior with ``#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF``. This will print a warning to ``std::err`` if this case is detected.
+        Examples situations:
 
-          One example situation is passing a newly created instance to a function which will immediately destroy the ``std::unique_ptr`` instance; the argument in Python will still hold the reference, and defer the call to :func:``__del__``. This shouldn't normally be a problem unless :func:``__del__`` has a non-trivial operation that relies on the polymorphic bits.
+        * (Generally not an issue) The C++ function is terminal (i.e. will destroy the object once it completes).
+        * (Really an issue) The Python object is passed to a C++ container which only tracks ``shared_ptr<Type>``
 
-  2.  Pass a Python "move container" (a mutable object that can "release" the reference to the object). This can be a single-item list, or any Python class / instance that has the field ``_is_move_container = True`` and has a ``release()`` function.
+    .. note::
 
-      .. note::
+        For polymorphic types that inherit from :class:``py::wrapper``, ``pybind11`` *can* warn about these situations.
+        You may enable this behavior with ``#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF``. This will print a warning to ``std::err`` if this case is detected.
 
-          When using a move container, this expects that the provided object is a **unique** reference, or will throw an error otherwise. This is a little more verbose, but will make debugging *much* easier.
+2.  Pass a Python "move container" (a mutable object that can "release" the reference to the object). This can be a single-item list, or any Python class / instance that has the field ``_is_move_container = True`` and has a ``release()`` function.
+
+    .. note::
+
+        When using a move container, this expects that the provided object is a **unique** reference, or will throw an error otherwise. This is a little more verbose, but will make debugging *much* easier.
+
+    As an example in C++:
+
+    .. code-block:: cpp
+
+        void terminal_func(std::unique_ptr<Example> obj) {
+            obj.do_something();
+            // `obj` will be destroyed here.
+        }
+
+        // Binding
+        py::class_<Example> example(m, "Example");
+        m.def("terminal_func", &terminal_func);
+
+    In Python, say you would normally do this:
+
+    .. code-block:: pycon
+
+        >>> obj = Example()
+        >>> terminal_func(obj)
+
+    As mentioned in the comment, you *must* ensure that `obj` is not used past this invocation, as the underlying data has been destroyed. To be more careful, you may "move" the object. The following will throw an error:
+
+    .. code-block:: pycon
+
+        >>> obj = Example()
+        >>> terminal_func([obj])
+
+    However, this will work, using a "move" container:
+
+    .. code-block:: pycon
+
+        >>> obj = Example()
+        >>> obj_move = [obj]
+        >>> del obj
+        >>> terminal_func(obj_move)
+        >>> print(obj_move)  # Reference will have been removed.
+        [None]
+
+    or even:
+
+    .. code-block:: pycon
+
+        >>> terminal_func([Example()])
+
+    .. note::
+
+        ``terminal_func(Example())`` also works, but still leaves a dangling reference, which is only a problem if it is polymorphic and has a non-trivial ``__del__`` method.
+
+    .. warning::
+
+        This reference counting mechanism is **not** robust aganist cyclic references. If you need a some sort of cyclic reference, *please* consider using :class:`weakref.ref` in Python.
 
 std::shared_ptr
 ===============
@@ -192,3 +255,22 @@ provides ``.get()`` functionality via ``.getPointer()``.
     The file :file:`tests/test_smart_ptr.cpp` contains a complete example
     that demonstrates how to work with custom reference-counting holder types
     in more detail.
+
+.. warning::
+
+    Holder type conversion (see :ref:`smart_ptrs_casting`) and advanced ownership transfer (see :ref:`virtual_inheritance_lifetime`) is *only* for supported for ``std::unique_ptr<Type> = unique_ptr<Type, std::default_deleter<Type>>`` and ``std::shared_ptr<Type>``, due to constraints on dynamic type erasure.
+
+.. _smart_ptrs_casting:
+
+Casting smart pointers
+======================
+
+As shown in the :ref:`conversion_table`, you may cast to any of the available holders (e.g. ``py::cast<std::shared_ptr<Type>>(obj)``) that can properly provide access to the underlying holder.
+
+.. warning::
+
+    ``pybind11`` will raise an error if there is an incompatible cast. You may of course cast to the exact same holder type. You may also move a ``std::unique_ptr<Type>`` into a ``std::shared_ptr<Type>``, as this is allowed. **However**, you may not convert a ``std::shared_ptr<Type>`` to a ``std::unique_ptr<Type>`` as you cannot release an object that is managed by ``std::shared_ptr<Type>``.
+
+    Additionally, conversion to ``std::unique_ptr<Type, Deleter>`` is not supported if ``Delter`` is not ``std::default_deleter<Type>``.
+
+    Conversion to a different custom smart pointer is not supported.
