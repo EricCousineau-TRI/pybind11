@@ -6,6 +6,8 @@
 #include <sstream>
 #include <string>
 
+#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF
+
 #include <pybind11/cast.h>
 #include <pybind11/embed.h>
 #include <pybind11/eval.h>
@@ -381,7 +383,7 @@ print(b1.value())
 print(b2.value())
 
 print("Delete references")
-del b1
+#del b1
 del b2
 
 print("Delete container")

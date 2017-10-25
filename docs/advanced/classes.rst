@@ -1019,11 +1019,14 @@ For :class:`std::shared_ptr`, this case is detected by placing a shim :func:`__d
 
 For :class:`std::unique_ptr`, this case is detected when calling `py::cast<unique_ptr<T>>`, which itself implies ownership transfer.
 
-.. seealso::
+.. warning::
 
-    The ownership transfer semantics for :class:`std::unique_ptr` are a tad awkward, hence it is discouraged to use this if possible. Since we require unique ownership to ensure that we do not double-free memory, the instance must be passed in a wrapped mechanism.
+    When transferring ownership for :class:`std::unique_ptr`, this means that Pybind11 no longer owns the reference, which means that if C++ lets the :class:``std::unqiue_ptr`` destruct but there is a dangling reference in Python, then you will encounter undefined behavior.
 
-    TODO(eric.cousineau): Relax this constraint.
+    At present, ``pybind11`` will **not** display a warning if there is a dangling Python reference. However, you may enable this behavior with ``#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF``. This will print a warning to ``std::err`` if this case is detected.
+
+    One example sitaution is passing a newly created instance to a function which will immediately destroy the :class:``std::unique_ptr`` instance; the argument in Python will still hold the reference, and defer the call to :func:``__del__``. This shouldn't normally be a problem unless :func:``__del__`` has a non-trivial operation that relies on the polymorphic bits.
+
 
 When ``pybind11`` detects case (b) (e.g. ``py::cast()`` is called to convert a C++ instance to `py::object`) and (a) has previously occurred, such that C++ manages the lifetime of the object, then :class:`py::wrapper` will release the Python reference to allow Python to manage the lifetime of the object.
 
