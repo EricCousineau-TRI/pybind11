@@ -383,7 +383,7 @@ print(b1.value())
 print(b2.value())
 
 print("Delete references")
-#del b1
+del b1
 del b2
 
 print("Delete container")
