@@ -1681,7 +1681,7 @@ struct move_only_holder_caster : type_caster_base<type> {
         // may work with the exact type desired, but it most likely *won't* work if the type is wrapped in a `move` container.
         // Solution: Check more aggressively if this is a move container.
 
-        object obj_exclusive = reinterpret_steal<object>(src);
+        object obj_exclusive = reinterpret_borrow<object>(src);
 //        if (obj_exclusive.ref_count() != 1) {
 //            throw std::runtime_error("Non-unique reference, cannot cast to unique_ptr.");
 //        }

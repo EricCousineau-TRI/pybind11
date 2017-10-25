@@ -1,0 +1,47 @@
+[ check_container ]
+Create container
+Create instance
+Base::Base(int)
+PyExtChildB.PyExtChildB
+Add instance
+WARNING: When entering C++, ref_count != 1
+Create instance 2
+Base::Base(int)
+Add instance 2
+Print values
+PyExtChildB.value
+ChildB::value()
+Base::value()
+300
+Base::value()
+10
+Delete references
+Delete container
+PyChildB::~PyChildB()
+WARNING: When being destructed, ref_count != 1
+ChildB::~ChildB()
+Base::~Base()
+Base::~Base()
+Make new container
+Base::Base(int)
+PyExtChildB.PyExtChildB
+WARNING: When entering C++, ref_count != 1
+Base::Base(int)
+Delete references - have to be strict...
+Release to list
+List: [<_move.PyExtChildB object at 0x7fe9a9a42780>, <_move.Base object at 0x7fe9a9a50c10>]
+PyExtChildB.value
+ChildB::value()
+Base::value()
+value: 300
+Base::value()
+value: 10
+Delete list
+PyExtChildB.__del__
+PyChildB::~PyChildB()
+ChildB::~ChildB()
+Base::~Base()
+PyExtChildB.__del__
+Base::~Base()
+[23597 refs]
+[ Done ]
