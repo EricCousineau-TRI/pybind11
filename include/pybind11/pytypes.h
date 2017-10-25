@@ -1383,13 +1383,14 @@ class wrapper : public Base {
 
   // Throw an error if this stuff is not unique.
   void check(const std::string& context, bool do_throw = true) {
+      (void)do_throw;
       if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
           if (patient_.ref_count() != 1) {
               std::string msg = "When " + context + ", ref_count != 1";
-              if (do_throw)
-                  throw std::runtime_error(msg);
-              else
-                  std::cerr << "ERROR: " << msg << std::endl;
+              if (true)
+//                  throw std::runtime_error(msg);
+//              else
+                  std::cerr << "WARNING: " << msg << std::endl;
           }
       }
   }

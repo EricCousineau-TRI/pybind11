@@ -1653,25 +1653,25 @@ struct move_only_holder_caster : type_caster_base<type> {
 
   explicit operator holder_type&&() { return std::move(holder); }
 
-    object extract_from_container(handle src) {
-        // See if this is a supported `move` container.
-        if (isinstance(src, (PyObject*)&PyList_Type) && PyList_Size(src.ptr()) == 1) {
-            // Extract the object from a single-item list, and remove the existing reference so we have exclusive control.
-            // @note This will break implicit casting when constructing from vectors, but eh, who cares.
-            // Swap.
-            list li = src.cast<list>();
-            object obj = li[0];
-            li[0] = none();
-            return obj;
-        } else if (hasattr(src, "_is_move_container")) {
-            // Try to extract the value with `release()`.
-            return src.attr("release")();
-        } else {
-            throw std::runtime_error(
-                "Only use cast<unique_ptr<T>>() with a Python move-container (such as a single-item list), "
-                "or ensure that you call cast<unique_ptr<T>(std::move(obj))");
-        }
-    }
+//    object extract_from_container(handle src) {
+//        // See if this is a supported `move` container.
+//        if (isinstance(src, (PyObject*)&PyList_Type) && PyList_Size(src.ptr()) == 1) {
+//            // Extract the object from a single-item list, and remove the existing reference so we have exclusive control.
+//            // @note This will break implicit casting when constructing from vectors, but eh, who cares.
+//            // Swap.
+//            list li = src.cast<list>();
+//            object obj = li[0];
+//            li[0] = none();
+//            return obj;
+//        } else if (hasattr(src, "_is_move_container")) {
+//            // Try to extract the value with `release()`.
+//            return src.attr("release")();
+//        } else {
+//            throw std::runtime_error(
+//                "Only use cast<unique_ptr<T>>() with a Python move-container (such as a single-item list), "
+//                "or ensure that you call cast<unique_ptr<T>(std::move(obj))");
+//        }
+//    }
 
     bool load(handle src, bool convert) {
         // Ensure that we have exclusive control (with `object` reference count control) over the entering object.
@@ -1681,10 +1681,10 @@ struct move_only_holder_caster : type_caster_base<type> {
         // may work with the exact type desired, but it most likely *won't* work if the type is wrapped in a `move` container.
         // Solution: Check more aggressively if this is a move container.
 
-        object obj_exclusive = extract_from_container(src);
-        if (obj_exclusive.ref_count() != 1) {
-            throw std::runtime_error("Non-unique reference, cannot cast to unique_ptr.");
-        }
+        object obj_exclusive = reinterpret_steal<object>(src);
+//        if (obj_exclusive.ref_count() != 1) {
+//            throw std::runtime_error("Non-unique reference, cannot cast to unique_ptr.");
+//        }
 
         // TODO(eric.cousineau): To reduce number of references, require that a list be passed in,
         // such that the value can be set to zero.
