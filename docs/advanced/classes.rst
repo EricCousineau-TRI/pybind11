@@ -1027,7 +1027,7 @@ For :class:`std::unique_ptr`, this case is detected when calling `py::cast<uniqu
 
     One example sitaution is passing a newly created instance to a function which will immediately destroy the :class:``std::unique_ptr`` instance; the argument in Python will still hold the reference, and defer the call to :func:``__del__``. This shouldn't normally be a problem unless :func:``__del__`` has a non-trivial operation that relies on the polymorphic bits.
 
-    If you wish to avoid this altogether, you can pass a single-item list with the contained item, which will check for a unique reference.
+    If you wish to avoid this altogether, you can pass a single-item list with the contained item, which will check for a unique reference. This is dubbed a Python "move container".
 
 When ``pybind11`` detects case (b) (e.g. ``py::cast()`` is called to convert a C++ instance to `py::object`) and (a) has previously occurred, such that C++ manages the lifetime of the object, then :class:`py::wrapper` will release the Python reference to allow Python to manage the lifetime of the object.
 

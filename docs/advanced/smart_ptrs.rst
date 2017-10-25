@@ -1,5 +1,15 @@
-Smart pointers
-##############
+Smart pointers and holders
+##########################
+
+Holders
+=======
+
+The binding generator for classes, :class:`class_`, can be passed a template
+type that denotes a special *holder* type that is used to manage references to
+the object.  If no such holder type template argument is given, the default for
+a type named ``Type`` is ``std::unique_ptr<Type>``, which means that the object
+is deallocated when Python's reference count goes to zero. It is possible to switch to other types of reference counting wrappers or smart
+pointers, which is useful in codebases that rely on them, such as ``std::shared_ptr<Type>``, or even a custom type.
 
 std::unique_ptr
 ===============
@@ -16,30 +26,41 @@ instances wrapped in C++11 unique pointers, like so
     m.def("create_example", &create_example);
 
 In other words, there is nothing special that needs to be done. While returning
-unique pointers in this way is allowed, it is *illegal* to use them as function
-arguments. For instance, the following function signature cannot be processed
-by pybind11.
+unique pointers in this way is allowed, it is also *possible* as function
+arguments, or use :func:``py::cast<unique_ptr<Type>>``.
+For instance, the following function signature can be processed by pybind11.
 
 .. code-block:: cpp
 
     void do_something_with_example(std::unique_ptr<Example> ex) { ... }
 
-The above signature would imply that Python needs to give up ownership of an
-object that is passed to this function, which is generally not possible (for
-instance, the object might be referenced elsewhere).
+The above signature does imply that Python needs to give up ownership of an
+object that is passed to this function. There are two ways to do this:
+
+  1. Simply pass the object in. The reference count of the object can be greater than one (non-unique) when passing the object in. **However**, you *must* ensure that the object has only **one** reference when C++ (which owns the C++ object).
+
+      .. warning::
+
+          To expand on this. when transferring ownership for :class:`std::unique_ptr`, this means that Pybind11 no longer owns the reference, which means that if C++ lets the :class:``std::unqiue_ptr`` destruct but if there is a dangling reference in Python, then you will encounter undefined behavior.
+
+      .. note::
+
+          For polymorphic types that inherit from :class:``py::wrapper``, ``pybind11`` *can* warn about these situations.
+          You may enable this behavior with ``#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF``. This will print a warning to ``std::err`` if this case is detected.
+
+          One example situation is passing a newly created instance to a function which will immediately destroy the ``std::unique_ptr`` instance; the argument in Python will still hold the reference, and defer the call to :func:``__del__``. This shouldn't normally be a problem unless :func:``__del__`` has a non-trivial operation that relies on the polymorphic bits.
+
+  2.  Pass a Python "move container" (a mutable object that can "release" the reference to the object). This can be a single-item list, or any Python class / instance that has the field ``_is_move_container = True`` and has a ``release()`` function.
+
+      .. note::
+
+          When using a move container, this expects that the provided object is a **unique** reference, or will throw an error otherwise. This is a little more verbose, but will make debugging *much* easier.
 
 std::shared_ptr
 ===============
 
-The binding generator for classes, :class:`class_`, can be passed a template
-type that denotes a special *holder* type that is used to manage references to
-the object.  If no such holder type template argument is given, the default for
-a type named ``Type`` is ``std::unique_ptr<Type>``, which means that the object
-is deallocated when Python's reference count goes to zero.
-
-It is possible to switch to other types of reference counting wrappers or smart
-pointers, which is useful in codebases that rely on them. For instance, the
-following snippet causes ``std::shared_ptr`` to be used instead.
+If you have an existing code base with ``std::shared_ptr``, or you wish to enable reference counting in C++ as well, then you may use this type as a holder.
+As an example, the following snippet causes ``std::shared_ptr`` to be used instead.
 
 .. code-block:: cpp
 
