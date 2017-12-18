@@ -1230,7 +1230,7 @@ public:
         //   2. When Python gets the instance-bound __del__ method.
         // TODO(eric.cousineau): Confirm this ^
         //   3. When pybind11 gets the argument
-        int orig_count = self.ref_count();
+        const int orig_count = self.ref_count();
 
         auto v_h = inst->get_value_and_holder(lowest_type);
         detail::holder_erased holder_raw(v_h.holder_ptr(), release_info.holder_type_id);
@@ -1247,6 +1247,7 @@ public:
             del_orig(self);
         } else {
             // This should have been kept alive by an increment in number of references.
+            unused(orig_count);
             assert(self.ref_count() == orig_count + 1);
         }
     }

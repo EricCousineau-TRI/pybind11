@@ -1327,7 +1327,7 @@ class wrapper : public Base {
   }
 
   /// To be used by `move_only_holder_caster`.
-  object release_cpp_lifetime(bool on_destruct = false) {
+  object release_cpp_lifetime() {
       if (!lives_in_cpp()) {
           throw std::runtime_error("Instance does not live in C++");
       }
@@ -1377,9 +1377,7 @@ class wrapper : public Base {
           }
 #endif  // PYBIND11_WARN_DANGLING_UNIQUE_HOLDER
           // Release object.
-          // TODO(eric.cousineau): Ensure that destructor is called instantly!!!
-          // Can we attach a listener to ensure that `dealloc` is called?
-          release_cpp_lifetime(true);
+          release_cpp_lifetime();
       }
   }
 
