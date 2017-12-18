@@ -234,6 +234,8 @@ def test_class_refcount():
     """Instances must correctly increase/decrease the reference count of their types (#1029)"""
     from sys import getrefcount
 
+
+
     class PyDog(m.Dog):
         pass
 
@@ -246,6 +248,18 @@ def test_class_refcount():
         pytest.gc_collect()
         refcount_3 = getrefcount(cls)
 
+        if cls == PyDog:
+            import gc
+            import inspect
+            refs = gc.get_referrers(cls)
+            for ref in refs:
+                print(ref)
+                try:
+                    lines = inspect.getsourcelines(ref)[0]
+                    print("\n".join(lines))
+                except:
+                    pass
+                print("---")
         assert refcount_1 == refcount_3
         assert refcount_2 > refcount_1
 
