@@ -1,4 +1,3 @@
-import pytest
 from pybind11_tests import ownership_transfer as m
 from pybind11_tests import ConstructorStats
 from sys import getrefcount
@@ -8,10 +7,8 @@ import weakref
 def define_child(name, BaseT, StatsT):
     # Derived instance of `DefineBase<>` in C++.
     # `StatsT` is meant to enable us to use `ConstructorStats` exclusively for a Python class.
+
     class ChildT(BaseT):
-        @staticmethod
-        def get_cstats():
-            return ConstructorStats.get(StatsT)
         def __init__(self, value):
             BaseT.__init__(self, value)
             self.icstats = m.get_instance_cstats(ChildT.get_cstats(), self)
@@ -20,7 +17,11 @@ def define_child(name, BaseT, StatsT):
             self.icstats.track_destroyed()
         def value(self):
             return 10 * BaseT.value(self)
-    ChildT.__name__ =  name
+        @staticmethod
+        def get_cstats():
+            return ConstructorStats.get(StatsT)
+
+    ChildT.__name__ = name
     return ChildT
 
 
@@ -80,7 +81,3 @@ def test_shared_ptr_derived_aliasing(capture):
     assert obj.value() == 200
     del obj
     assert cstats.alive() == 0
-
-
-if __name__ == "__main__":
-    test_shared_ptr_derived_aliasing(None)

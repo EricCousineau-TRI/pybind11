@@ -1548,7 +1548,6 @@ protected:
     }
 
     bool load_value(value_and_holder &&v_h, LoadType load_type) {
-        holder_type& v_holder = v_h.holder<holder_type>();
         bool do_release_to_cpp = false;
         const type_info* lowest_type = nullptr;
         if (src.ref_count() == 1 && load_type == LoadType::DerivedCppSinglePySingle) {
