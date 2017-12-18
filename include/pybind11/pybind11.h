@@ -1244,7 +1244,7 @@ public:
         // Right now, this doesn't really type-erase anything...
         if (allow_destruct(inst, holder_raw)) {
             // Call the old destructor.
-            if (del_orig != none()) {
+            if (!del_orig.is(none())) {
                 del_orig(self);
             }
         } else {
