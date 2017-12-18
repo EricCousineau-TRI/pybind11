@@ -249,16 +249,13 @@ def test_class_refcount():
 
             if cls == PyDog and i == 0:
                 # If this is the first time the derived class is called, then 
-                # creating the instance created the dtor hook, introducing two new references:
-                #  1. Redirecting the unbound __del__ method
-                #  2. Creating the new __del__method that refers to the class.
-                assert refcount_1 + 2 == refcount_3
+                # creating the instance created the dtor hook, introducing one more reference.
+                assert refcount_1 + 1 == refcount_3
             else:
                 assert refcount_1 == refcount_3
             assert refcount_2 > refcount_1
 
-    # @note Deleting `PyDog` does not return the refcount of `m.Dog` back to zero, due to refcounting.
-    assert False
+    # @note Deleting `PyDog` does not return the refcount of `m.Dog` back to zero, due to the destructor shim.
 
 
 def test_reentrant_implicit_conversion_failure(msg):

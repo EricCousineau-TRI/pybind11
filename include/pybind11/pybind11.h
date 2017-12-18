@@ -1627,11 +1627,10 @@ private:
             // TODO(eric.cousineau): Consider moving this outside of this class,
             // to potentially enable multiple inheritance.
             const std::string orig_field = "_pybind11_del_orig";
-            object del_orig = getattr(h_type, orig_field.c_str(), none());
-            if (del_orig.is(none())) {
+            if (!hasattr(h_type, orig_field.c_str())) {
                 // Get non-instance-bound method (analogous `tp_del`)
                 // Is there a way to check if `__del__` is an instance-assigned method? (Rather than a class method?)
-                del_orig = getattr(h_type, "__del__", none());
+                object del_orig = getattr(h_type, "__del__", none());
                 holder_type& holder = v_h.holder<holder_type>();
                 // The holder will not change address during the lifetime of this object,
                 // as it will always live in the instance (for `simple_holder` types).
@@ -1639,7 +1638,6 @@ private:
                 // NOTE: This is NOT tied to this particular type.
                 auto del_new = [orig_field](handle h_self) {
                   // TODO(eric.cousineau): Make this global, not tied to this type.
-                  std::cout << "CALLING WRAPPED DTOR" << std::endl;
                   object del_orig = getattr(h_self.get_type(), orig_field.c_str());
                   del_wrapped(h_self, del_orig);
                 };
