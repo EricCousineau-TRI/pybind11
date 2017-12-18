@@ -1637,6 +1637,7 @@ private:
                 // NOTE: This is NOT tied to this particular type.
                 auto del_new = [orig_field](handle h_self) {
                   // TODO(eric.cousineau): Make this global, not tied to this type.
+                  std::cout << "CALLING WRAPPED DTOR" << std::endl;
                   object del_orig = getattr(h_self.get_type(), orig_field.c_str());
                   del_wrapped(h_self, del_orig);
                 };

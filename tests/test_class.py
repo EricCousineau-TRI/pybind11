@@ -234,34 +234,31 @@ def test_class_refcount():
     """Instances must correctly increase/decrease the reference count of their types (#1029)"""
     from sys import getrefcount
 
-
-
     class PyDog(m.Dog):
         pass
 
     for cls in m.Dog, PyDog:
-        refcount_1 = getrefcount(cls)
-        molly = [cls("Molly") for _ in range(10)]
-        refcount_2 = getrefcount(cls)
+        for i in xrange(5):
+            refcount_1 = getrefcount(cls)
+            molly = [cls("Molly") for _ in range(10)]
+            refcount_2 = getrefcount(cls)
 
-        del molly
-        pytest.gc_collect()
-        refcount_3 = getrefcount(cls)
+            del molly
+            pytest.gc_collect()
+            refcount_3 = getrefcount(cls)
 
-        if cls == PyDog:
-            import gc
-            import inspect
-            refs = gc.get_referrers(cls)
-            for ref in refs:
-                print(ref)
-                try:
-                    lines = inspect.getsourcelines(ref)[0]
-                    print("\n".join(lines))
-                except:
-                    pass
-                print("---")
-        assert refcount_1 == refcount_3
-        assert refcount_2 > refcount_1
+            if cls == PyDog and i == 0:
+                # If this is the first time the derived class is called, then 
+                # creating the instance created the dtor hook, introducing two new references:
+                #  1. Redirecting the unbound __del__ method
+                #  2. Creating the new __del__method that refers to the class.
+                assert refcount_1 + 2 == refcount_3
+            else:
+                assert refcount_1 == refcount_3
+            assert refcount_2 > refcount_1
+
+    # @note Deleting `PyDog` does not return the refcount of `m.Dog` back to zero, due to refcounting.
+    assert False
 
 
 def test_reentrant_implicit_conversion_failure(msg):
