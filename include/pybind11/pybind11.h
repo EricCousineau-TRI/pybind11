@@ -1244,7 +1244,9 @@ public:
         // Right now, this doesn't really type-erase anything...
         if (allow_destruct(inst, holder_raw)) {
             // Call the old destructor.
-            del_orig(self);
+            if (del_orig != none()) {
+                del_orig(self);
+            }
         } else {
             // This should have been kept alive by an increment in number of references.
             unused(orig_count);
