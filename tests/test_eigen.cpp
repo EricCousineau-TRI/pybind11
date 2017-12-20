@@ -321,4 +321,9 @@ TEST_SUBMODULE(eigen, m) {
         py::module::import("numpy").attr("ones")(10);
         return v[0](5);
     });
+
+    m.def("get_eigen_shared_ptr", []() {
+        return std::unique_ptr<Eigen::VectorXd>(
+            new Eigen::VectorXd(Eigen::VectorXd::Constant(1, 0.)));
+    });
 }
