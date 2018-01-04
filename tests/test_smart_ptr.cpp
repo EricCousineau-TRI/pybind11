@@ -56,6 +56,32 @@ public:
 };
 PYBIND11_DECLARE_HOLDER_TYPE(T, custom_unique_ptr<T>);
 
+template <typename T, bool do_keep_alive, typename Ptr = std::unique_ptr<T>>
+class Container {
+public:
+    Container(Ptr ptr)
+        : ptr_(std::move(ptr)) {
+        print_created(this);
+    }
+    ~Container() {
+        print_destroyed(this);
+    }
+    T* get() const { return ptr_.get(); }
+    Ptr release() { return std::move(ptr_); }
+
+    static void def(py::module &m, const std::string& name) {
+        py::class_<Container> cls(m, name.c_str());
+        if (do_keep_alive) {
+            cls.def(py::init<Ptr>(), py::keep_alive<2, 1>());
+        } else {
+            cls.def(py::init<Ptr>());
+        }
+        cls.def("get", &Container::get);
+        cls.def("release", &Container::release);
+    }
+private:
+    Ptr ptr_;
+};
 
 TEST_SUBMODULE(smart_ptr, m) {
 
@@ -303,6 +329,9 @@ TEST_SUBMODULE(smart_ptr, m) {
             obj.reset();
             return nullptr;
         });
+
+    Container<UniquePtrHeld, true>::def(m, "ContainerKeepAlive");
+    Container<UniquePtrHeld, false>::def(m, "ContainerPlain");
 
     // Ensure class is non-empty, so it's easier to detect double-free
     // corruption. (If empty, this may be harder to see easily.)

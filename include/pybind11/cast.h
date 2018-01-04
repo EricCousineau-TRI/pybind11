@@ -553,6 +553,9 @@ inline LoadType determine_load_type(handle src, const type_info* typeinfo,
     }
 }
 
+inline void clear_patients(PyObject *self);
+
+
 class type_caster_generic {
 public:
     PYBIND11_NOINLINE type_caster_generic(const std::type_info &type_info)
@@ -586,12 +589,17 @@ public:
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
                     instance* const inst = it_i->second;
+                    handle h((PyObject *)inst);
 
                     bool try_to_reclaim = false;
                     if (!is_bare_ptr) {
                         switch (instance_type->release_info.holder_type_id) {
                             case detail::HolderTypeId::UniquePtr: {
                                 try_to_reclaim = take_ownership;
+                                if (take_ownership) {
+                                    // If pybind is taking ownership, then we can release all patients that have this as a nurse.
+                                    clear_patients(h.ptr());
+                                }
                                 break;
                             }
                             case detail::HolderTypeId::SharedPtr: {
@@ -632,7 +640,7 @@ public:
                         // TODO(eric.cousineau): Should really check that ownership is consistent.
                         // e.g. if we say to take ownership of a pointer that is passed, does not have a holder...
                         // In the end, pybind11 would let ownership slip, and leak memory, possibly violating RAII (if someone is using that...)
-                        return handle((PyObject *) it_i->second).inc_ref();
+                        return h.inc_ref();
                     }
                 }
             }

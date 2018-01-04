@@ -1,4 +1,5 @@
 import pytest
+import weakref
 from pybind11_tests import smart_ptr as m
 from pybind11_tests import ConstructorStats
 
@@ -238,6 +239,44 @@ def test_unique_ptr_arg():
 
     assert m.unique_ptr_pass_through(None) is None
     m.unique_ptr_terminal(None)
+
+
+def test_unique_ptr_keep_alive():
+    obj_stats = ConstructorStats.get(m.UniquePtrHeld)
+    c_plain_stats = ConstructorStats.get(m.ContainerPlain)
+    c_keep_stats = ConstructorStats.get(m.ContainerKeepAlive)
+
+    # Try with plain container.
+    obj = m.UniquePtrHeld(1)
+    c_plain = m.ContainerPlain(obj)
+    c_plain_wref = weakref.ref(c_plain)
+    assert obj_stats.alive() == 1
+    assert c_plain_stats.alive() == 1
+    del c_plain
+    pytest.gc_collect()
+    # Everything should have died.
+    assert c_plain_wref() is None
+    assert c_plain_stats.alive() == 0
+    assert obj_stats.alive() == 0
+    del obj
+
+    # Now try with keep-alive container.
+    obj = m.UniquePtrHeld(1)
+    c_keep = m.ContainerKeepAlive(obj)
+    c_keep_wref = weakref.ref(c_keep)
+    assert obj_stats.alive() == 1
+    assert c_keep_stats.alive() == 1
+    del c_keep
+    pytest.gc_collect()
+    # Everything should have stayed alive.
+    assert c_keep_wref() is not None
+    assert c_keep_stats.alive() == 1
+    assert obj_stats.alive() == 1
+    # Now release the object. This should have released the container as a patient.
+    c_keep_wref().release()
+    pytest.gc_collect()
+    assert obj_stats.alive() == 1
+    assert c_keep_stats.alive() == 0
 
 
 def test_unique_ptr_to_shared_ptr():
