@@ -260,8 +260,23 @@ def test_unique_ptr_keep_alive():
     assert obj_stats.alive() == 0
     del obj
 
+    # Ensure keep_alive via `reference_internal` still works.
+    obj = m.UniquePtrHeld(2)
+    c_plain = m.ContainerPlain(obj)
+    assert c_plain.get() is obj  # Trigger keep_alive
+    assert obj_stats.alive() == 1
+    assert c_plain_stats.alive() == 1
+    del c_plain
+    pytest.gc_collect()
+    assert obj_stats.alive() == 1
+    assert c_plain_stats.alive() == 1
+    del obj
+    pytest.gc_collect()
+    assert obj_stats.alive() == 0
+    assert c_plain_stats.alive() == 0
+
     # Now try with keep-alive container.
-    obj = m.UniquePtrHeld(1)
+    obj = m.UniquePtrHeld(3)
     c_keep = m.ContainerKeepAlive(obj)
     c_keep_wref = weakref.ref(c_keep)
     assert obj_stats.alive() == 1
@@ -276,6 +291,15 @@ def test_unique_ptr_keep_alive():
     c_keep_wref().release()
     pytest.gc_collect()
     assert obj_stats.alive() == 1
+    assert c_keep_stats.alive() == 0
+
+    # Check with nullptr.
+    c_keep = m.ContainerKeepAlive(None)
+    assert c_keep_stats.alive() == 1
+    obj = c_keep.get()
+    assert obj is None
+    del c_keep
+    pytest.gc_collect()
     assert c_keep_stats.alive() == 0
 
 

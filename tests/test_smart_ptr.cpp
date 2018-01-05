@@ -76,7 +76,8 @@ public:
         } else {
             cls.def(py::init<Ptr>());
         }
-        cls.def("get", &Container::get);
+        // TODO: Figure out why reference_internal does not work???
+        cls.def("get", &Container::get, py::keep_alive<0, 1>()); //py::return_value_policy::reference_internal);
         cls.def("release", &Container::release);
     }
 private:
