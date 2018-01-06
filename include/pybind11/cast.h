@@ -1468,6 +1468,9 @@ protected:
 template <typename T>
 class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::shared_ptr<T>> { };
 
+// Use by `move_only_holder_caster`.
+inline void clear_patients(PyObject *self);
+
 template <typename type, typename holder_type>
 struct move_only_holder_caster : type_caster_base<type> {
         using base = type_caster_base<type>;
@@ -1497,6 +1500,8 @@ struct move_only_holder_caster : type_caster_base<type> {
         auto *ptr = holder_helper<holder_type>::get(src);
         handle h = type_caster_base<type>::cast_holder(ptr, &src);
         assert(src.get() == nullptr);
+        // If this instance is now owend by pybind, release any existing patients (owners).
+        clear_patients(h.ptr());
         return h;
     }
 

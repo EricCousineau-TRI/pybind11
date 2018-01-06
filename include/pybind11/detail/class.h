@@ -222,9 +222,6 @@ inline bool deregister_instance_impl(void *ptr, instance *self) {
     auto &registered_instances = get_internals().registered_instances;
     auto range = registered_instances.equal_range(ptr);
     for (auto it = range.first; it != range.second; ++it) {
-        // Do not use `Py_TYPE(...)` comparisons, because `malloc` may
-        // recycle memory, and return a new object with the same address as
-        // an old object.
         if (self == it->second) {
             registered_instances.erase(it);
             return true;
@@ -299,6 +296,8 @@ inline void add_patient(PyObject *nurse, PyObject *patient) {
 
 inline void clear_patients(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
+    if (!instance->has_patients)
+        return;
     auto &internals = get_internals();
     auto pos = internals.patients.find(self);
     assert(pos != internals.patients.end());
