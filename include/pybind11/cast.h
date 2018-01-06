@@ -1455,13 +1455,20 @@ template <typename T>
 class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::shared_ptr<T>> { };
 
 template <typename type, typename holder_type>
-struct move_only_holder_caster {
+struct move_only_holder_caster : type_caster_base<type> {
+        using base = type_caster_base<type>;
+    static_assert(std::is_base_of<base, type_caster<type>>::value,
+            "Holder classes are only supported for custom types");
+    using base::base;
+    using base::cast;
+    using base::typeinfo;
+    using base::value;
+
     static_assert(std::is_base_of<type_caster_base<type>, type_caster<type>>::value,
             "Holder classes are only supported for custom types");
 
-    static handle cast(holder_type &&src, return_value_policy, handle) {
-        auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, &src);
+    bool load(handle src, bool convert) {
+        return base::template load_impl<move_only_holder_caster<type, holder_type>>(src, convert);
     }
 
     // Force rvalue.
@@ -1469,10 +1476,40 @@ struct move_only_holder_caster {
     using cast_op_type = holder_type&&;
 
     operator holder_type&&() {
-        throw std::runtime_error("Currently unsupported");
+        return std::move(holder);
+    }
+
+    static handle cast(holder_type &&src, return_value_policy, handle) {
+        auto *ptr = holder_helper<holder_type>::get(src);
+        return type_caster_base<type>::cast_holder(ptr, &src);
     }
 
     static constexpr auto name = type_caster_base<type>::name;
+protected:
+    friend class type_caster_generic;
+    void check_holder_compat() {}
+
+    bool load_value(value_and_holder &&v_h) {
+        if (v_h.holder_constructed()) {
+            holder = std::move(v_h.template holder<holder_type>());
+            return true;
+        } else {
+            throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
+#if defined(NDEBUG)
+                             "(compile in debug mode for type information)");
+#else
+                             "of type '" + type_id<holder_type>() + "''");
+#endif
+        }
+    }
+
+    // TODO(eric.cousineau): Resolve this.
+    bool try_implicit_casts(handle, bool) { return false; }
+
+    static bool try_direct_conversions(handle) { return false; }
+
+private:
+    holder_type holder;
 };
 
 template <typename type, typename deleter>
@@ -1631,6 +1668,26 @@ template <typename T> T handle::cast() const { return pybind11::cast<T>(*this); 
 template <> inline void handle::cast() const { return; }
 
 template <typename T>
+detail::enable_if_t<
+        // TODO(eric.cousineau): Figure out how to prevent perfect-forwarding more elegantly.
+        std::is_rvalue_reference<T&&>::value && !detail::is_pyobject<detail::intrinsic_t<T>>::value, object>
+    move(T&& value) {
+    // TODO(eric.cousineau): Add policies, parent, etc.
+    // It'd be nice to supply a parent, but for now, just leave it as-is.
+    handle no_parent;
+    return reinterpret_steal<object>(
+        detail::make_caster<T>::cast(std::move(value), return_value_policy::take_ownership, no_parent));
+}
+
+template <typename T>
+detail::enable_if_t<
+        std::is_rvalue_reference<T&&>::value && !detail::is_pyobject<detail::intrinsic_t<T>>::value, object>
+    cast(T&& value) {
+    // Have to use `pybind11::move` because some compilers might try to bind `move` to `std::move`...
+    return pybind11::move<T>(std::move(value));
+}
+
+template <typename T>
 detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
     if (obj.ref_count() > 1)
 #if defined(NDEBUG)
@@ -1642,7 +1699,7 @@ detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
 #endif
 
     // Move into a temporary and return that, because the reference may be a local value of `conv`
-    T ret = std::move(detail::load_type<T>(obj).operator T&());
+    T ret = std::move(detail::cast_op<T>(detail::load_type<T>(obj)));
     return ret;
 }
 
