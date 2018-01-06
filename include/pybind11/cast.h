@@ -508,12 +508,17 @@ public:
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
                     instance *inst = it_i->second;
-                    if (existing_holder) {
+                    bool do_reclaim = false;
+                    // Only reclaim if (a) we have an existing holder and (b) if it's a move-only holder.
+                    if (existing_holder && tinfo->default_holder) {
+                        // TODO: Move `default_holder` into `holder_info`.
+                        do_reclaim = true;
+                    }
+                    if (do_reclaim) {
                         // Requesting reclaim from C++.
                         value_and_holder v_h = inst->get_value_and_holder(tinfo);
-                        // TODO(eric.cousineau): Add `holder_type_erased` to fix this.
-                        void *existing_holder_write = const_cast<void*>(existing_holder);
-                        tinfo->holder_info.reclaim(v_h, existing_holder_write);
+                        // TODO(eric.cousineau): Add `holder_type_erased` to avoid need for `const_cast`?.
+                        tinfo->holder_info.reclaim(v_h, const_cast<void*>(existing_holder));
                     }
                     return handle((PyObject *) inst).inc_ref();
                 }
