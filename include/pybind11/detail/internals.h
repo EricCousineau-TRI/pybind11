@@ -110,9 +110,11 @@ struct type_info {
     bool module_local : 1;
     /* Holder information. (For now, just release. Eventually, type and reclaim.) */
     struct holder_info_t {
-        typedef void (*release_t)(detail::value_and_holder& v_h, void* existing_holder_raw);
+        typedef void (*transfer_t)(detail::value_and_holder& v_h, void* existing_holder_raw);
         // Release an instance to C++.
-        release_t release = nullptr;
+        transfer_t release = nullptr;
+        // Reclaim an instance from C++.
+        transfer_t reclaim = nullptr;
     };
     holder_info_t holder_info;
 };

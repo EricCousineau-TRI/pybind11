@@ -1055,6 +1055,7 @@ public:
         record.dealloc = dealloc;
         record.default_holder = std::is_same<holder_type, std::unique_ptr<type>>::value;
         record.holder_info.release = holder_release;
+        record.holder_info.reclaim = holder_reclaim;
         set_operator_new<type>(&record);
 
         /* Register base classes specified via template arguments to class_, if any */
@@ -1072,6 +1073,7 @@ public:
     }
 
     static void holder_release(detail::value_and_holder& v_h, void* external_holder_raw) {
+        // Release from `v_h.holder<...>()` into `external_holder`.
         assert(v_h.inst->owned && v_h.holder_constructed() && "Internal error: Object must be owned");
         assert(external_holder_raw && "Internal error: External holder must not be null");
         holder_type& holder = v_h.holder<holder_type>();
@@ -1080,6 +1082,16 @@ public:
         holder.~holder_type();
         v_h.set_holder_constructed(false);
         v_h.inst->owned = false;
+    }
+
+    static void holder_reclaim(detail::value_and_holder& v_h, void* external_holder_raw) {
+        // Reclaim from `external_holder` into `v_h.holder<...>()`.
+        assert(!v_h.inst->owned && !v_h.holder_constructed() && "Internal error: Object must not be owned");
+        assert(external_holder_raw && "Internal error: External holder must not be null");
+        holder_type& external_holder = *reinterpret_cast<holder_type*>(external_holder_raw);
+        new (&v_h.holder<holder_type>()) holder_type(std::move(external_holder));
+        v_h.set_holder_constructed();
+        v_h.inst->owned = true;
     }
 
     template <typename Base, detail::enable_if_t<is_base<Base>::value, int> = 0>

@@ -509,11 +509,11 @@ public:
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
                     instance *inst = it_i->second;
                     if (existing_holder) {
-                        // Requesting release to C++.
+                        // Requesting reclaim from C++.
                         value_and_holder v_h = inst->get_value_and_holder(tinfo);
-                        // TODO(eric.cousineau): Blech. Add `holder_type_erased` to fix this.
+                        // TODO(eric.cousineau): Add `holder_type_erased` to fix this.
                         void *existing_holder_write = const_cast<void*>(existing_holder);
-                        tinfo->holder_info.release(v_h, existing_holder_write);
+                        tinfo->holder_info.reclaim(v_h, existing_holder_write);
                     }
                     return handle((PyObject *) inst).inc_ref();
                 }
@@ -1491,7 +1491,6 @@ struct move_only_holder_caster : type_caster_base<type> {
     static handle cast(holder_type &&src, return_value_policy, handle) {
         auto *ptr = holder_helper<holder_type>::get(src);
         handle h = type_caster_base<type>::cast_holder(ptr, &src);
-        // Ensure that we have successfully moved the value out.
         assert(src.get() == nullptr);
         return h;
     }
@@ -1503,7 +1502,9 @@ protected:
 
     bool load_value(value_and_holder &&v_h) {
         if (v_h.holder_constructed()) {
-            holder = std::move(v_h.template holder<holder_type>());
+            // Do NOT use `v_h.type`.
+            typeinfo->holder_info.release(v_h, &holder);
+            assert(v_h.holder<holder_type>().get() == nullptr);
             return true;
         } else {
             throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
