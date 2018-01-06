@@ -222,7 +222,10 @@ inline bool deregister_instance_impl(void *ptr, instance *self) {
     auto &registered_instances = get_internals().registered_instances;
     auto range = registered_instances.equal_range(ptr);
     for (auto it = range.first; it != range.second; ++it) {
-        if (Py_TYPE(self) == Py_TYPE(it->second)) {
+        // Do not use `Py_TYPE(...)` comparisons, because `malloc` may
+        // recycle memory, and return a new object with the same address as
+        // an old object.
+        if (self == it->second) {
             registered_instances.erase(it);
             return true;
         }
@@ -315,7 +318,8 @@ inline void clear_instance(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
 
     // Deallocate any values/holders, if present:
-    for (auto &v_h : values_and_holders(instance)) {
+    auto v_h_list = values_and_holders(instance);
+    for (auto &v_h : v_h_list) {
         if (v_h) {
 
             // We have to deregister before we call dealloc because, for virtual MI types, we still
