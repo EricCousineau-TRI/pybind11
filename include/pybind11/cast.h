@@ -506,8 +506,17 @@ public:
         auto it_instances = get_internals().registered_instances.equal_range(src);
         for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
-                if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype))
-                    return handle((PyObject *) it_i->second).inc_ref();
+                if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
+                    instance *inst = it_i->second;
+                    if (existing_holder) {
+                        // Requesting release to C++.
+                        value_and_holder v_h = inst->get_value_and_holder(tinfo);
+                        // TODO(eric.cousineau): Blech. Add `holder_type_erased` to fix this.
+                        void *existing_holder_write = const_cast<void*>(existing_holder);
+                        tinfo->holder_info.release(v_h, existing_holder_write);
+                    }
+                    return handle((PyObject *) inst).inc_ref();
+                }
             }
         }
 
@@ -1481,7 +1490,10 @@ struct move_only_holder_caster : type_caster_base<type> {
 
     static handle cast(holder_type &&src, return_value_policy, handle) {
         auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, &src);
+        handle h = type_caster_base<type>::cast_holder(ptr, &src);
+        // Ensure that we have successfully moved the value out.
+        assert(src.get() == nullptr);
+        return h;
     }
 
     static constexpr auto name = type_caster_base<type>::name;

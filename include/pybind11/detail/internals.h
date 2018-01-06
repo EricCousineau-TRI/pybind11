@@ -108,6 +108,13 @@ struct type_info {
     bool default_holder : 1;
     /* true if this is a type registered with py::module_local */
     bool module_local : 1;
+    /* Holder information. (For now, just release. Eventually, type and reclaim.) */
+    struct holder_info_t {
+        typedef void (*release_t)(detail::value_and_holder& v_h, void* existing_holder_raw);
+        // Release an instance to C++.
+        release_t release = nullptr;
+    };
+    holder_info_t holder_info;
 };
 
 /// Tracks the `internals` and `type_info` ABI version independent of the main library version
