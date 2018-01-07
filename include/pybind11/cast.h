@@ -1603,14 +1603,22 @@ T cast(const handle &handle) {
 template <typename T, detail::enable_if_t<detail::is_pyobject<T>::value, int> = 0>
 T cast(const handle &handle) { return T(reinterpret_borrow<object>(handle)); }
 
+template <typename>
+struct is_mutable_lvalue_reference : public std::false_type {};
+template <typename T>
+struct is_mutable_lvalue_reference<T&> : public std::true_type {};
+template <typename T>
+struct is_mutable_lvalue_reference<const T&> : public std::false_type {};
+
 // C++ type -> py::object
-template <typename T, detail::enable_if_t<!detail::is_pyobject<T>::value, int> = 0>
-object cast(const T &value, return_value_policy policy = return_value_policy::automatic_reference,
-            handle parent = handle()) {
+template <typename T, detail::enable_if_t<!detail::is_pyobject<detail::intrinsic_t<T>>::value, int> = 0>
+object cast(T &&value, return_value_policy policy = return_value_policy::automatic_reference, handle parent = handle()) {
+    using TI = detail::intrinsic_t<T>;
     if (policy == return_value_policy::automatic)
-        policy = std::is_pointer<T>::value ? return_value_policy::take_ownership : return_value_policy::copy;
+        policy = std::is_pointer<TI>::value ? return_value_policy::take_ownership : return_value_policy::copy;
     else if (policy == return_value_policy::automatic_reference)
-        policy = std::is_pointer<T>::value ? return_value_policy::reference : return_value_policy::copy;
+        policy = std::is_pointer<TI>::value || is_mutable_lvalue_reference<T&&>::value
+                 ? return_value_policy::reference : return_value_policy::copy;
     return reinterpret_steal<object>(detail::make_caster<T>::cast(value, policy, parent));
 }
 
