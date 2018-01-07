@@ -479,6 +479,18 @@ inline PyThreadState *get_thread_state_unchecked() {
 inline void keep_alive_impl(handle nurse, handle patient);
 inline PyObject *make_new_instance(PyTypeObject *type);
 
+inline void reclaim_existing_if_needed(
+        instance *inst, const detail::type_info *tinfo, const void *existing_holder) {
+    // Only reclaim if (a) we have an existing holder and (b) if it's a move-only holder.
+    // TODO: Remove `default_holder`, store more descriptive holder information.
+    if (existing_holder && tinfo->default_holder) {
+        // Requesting reclaim from C++.
+        value_and_holder v_h = inst->get_value_and_holder(tinfo);
+        // TODO(eric.cousineau): Add `holder_type_erased` to avoid need for `const_cast`.
+        tinfo->holder_info.reclaim(v_h, const_cast<void*>(existing_holder));
+    }
+}
+
 class type_caster_generic {
 public:
     PYBIND11_NOINLINE type_caster_generic(const std::type_info &type_info)
@@ -507,19 +519,9 @@ public:
         for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
             for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
                 if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
+                    // Casting for an already registered type. Return existing reference.
                     instance *inst = it_i->second;
-                    bool do_reclaim = false;
-                    // Only reclaim if (a) we have an existing holder and (b) if it's a move-only holder.
-                    if (existing_holder && tinfo->default_holder) {
-                        // TODO: Move `default_holder` into `holder_info`.
-                        do_reclaim = true;
-                    }
-                    if (do_reclaim) {
-                        // Requesting reclaim from C++.
-                        value_and_holder v_h = inst->get_value_and_holder(tinfo);
-                        // TODO(eric.cousineau): Add `holder_type_erased` to avoid need for `const_cast`?.
-                        tinfo->holder_info.reclaim(v_h, const_cast<void*>(existing_holder));
-                    }
+                    reclaim_existing_if_needed(inst, tinfo, existing_holder);
                     return handle((PyObject *) inst).inc_ref();
                 }
             }
