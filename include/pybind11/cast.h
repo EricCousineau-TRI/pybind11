@@ -1389,6 +1389,16 @@ struct holder_helper {
     static auto get(const T &p) -> decltype(p.get()) { return p.get(); }
 };
 
+template <typename holder_type>
+cast_error cast_error_holder_unheld() {
+    return cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
+#if defined(NDEBUG)
+                     "(compile in debug mode for type information)");
+#else
+                     "of type '" + type_id<holder_type>() + "''");
+#endif
+}
+
 /// Type caster for holder types like std::shared_ptr, etc.
 template <typename type, typename holder_type>
 struct copyable_holder_caster : public type_caster_base<type> {
@@ -1435,12 +1445,7 @@ protected:
             holder = v_h.template holder<holder_type>();
             return true;
         } else {
-            throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
-#if defined(NDEBUG)
-                             "(compile in debug mode for type information)");
-#else
-                             "of type '" + type_id<holder_type>() + "''");
-#endif
+            throw cast_error_holder_unheld<holder_type>();
         }
     }
 
@@ -1462,7 +1467,7 @@ protected:
 
     static bool try_direct_conversions(handle) { return false; }
 
-
+private:
     holder_type holder;
 };
 
@@ -1472,16 +1477,13 @@ class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::sh
 
 template <typename type, typename holder_type>
 struct move_only_holder_caster : type_caster_base<type> {
-        using base = type_caster_base<type>;
+    using base = type_caster_base<type>;
     static_assert(std::is_base_of<base, type_caster<type>>::value,
             "Holder classes are only supported for custom types");
     using base::base;
     using base::cast;
     using base::typeinfo;
     using base::value;
-
-    static_assert(std::is_base_of<type_caster_base<type>, type_caster<type>>::value,
-            "Holder classes are only supported for custom types");
 
     bool load(handle src, bool convert) {
         return base::template load_impl<move_only_holder_caster<type, holder_type>>(src, convert);
@@ -1502,7 +1504,6 @@ struct move_only_holder_caster : type_caster_base<type> {
         return h;
     }
 
-    static constexpr auto name = type_caster_base<type>::name;
 protected:
     friend class type_caster_generic;
     void check_holder_compat() {}
@@ -1514,12 +1515,7 @@ protected:
             assert(v_h.holder<holder_type>().get() == nullptr);
             return true;
         } else {
-            throw cast_error("Unable to cast from non-held to held instance (T& to Holder<T>) "
-#if defined(NDEBUG)
-                             "(compile in debug mode for type information)");
-#else
-                             "of type '" + type_id<holder_type>() + "''");
-#endif
+            throw cast_error_holder_unheld<holder_type>();
         }
     }
 
