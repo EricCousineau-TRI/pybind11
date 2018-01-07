@@ -250,8 +250,8 @@ struct type_record {
     /// Is the class definition local to the module shared object?
     bool module_local : 1;
 
-    /* See `type_info::holder_info_t` for more information.) */
-    type_info::holder_info_t holder_info;
+    /* See `type_info::ownership_info_t` for more information.) */
+    type_info::ownership_info_t ownership_info;
 
     PYBIND11_NOINLINE void add_base(const std::type_info &base, void *(*caster)(void *)) {
         auto base_info = detail::get_type_info(base, false);

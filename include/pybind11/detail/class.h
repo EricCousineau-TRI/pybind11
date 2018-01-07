@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "../attr.h"
 
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
@@ -222,7 +224,7 @@ inline bool deregister_instance_impl(void *ptr, instance *self) {
     auto &registered_instances = get_internals().registered_instances;
     auto range = registered_instances.equal_range(ptr);
     for (auto it = range.first; it != range.second; ++it) {
-        if (self == it->second) {
+        if (self == it->second && Py_TYPE(self) == Py_TYPE(it->second)) {
             registered_instances.erase(it);
             return true;
         }
@@ -294,6 +296,15 @@ inline void add_patient(PyObject *nurse, PyObject *patient) {
     internals.patients[nurse].push_back(patient);
 }
 
+inline bool has_patient(PyObject *nurse, PyObject *patient) {
+    auto &internals = get_internals();
+    auto instance = reinterpret_cast<detail::instance *>(nurse);
+    if (!instance->has_patients)
+        return false;
+    auto& cur = internals.patients[nurse];
+    return (std::find(cur.begin(), cur.end(), patient) != cur.end());
+}
+
 inline void clear_patients(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
     if (!instance->has_patients)
@@ -317,8 +328,7 @@ inline void clear_instance(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
 
     // Deallocate any values/holders, if present:
-    auto v_h_list = values_and_holders(instance);
-    for (auto &v_h : v_h_list) {
+    for (auto &v_h : values_and_holders(instance)) {
         if (v_h) {
 
             // We have to deregister before we call dealloc because, for virtual MI types, we still

@@ -60,7 +60,7 @@ def test_methods_and_attributes():
     assert cstats.default_constructions == 1
     assert cstats.copy_constructions == 2
     # On most platforms, there should be 2 moves. VisualStudio builds count 3.
-    assert cstats.move_constructions == 2 || cstats.move_constructions == 3
+    assert cstats.move_constructions == 2 or cstats.move_constructions == 3
     assert cstats.copy_assignments == 0
     assert cstats.move_assignments == 0
 

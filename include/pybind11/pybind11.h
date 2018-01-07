@@ -899,7 +899,7 @@ protected:
         tinfo->simple_ancestors = true;
         tinfo->default_holder = rec.default_holder;
         tinfo->module_local = rec.module_local;
-        tinfo->holder_info = rec.holder_info;
+        tinfo->ownership_info = rec.ownership_info;
 
         auto &internals = get_internals();
         auto tindex = std::type_index(*rec.type);
@@ -1054,8 +1054,8 @@ public:
         record.init_instance = init_instance;
         record.dealloc = dealloc;
         record.default_holder = std::is_same<holder_type, std::unique_ptr<type>>::value;
-        record.holder_info.release = holder_release;
-        record.holder_info.reclaim = holder_reclaim;
+        record.ownership_info.release = holder_release;
+        record.ownership_info.reclaim = holder_reclaim;
         set_operator_new<type>(&record);
 
         /* Register base classes specified via template arguments to class_, if any */
@@ -1087,9 +1087,15 @@ public:
     static void holder_reclaim(detail::value_and_holder& v_h, void* external_holder_raw) {
         // Reclaim from `external_holder` into `v_h.holder<...>()`.
         assert(!v_h.inst->owned && !v_h.holder_constructed() && "Internal error: Object must not be owned");
-        assert(external_holder_raw && "Internal error: External holder must not be null");
-        holder_type& external_holder = *reinterpret_cast<holder_type*>(external_holder_raw);
-        new (&v_h.holder<holder_type>()) holder_type(std::move(external_holder));
+        holder_type& holder = v_h.holder<holder_type>();
+        if (external_holder_raw) {
+            // Take from external holder.
+            holder_type& external_holder = *reinterpret_cast<holder_type*>(external_holder_raw);
+            new (&holder) holder_type(std::move(external_holder));
+        } else {
+            // Construct new holder, using existing value.
+            new (&holder) holder_type(v_h.value_ptr<type>());
+        }
         v_h.set_holder_constructed();
         v_h.inst->owned = true;
         // If this instance is now owend by pybind, release any existing
