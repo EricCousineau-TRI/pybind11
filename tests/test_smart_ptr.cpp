@@ -56,6 +56,74 @@ public:
 };
 PYBIND11_DECLARE_HOLDER_TYPE(T, custom_unique_ptr<T>);
 
+using std::unique_ptr;
+
+template <typename NurseT>
+void end_ownership(unique_ptr<NurseT> nurse_ptr) {
+    if (nurse_ptr && py::detail::cast_existing(nurse_ptr.get())) {
+        // Release object to be managed by pybind.
+        py::move(std::move(nurse_ptr));
+    }
+}
+
+template <typename T>
+unique_ptr<T> create_unique(T* raw) {
+    return unique_ptr<T>(raw);
+}
+
+enum class KeepAliveType : int {
+    Plain = 0,
+    KeepAlive,
+    ExposeOwnership,
+};
+
+template <
+    typename T,
+    KeepAliveType keep_alive_type>
+class Container {
+public:
+    using Ptr = std::unique_ptr<T>;
+    Container(Ptr ptr)
+        : ptr_(std::move(ptr)) {
+        print_created(this);
+    }
+    ~Container() {
+        if (keep_alive_type == KeepAliveType::ExposeOwnership) {
+            end_ownership(std::move(ptr_));
+        }
+        print_destroyed(this);
+    }
+    T* get() const { return ptr_.get(); }
+    Ptr release() {
+        return std::move(ptr_);
+    }
+    void reset(Ptr ptr) {
+        if (keep_alive_type == KeepAliveType::ExposeOwnership) {
+            end_ownership(std::move(ptr_));
+        }
+        ptr_ = std::move(ptr);
+    }
+    void steal_from(Container* other) {
+        assert(other != nullptr);
+        reset(other->release());
+    }
+
+    static void def(py::module &m, const std::string& name) {
+        py::class_<Container> cls(m, name.c_str());
+        if (keep_alive_type == KeepAliveType::KeepAlive) {
+            cls.def(py::init<Ptr>(), py::keep_alive<2, 1>());
+        } else {
+            cls.def(py::init<Ptr>());
+        }
+        // TODO: Figure out why reference_internal does not work???
+        cls.def("get", &Container::get, py::keep_alive<0, 1>()); //py::return_value_policy::reference_internal);
+        cls.def("release", &Container::release);
+        cls.def("reset", &Container::reset);
+        cls.def("steal_from", &Container::steal_from);
+    }
+private:
+    Ptr ptr_;
+};
 
 TEST_SUBMODULE(smart_ptr, m) {
 
@@ -329,6 +397,25 @@ TEST_SUBMODULE(smart_ptr, m) {
     m.def("unique_ptr_pass_through_cast_to_py",
         [](std::unique_ptr<UniquePtrHeld> obj) {
             return py::cast(std::move(obj));
+        });
+
+    Container<UniquePtrHeld, KeepAliveType::Plain>::def(
+        m, "ContainerPlain");
+    Container<UniquePtrHeld, KeepAliveType::KeepAlive>::def(
+        m, "ContainerKeepAlive");
+    using ContainerExposeOwnership = Container<UniquePtrHeld, KeepAliveType::ExposeOwnership>;
+    ContainerExposeOwnership::def(
+        m, "ContainerExposeOwnership");
+
+    // See what happens when a container is created and destroyed in C++, and
+    // another is returned.
+    m.def("create_container_expose_ownership",
+        [](ContainerExposeOwnership* in) {
+            // This container will be exposed in Python; however, it will disapper
+            // once `obj` is destroyed in Python.
+            if (in->get()->value() != 100)
+                throw std::runtime_error("Bad value");
+            return create_unique(new ContainerExposeOwnership(in->release()));
         });
 
     // Ensure class is non-empty, so it's easier to detect double-free

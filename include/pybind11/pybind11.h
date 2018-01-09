@@ -1335,8 +1335,6 @@ public:
         holder.~holder_type();
         v_h.set_holder_constructed(false);
         inst->owned = false;
-        // Register this type's reclamation procedure, since it's wrapper may have the contained object.
-        inst->reclaim_from_cpp = reclaim_from_cpp;
     }
 
     static object reclaim_from_cpp(detail::instance* inst, detail::holder_erased external_holder_raw) {
@@ -1361,9 +1359,6 @@ public:
             holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
             new (&holder) holder_type(std::move(external_holder));
             v_h.set_holder_constructed(true);
-
-            // Show that it has been reclaimed.
-            inst->reclaim_from_cpp = nullptr;
         }
         object obj;
         switch (load_type) {
@@ -1655,6 +1650,9 @@ private:
         // TODO(eric.cousineau): Inject override of __del__ for intercepting C++ stuff
         handle self((PyObject*)inst);
         handle h_type = self.get_type();
+
+        // Register this type's reclamation procedure, since it's wrapper may have the contained object.
+        inst->reclaim_from_cpp = reclaim_from_cpp;
 
         // Use hacky Python-style inheritance check.
         PyTypeObject *py_type = (PyTypeObject*)h_type.ptr();

@@ -553,6 +553,75 @@ inline LoadType determine_load_type(handle src, const type_info* typeinfo,
     }
 }
 
+// Get the instance for a given type, if it exists.
+inline std::pair<instance*, detail::type_info*> cast_existing_erased(
+        const void* _src, const std::type_info* cpptype) {
+    void *src = const_cast<void*>(_src);
+    auto it_instances = get_internals().registered_instances.equal_range(src);
+    for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
+        for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
+            if (instance_type && same_type(*instance_type->cpptype, *cpptype)) {
+                instance* inst = it_i->second;
+                return {inst, instance_type};
+            }
+        }
+    }
+    return {nullptr, nullptr};
+}
+
+template <typename T>
+inline handle cast_existing(const T* src) {
+    return handle((PyObject*) cast_existing_erased(src, &typeid(T)).first);
+}
+
+inline handle cast_existing_check_for_reclaim(
+        instance* inst, detail::type_info* instance_type, holder_erased existing_holder,
+        bool is_bare_ptr, bool take_ownership) {
+    handle h((PyObject *)inst);
+    if (is_bare_ptr) {
+        return h.inc_ref();
+    }
+    bool try_to_reclaim = false;
+    switch (instance_type->release_info.holder_type_id) {
+        case detail::HolderTypeId::UniquePtr: {
+            try_to_reclaim = take_ownership;
+            break;
+        }
+        case detail::HolderTypeId::SharedPtr: {
+            if (take_ownership) {
+                // Only try to reclaim the object if (a) it is not owned and (b) has no holder.
+                if (!inst->simple_holder_constructed) {
+                    assert(!inst->owned && "Unknown state?");
+                    try_to_reclaim = true;
+                }
+            }
+            break;
+        }
+        default: {
+            // Otherwise, do not try any reclaiming.
+            break;
+        }
+    }
+    if (try_to_reclaim) {
+        // If this object has already been registered, but we wish to take ownership of it,
+        // then use the `has_cpp_release` mechanisms to reclaim ownership.
+        // @note This should be the sole occurrence of this registered object when releasing back.
+        // @note This code path should not be invoked for pure C++
+
+        // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
+        // Need to think of a desirable workflow - and if there is possible interop.
+        assert(existing_holder && "Should have non-null holder");
+        // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
+        // See `move_only_holder_caster::load_value`.
+        assert(inst->reclaim_from_cpp && "Instance is registered but does not have a registered reclaim method");
+        return inst->reclaim_from_cpp(inst, existing_holder).release();
+    } else {
+        // Follow nominal operation.
+        return h.inc_ref();
+    }
+}
+
+
 class type_caster_generic {
 public:
     PYBIND11_NOINLINE type_caster_generic(const std::type_info &type_info)
@@ -581,79 +650,31 @@ public:
         // We only come across `!existing_holder` if we are coming from `cast` and not `cast_holder`.
         const bool is_bare_ptr = !existing_holder.ptr() && existing_holder.type_id() == HolderTypeId::Unknown;
 
-        auto it_instances = get_internals().registered_instances.equal_range(src);
-        for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
-            for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
-                if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype)) {
-                    instance* const inst = it_i->second;
-
-                    bool try_to_reclaim = false;
-                    if (!is_bare_ptr) {
-                        switch (instance_type->release_info.holder_type_id) {
-                            case detail::HolderTypeId::UniquePtr: {
-                                try_to_reclaim = take_ownership;
-                                break;
-                            }
-                            case detail::HolderTypeId::SharedPtr: {
-                                if (take_ownership) {
-                                    // Only try to reclaim the object if (a) it is not owned and (b) has no holder.
-                                    if (!inst->simple_holder_constructed) {
-                                        if (inst->owned)
-                                            throw std::runtime_error("Internal error?");
-                                        try_to_reclaim = true;
-                                    }
-                                }
-                                break;
-                            }
-                            default: {
-                                // Otherwise, do not try any reclaiming.
-                                break;
-                            }
-                        }
-                    }
-                    if (try_to_reclaim) {
-                        // If this object has already been registered, but we wish to take ownership of it,
-                        // then use the `has_cpp_release` mechanisms to reclaim ownership.
-                        // @note This should be the sole occurrence of this registered object when releasing back.
-                        // @note This code path should not be invoked for pure C++
-
-                        // TODO(eric.cousineau): This may be still be desirable if this is a raw pointer...
-                        // Need to think of a desirable workflow - and if there is possible interop.
-                        if (!existing_holder) {
-                            throw std::runtime_error("Internal error: Should have non-null holder.");
-                        }
-                        // TODO(eric.cousineau): This field may not be necessary if the lowest-level type is valid.
-                        // See `move_only_holder_caster::load_value`.
-                        if (!inst->reclaim_from_cpp) {
-                            throw std::runtime_error("Instance is registered but does not have a registered reclaim method. Internal error?");
-                        }
-                        return inst->reclaim_from_cpp(inst, existing_holder).release();
-                    } else {
-                        // TODO(eric.cousineau): Should really check that ownership is consistent.
-                        // e.g. if we say to take ownership of a pointer that is passed, does not have a holder...
-                        // In the end, pybind11 would let ownership slip, and leak memory, possibly violating RAII (if someone is using that...)
-                        return handle((PyObject *) it_i->second).inc_ref();
-                    }
-                }
-            }
+        std::pair<instance*, detail::type_info*> existing_pair =
+            cast_existing_erased(src, tinfo->cpptype);
+        // TODO: What about needing to cast for polymorphic types???
+        if (existing_pair.first) {
+            return cast_existing_check_for_reclaim(
+                existing_pair.first, existing_pair.second, existing_holder, is_bare_ptr, take_ownership);
         }
 
-        auto inst = reinterpret_steal<object>(make_new_instance(tinfo->type));
-        auto wrapper = reinterpret_cast<instance *>(inst.ptr());
-        wrapper->owned = false;
-        void *&valueptr = values_and_holders(wrapper).begin()->value_ptr();
+        // Otherwise, we should go ahead and register the instance.
+        object obj = reinterpret_steal<object>(make_new_instance(tinfo->type));
+        auto inst = reinterpret_cast<instance *>(obj.ptr());
+        inst->owned = false;
+        void *&valueptr = values_and_holders(inst).begin()->value_ptr();
 
         switch (policy) {
             case return_value_policy::automatic:
             case return_value_policy::take_ownership:
                 valueptr = src;
-                wrapper->owned = true;
+                inst->owned = true;
                 break;
 
             case return_value_policy::automatic_reference:
             case return_value_policy::reference:
                 valueptr = src;
-                wrapper->owned = false;
+                inst->owned = false;
                 break;
 
             case return_value_policy::copy:
@@ -662,7 +683,7 @@ public:
                 else
                     throw cast_error("return_value_policy = copy, but the "
                                      "object is non-copyable!");
-                wrapper->owned = true;
+                inst->owned = true;
                 break;
 
             case return_value_policy::move:
@@ -673,22 +694,21 @@ public:
                 else
                     throw cast_error("return_value_policy = move, but the "
                                      "object is neither movable nor copyable!");
-                wrapper->owned = true;
+                inst->owned = true;
                 break;
 
             case return_value_policy::reference_internal:
                 valueptr = src;
-                wrapper->owned = false;
-                keep_alive_impl(inst, parent);
+                inst->owned = false;
+                keep_alive_impl(obj, parent);
                 break;
 
             default:
                 throw cast_error("unhandled return_value_policy: should not happen!");
         }
-
         // TODO(eric.cousineau): Propagate `holder_erased` through this chain.
-        tinfo->init_instance(wrapper, existing_holder);
-        return inst.release();
+        tinfo->init_instance(inst, existing_holder);
+        return obj.release();
     }
 
     // Base methods for generic caster; there are overridden in copyable_holder_caster
