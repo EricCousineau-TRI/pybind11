@@ -71,6 +71,21 @@ unique_ptr<T> create_unique(T* raw) {
     return unique_ptr<T>(raw);
 }
 
+template <typename NurseT, typename OwnerT>
+void release_ownership(const unique_ptr<NurseT>& nurse_ptr, const OwnerT* owner) {
+    // Attempt to get the existing owner.
+    // If it and the nurse exists, ensure that this nurse no longer takes care of this owner.
+    py::handle owner_py = py::detail::cast_existing(owner);
+    if (!owner_py.is_none()) {
+        py::handle nurse_py = py::detail::cast_existing(nurse_ptr.get());
+        if (!nurse_py.is_none()) {
+            if (py::detail::has_patient(nurse_py.ptr(), owner_py.ptr())) {
+                py::detail::remove_patient(nurse_py.ptr(), owner_py.ptr());
+            }
+        }
+    }
+}
+
 enum class KeepAliveType : int {
     Plain = 0,
     KeepAlive,
@@ -95,6 +110,9 @@ public:
     }
     T* get() const { return ptr_.get(); }
     Ptr release() {
+        if (keep_alive_type == KeepAliveType::ExposeOwnership) {
+            release_ownership(ptr_, this);
+        }
         return std::move(ptr_);
     }
     void reset(Ptr ptr) {

@@ -553,6 +553,9 @@ inline LoadType determine_load_type(handle src, const type_info* typeinfo,
     }
 }
 
+inline void clear_patients(PyObject *self);
+
+
 // Get the instance for a given type, if it exists.
 inline std::pair<instance*, detail::type_info*> cast_existing_erased(
         const void* _src, const std::type_info* cpptype) {
@@ -585,6 +588,10 @@ inline handle cast_existing_check_for_reclaim(
     switch (instance_type->release_info.holder_type_id) {
         case detail::HolderTypeId::UniquePtr: {
             try_to_reclaim = take_ownership;
+            if (take_ownership) {
+                // If pybind is taking ownership, then we can release all patients that have this as a nurse.
+                clear_patients(h.ptr());
+            }
             break;
         }
         case detail::HolderTypeId::SharedPtr: {

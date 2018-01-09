@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "../attr.h"
 
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
@@ -286,16 +288,44 @@ extern "C" inline int pybind11_object_init(PyObject *self, PyObject *, PyObject 
     return -1;
 }
 
-inline void add_patient(PyObject *nurse, PyObject *patient) {
-    auto &internals = get_internals();
+inline bool has_patient(PyObject *nurse, PyObject *patient) {
     auto instance = reinterpret_cast<detail::instance *>(nurse);
+    auto& patients_cur = get_internals().patients[nurse];
+    if (instance->has_patients) {
+        if (std::find(patients_cur.begin(), patients_cur.end(), patient) !=
+                patients_cur.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline void add_patient(PyObject *nurse, PyObject *patient) {
+    auto instance = reinterpret_cast<detail::instance *>(nurse);
+    // Check if the patient has already been added.
+    if (has_patient(nurse, patient)) {
+        // No need to add more cruft.
+        return;
+    }
     instance->has_patients = true;
     Py_INCREF(patient);
-    internals.patients[nurse].push_back(patient);
+    get_internals().patients[nurse].push_back(patient);
+}
+
+template <typename T>
+inline void clear_value(std::vector<T>& vec, const T& v) {
+    vec.erase(std::find(vec.begin(), vec.end(), v));
+}
+
+inline void remove_patient(PyObject *nurse, PyObject *patient) {
+    clear_value(get_internals().patients[nurse], patient);
+    Py_CLEAR(patient);
 }
 
 inline void clear_patients(PyObject *self) {
     auto instance = reinterpret_cast<detail::instance *>(self);
+    if (!instance->has_patients)
+        return;
     auto &internals = get_internals();
     auto pos = internals.patients.find(self);
     assert(pos != internals.patients.end());
@@ -305,8 +335,9 @@ inline void clear_patients(PyObject *self) {
     auto patients = std::move(pos->second);
     internals.patients.erase(pos);
     instance->has_patients = false;
-    for (PyObject *&patient : patients)
+    for (PyObject *patient : patients) {
         Py_CLEAR(patient);
+    }
 }
 
 /// Clears all internal data from the instance and removes it from registered instances in
