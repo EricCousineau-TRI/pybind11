@@ -192,12 +192,6 @@ There are two ways to resolve this issue:
 
     class Child : public std::enable_shared_from_this<Child> { };
 
-.. seealso::
-
-    While ownership transfer is generally not an issue with ``std::shared_ptr<Type>``, it becomes an issue when an instance of a Python subclass of a pybind11 class is effectively managed by C++ (e.g. all live references to the object are from C++, and all reference in Python have "died").
-
-    See :ref:`virtual_inheritance_lifetime` for more information.
-
 .. _smart_pointers:
 
 Custom smart pointers
@@ -261,7 +255,7 @@ provides ``.get()`` functionality via ``.getPointer()``.
 
 .. warning::
 
-    Holder type conversion (see :ref:`smart_ptrs_casting`) and advanced ownership transfer (see :ref:`virtual_inheritance_lifetime`) is **not** supported for custom shared pointer types, due to constraints on dynamic type erasure.
+    Holder type conversion (see :ref:`smart_ptrs_casting`) is not supported for custom shared pointer types, due to constraints on dynamic type erasure.
 
 .. _smart_ptrs_casting:
 
