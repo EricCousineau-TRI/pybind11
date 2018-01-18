@@ -225,28 +225,29 @@ TEST_SUBMODULE(factory_constructors, m) {
 
     // test_init_factory_dual
     // Separate alias constructor testing
+    using PyTF7w = py::detail::wrapper<PyTF7>;
     py::class_<TestFactory7, PyTF7, std::shared_ptr<TestFactory7>>(m, "TestFactory7")
         .def(py::init(
             [](int i) { return TestFactory7(i); },
-            [](int i) { return PyTF7(i); }))
+            [](int i) { return PyTF7w(i); }))
         .def(py::init(
             [](pointer_tag, int i) { return new TestFactory7(i); },
-            [](pointer_tag, int i) { return new PyTF7(i); }))
+            [](pointer_tag, int i) { return new PyTF7w(i); }))
         .def(py::init(
             [](mixed_tag, int i) { return new TestFactory7(i); },
-            [](mixed_tag, int i) { return PyTF7(i); }))
+            [](mixed_tag, int i) { return PyTF7w(i); }))
         .def(py::init(
             [](mixed_tag, std::string s) { return TestFactory7((int) s.size()); },
-            [](mixed_tag, std::string s) { return new PyTF7((int) s.size()); }))
+            [](mixed_tag, std::string s) { return new PyTF7w((int) s.size()); }))
         .def(py::init(
             [](base_tag, pointer_tag, int i) { return new TestFactory7(i); },
-            [](base_tag, pointer_tag, int i) { return (TestFactory7 *) new PyTF7(i); }))
+            [](base_tag, pointer_tag, int i) { return (TestFactory7 *) new PyTF7w(i); }))
         .def(py::init(
-            [](alias_tag, pointer_tag, int i) { return new PyTF7(i); },
-            [](alias_tag, pointer_tag, int i) { return new PyTF7(10*i); }))
+            [](alias_tag, pointer_tag, int i) { return new PyTF7w(i); },
+            [](alias_tag, pointer_tag, int i) { return new PyTF7w(10*i); }))
         .def(py::init(
             [](shared_ptr_tag, base_tag, int i) { return std::make_shared<TestFactory7>(i); },
-            [](shared_ptr_tag, base_tag, int i) { auto *p = new PyTF7(i); return std::shared_ptr<TestFactory7>(p); }))
+            [](shared_ptr_tag, base_tag, int i) { auto *p = new PyTF7w(i); return std::shared_ptr<TestFactory7>(p); }))
         .def(py::init(
             [](shared_ptr_tag, invalid_base_tag, int i) { return std::make_shared<TestFactory7>(i); },
             [](shared_ptr_tag, invalid_base_tag, int i) { return std::make_shared<TestFactory7>(i); })) // <-- invalid alias factory
