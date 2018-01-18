@@ -208,13 +208,14 @@ TEST_SUBMODULE(factory_constructors, m) {
 
     // test_init_factory_alias
     // Alias testing
+    using PyTF6w = py::detail::wrapper<PyTF6>;
     py::class_<TestFactory6, PyTF6>(m, "TestFactory6")
         .def(py::init([](base_tag, int i) { return TestFactory6(i); }))
-        .def(py::init([](alias_tag, int i) { return PyTF6(i); }))
-        .def(py::init([](alias_tag, std::string s) { return PyTF6(s); }))
-        .def(py::init([](alias_tag, pointer_tag, int i) { return new PyTF6(i); }))
+        .def(py::init([](alias_tag, int i) { return PyTF6w(i); }))
+        .def(py::init([](alias_tag, std::string s) { return PyTF6w(s); }))
+        .def(py::init([](alias_tag, pointer_tag, int i) { return new PyTF6w(i); }))
         .def(py::init([](base_tag, pointer_tag, int i) { return new TestFactory6(i); }))
-        .def(py::init([](base_tag, alias_tag, pointer_tag, int i) { return (TestFactory6 *) new PyTF6(i); }))
+        .def(py::init([](base_tag, alias_tag, pointer_tag, int i) { return (TestFactory6 *) new PyTF6w(i); }))
 
         .def("get", &TestFactory6::get)
         .def("has_alias", &TestFactory6::has_alias)
