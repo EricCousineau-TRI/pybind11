@@ -208,7 +208,7 @@ TEST_SUBMODULE(factory_constructors, m) {
 
     // test_init_factory_alias
     // Alias testing
-    using PyTF6w = py::detail::wrapper<PyTF6>;
+    using PyTF6w = py::lifetime_wrapper<PyTF6>;
     py::class_<TestFactory6, PyTF6>(m, "TestFactory6")
         .def(py::init([](base_tag, int i) { return TestFactory6(i); }))
         .def(py::init([](alias_tag, int i) { return PyTF6w(i); }))
@@ -226,7 +226,7 @@ TEST_SUBMODULE(factory_constructors, m) {
 
     // test_init_factory_dual
     // Separate alias constructor testing
-    using PyTF7w = py::detail::wrapper<PyTF7>;
+    using PyTF7w = py::lifetime_wrapper<PyTF7>;
     py::class_<TestFactory7, PyTF7, std::shared_ptr<TestFactory7>>(m, "TestFactory7")
         .def(py::init(
             [](int i) { return TestFactory7(i); },

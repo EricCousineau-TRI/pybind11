@@ -1706,12 +1706,12 @@ protected:
     bool load_value(object obj_exclusive, value_and_holder &&v_h, LoadType load_type) {
         // TODO(eric.cousineau): This should try and find the downcast-lowest
         // level (closest to child) `release_to_cpp` method that is derived-releasable
-        // (which derives from `wrapper<type>`).
+        // (which derives from `lifetime_wrapper<type>`).
         // This should resolve general casting, and should also avoid alias
         // branch issues:
-        //   Example: `Base` has wrapper `PyBase` which extends `wrapper<Base>`.
+        //   Example: `Base` has wrapper `PyBase` which extends `lifetime_wrapper<Base>`.
         //   `Child` extends `Base`, has its own wrapper `PyChild`, which extends
-        //   `wrapper<Child>`.
+        //   `lifetime_wrapper<Child>`.
         //   Anything deriving from `Child` does not derive from `PyBase`, so we should
         //   NOT try to release using `PyBase`s mechanism.
         //   Additionally, if `Child` does not have a wrapper (for whatever reason) and is extended,

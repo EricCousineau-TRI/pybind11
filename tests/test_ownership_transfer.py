@@ -83,9 +83,9 @@ def test_shared_ptr_derived_slicing(capture):
     c = m.BaseContainer(obj)
     del obj
     assert cstats.alive() == 1
-    # We now still have a reference to the object. py::detail::wrapper<> will intercept Python's
+    # We now still have a reference to the object. py::lifetime_wrapper<> will intercept Python's
     # attempt to destroy `obj`, is aware the `shared_ptr<>.use_count() > 1`, and will increase
-    # the ref count by transferring a new reference to `py::detail::wrapper<>` (thus reviving the object,
+    # the ref count by transferring a new reference to `py::lifetime_wrapper<>` (thus reviving the object,
     # per Python's documentation of __del__).
     assert obj_weak() is not None
     assert cstats.alive() == 1
@@ -104,7 +104,7 @@ def test_shared_ptr_derived_slicing(capture):
     assert cstats.alive() == 1
     obj = c.get()
     # Now that we have it in Python, there should only be 1 Python reference, since
-    # py::detail::wrapper<> in C++ should have released its reference.
+    # py::lifetime_wrapper<> in C++ should have released its reference.
     assert getrefcount(obj) == 2
     del c
     assert cstats.alive() == 1

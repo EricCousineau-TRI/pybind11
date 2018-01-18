@@ -1111,21 +1111,21 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
       }
 };
 
-namespace detail {
-
-// Trampoline class to permit attaching a derived Python object's data
-// (namely __dict__) to an actual C++ class.
-// If the object lives purely in C++, then there should only be one reference to
-// this data.
+// Wrapper to permit lifetime of a Python instance which is derived from a C++
+// pybind type to be managed by C++. Useful when adding virtual classes to
+// containers, where Python instance being added may be collected by Python
+// gc / refcounting.
+// @note Do NOT use the methods in this class. ONLY use this class if you need
+// to create a factory method.
 template <typename Base>
-class wrapper : public Base {
+class lifetime_wrapper : public Base {
  protected:
     using Base::Base;
 
  public:
   // TODO(eric.cousineau): Complain if this is not virtual? (and remove `virtual` specifier in dtor?)
 
-  virtual ~wrapper() {
+  virtual ~lifetime_wrapper() {
       delete_py_if_in_cpp();
   }
 
@@ -1200,13 +1200,15 @@ class wrapper : public Base {
   detail::HolderTypeId holder_type_id_{detail::HolderTypeId::Unknown};
 };
 
+namespace detail {
+
 template <typename Alias>
-struct wrapper_of {
-    using type = wrapper<Alias>;
+struct lifetime_wrapper_of {
+    using type = lifetime_wrapper<Alias>;
 };
 
 template <>
-struct wrapper_of<void> {
+struct lifetime_wrapper_of<void> {
     using type = void;
 };
 
@@ -1221,7 +1223,7 @@ struct wrapper_interface_impl {
                 "Attempting to release to C++ using pybind11::wrapper<> "
                 "at too high of a level. Use a class type lower in the hierarchy, such that "
                 "the Python-derived instance actually is part of the lineage of "
-                "pybind11::wrapper<downcast_type>");
+                "pybind11::lifetime_wrapper<downcast_type>");
         }
         // Let the external holder take ownership, but keep instance registered.
         tr->use_cpp_lifetime(std::move(obj), holder_type_id);
@@ -1264,7 +1266,7 @@ class class_ : public detail::generic_type {
 public:
     using type = type_;
     using type_alias_orig = detail::exactly_one_t<is_subtype, void, options...>;
-    using type_alias = typename detail::wrapper_of<type_alias_orig>::type;
+    using type_alias = typename detail::lifetime_wrapper_of<type_alias_orig>::type;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
     constexpr static bool has_wrapper = has_alias;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;

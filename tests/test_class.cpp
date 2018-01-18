@@ -232,7 +232,7 @@ TEST_SUBMODULE(class_, m) {
     py::class_<AliasedHasOpNewDelSize, PyAliasedHasOpNewDelSize> aliased(m, "AliasedHasOpNewDelSize");
     aliased.def(py::init<>());
     aliased.attr("size_noalias") = py::int_(sizeof(AliasedHasOpNewDelSize));
-    aliased.attr("size_alias") = py::int_(sizeof(py::detail::wrapper<PyAliasedHasOpNewDelSize>));
+    aliased.attr("size_alias") = py::int_(sizeof(py::lifetime_wrapper<PyAliasedHasOpNewDelSize>));
 
     // This test is actually part of test_local_bindings (test_duplicate_local), but we need a
     // definition in a different compilation unit within the same module:
