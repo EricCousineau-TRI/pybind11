@@ -1118,14 +1118,14 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
 // @note Do NOT use the methods in this class. ONLY use this class if you need
 // to create a factory method.
 template <typename Base>
-class lifetime_wrapper : public Base {
+class alias_wrapper : public Base {
  protected:
     using Base::Base;
 
  public:
   // TODO(eric.cousineau): Complain if this is not virtual? (and remove `virtual` specifier in dtor?)
 
-  virtual ~lifetime_wrapper() {
+  virtual ~alias_wrapper() {
       delete_py_if_in_cpp();
   }
 
@@ -1203,12 +1203,17 @@ class lifetime_wrapper : public Base {
 namespace detail {
 
 template <typename Alias>
-struct lifetime_wrapper_of {
-    using type = lifetime_wrapper<Alias>;
+struct alias_wrapper_of {
+    using type = alias_wrapper<Alias>;
+};
+
+template <typename Alias>
+struct alias_wrapper_of<alias_wrapper<Alias>> {
+    using type = alias_wrapper<Alias>;
 };
 
 template <>
-struct lifetime_wrapper_of<void> {
+struct alias_wrapper_of<void> {
     using type = void;
 };
 
@@ -1223,7 +1228,7 @@ struct wrapper_interface_impl {
                 "Attempting to release to C++ using pybind11::wrapper<> "
                 "at too high of a level. Use a class type lower in the hierarchy, such that "
                 "the Python-derived instance actually is part of the lineage of "
-                "pybind11::lifetime_wrapper<downcast_type>");
+                "pybind11::alias_wrapper<downcast_type>");
         }
         // Let the external holder take ownership, but keep instance registered.
         tr->use_cpp_lifetime(std::move(obj), holder_type_id);
@@ -1266,7 +1271,7 @@ class class_ : public detail::generic_type {
 public:
     using type = type_;
     using type_alias_orig = detail::exactly_one_t<is_subtype, void, options...>;
-    using type_alias = typename detail::lifetime_wrapper_of<type_alias_orig>::type;
+    using type_alias = typename detail::alias_wrapper_of<type_alias_orig>::type;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
     constexpr static bool has_wrapper = has_alias;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
