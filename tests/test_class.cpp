@@ -351,6 +351,18 @@ CHECK_ALIAS(1); CHECK_ALIAS(2); CHECK_NOALIAS(3); CHECK_ALIAS(4); CHECK_NOALIAS(
 CHECK_HOLDER(1, unique); CHECK_HOLDER(2, unique); CHECK_HOLDER(3, unique); CHECK_HOLDER(4, unique); CHECK_HOLDER(5, unique);
 CHECK_HOLDER(6, shared); CHECK_HOLDER(7, shared); CHECK_HOLDER(8, shared);
 
+// Check wrapper options, manually.
+static_assert(!DoesntBreak1::has_wrapper,
+              "Alias wrapper should not have been detected.");
+typedef py::class_<BreaksBase<101>, py::wrapper<BreaksTramp<101>>> DoesntBreak101;
+static_assert(DoesntBreak101::has_wrapper,
+              "Alias wrapper should have been detected.");
+// Test inheritance.
+class BreaksTramp102Wrapped : public py::wrapper<BreaksTramp<102>> {};
+typedef py::class_<BreaksBase<102>, BreaksTramp102Wrapped> DoesntBreak102;
+static_assert(DoesntBreak102::has_wrapper,
+              "Alias wrapper should have been detected.");
+
 // There's no nice way to test that these fail because they fail to compile; leave them here,
 // though, so that they can be manually tested by uncommenting them (and seeing that compilation
 // failures occurs).

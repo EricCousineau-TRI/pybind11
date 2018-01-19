@@ -75,9 +75,9 @@ class DefineBaseUniqueContainer {
 };
 
 template <int label>
-class DefinePyBase : public py::wrapper<DefineBase<label>> {
+class DefinePyBase : public DefineBase<label> {
  public:
-  using BaseT = py::wrapper<DefineBase<label>>;
+  using BaseT = DefineBase<label>;
   using BaseT::BaseT;
   int value() const override {
     PYBIND11_OVERLOAD(int, BaseT, value);
@@ -135,6 +135,7 @@ template <typename... Args>
 using class_unique_ = py::class_<Args...>;
 
 TEST_SUBMODULE(ownership_transfer, m) {
+  // No alias - will not have lifetime extended.
   class_shared_<BaseBad>(m, "BaseBad")
       .def(py::init<int>())
       .def("value", &BaseBad::value);
@@ -144,7 +145,8 @@ TEST_SUBMODULE(ownership_transfer, m) {
       .def("release", &BaseBadContainer::release);
   class_shared_<ChildBadStats>(m, "ChildBadStats");
 
-  class_shared_<Base, PyBase>(m, "Base")
+  // Has wrapped alias - will have lifetime extended.
+  class_shared_<Base, py::wrapper<PyBase>>(m, "Base")
       .def(py::init<int>())
       .def("value", &Base::value);
   class_shared_<BaseContainer>(m, "BaseContainer")
@@ -162,7 +164,7 @@ TEST_SUBMODULE(ownership_transfer, m) {
       .def("release", &BaseBadUniqueContainer::release);
   class_unique_<ChildBadUniqueStats>(m, "ChildBadUniqueStats");
 
-  class_unique_<BaseUnique, PyBaseUnique>(m, "BaseUnique")
+  class_unique_<BaseUnique, py::wrapper<PyBaseUnique>>(m, "BaseUnique")
       .def(py::init<int>())
       .def("value", &BaseUnique::value);
   class_unique_<BaseUniqueContainer>(m, "BaseUniqueContainer")

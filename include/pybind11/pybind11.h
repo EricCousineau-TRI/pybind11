@@ -1013,51 +1013,6 @@ auto method_adaptor(Return (Class::*pmf)(Args...) const) -> Return (Derived::*)(
     return pmf;
 }
 
-
-
-template <typename type, bool compatible>
-struct wrapper_interface_impl {
-    static void use_cpp_lifetime(type* cppobj, object&& obj, detail::HolderTypeId holder_type_id) {
-        auto* tr = dynamic_cast<wrapper<type>*>(cppobj);
-        if (tr == nullptr) {
-            // This has been invoked at too high of a level; should use a
-            // downcast class's `release_to_cpp` mechanism (if it supports it).
-            throw std::runtime_error(
-                "Attempting to release to C++ using pybind11::wrapper<> "
-                "at too high of a level. Use a class type lower in the hierarchy, such that "
-                "the Python-derived instance actually is part of the lineage of "
-                "pybind11::wrapper<downcast_type>");
-        }
-        // Let the external holder take ownership, but keep instance registered.
-        tr->use_cpp_lifetime(std::move(obj), holder_type_id);
-    }
-
-    static object release_cpp_lifetime(type* cppobj) {
-        auto* tr = dynamic_cast<wrapper<type>*>(cppobj);
-        if (tr == nullptr) {
-            // This shouldn't happen here...
-            throw std::runtime_error("Internal error?");
-        }
-        // Return newly created object.
-        return tr->release_cpp_lifetime();
-    }
-    static wrapper<type>* run(type*, std::false_type) {
-        return nullptr;
-    }
-};
-
-template <typename type>
-struct wrapper_interface_impl<type, false> {
-    static void use_cpp_lifetime(type*, object&&, detail::HolderTypeId) {
-        // This should be captured by runtime flag.
-        // TODO(eric.cousineau): Runtime flag may not be necessary.
-        throw std::runtime_error("Internal error?");
-    }
-    static object release_cpp_lifetime(type*) {
-        throw std::runtime_error("Internal error?");
-    }
-};
-
 template <detail::HolderTypeId holder_type_id = detail::HolderTypeId::Unknown>
 struct holder_check_impl {
     template <typename holder_type>
@@ -1156,6 +1111,155 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
       }
 };
 
+// Wrapper to permit lifetime of a Python instance which is derived from a C++
+// pybind type to be managed by C++. Useful when adding virtual classes to
+// containers, where Python instance being added may be collected by Python
+// gc / refcounting.
+// @note Do NOT use the methods in this class. ONLY use this class if you need
+// to create a factory method.
+template <typename Base>
+class wrapper : public Base {
+ protected:
+    using Base::Base;
+
+ public:
+  // TODO(eric.cousineau): Complain if this is not virtual? (and remove `virtual` specifier in dtor?)
+
+  virtual ~wrapper() {
+      delete_py_if_in_cpp();
+  }
+
+  // To be used by the holder casters, by means of `wrapper_interface<>`.
+  // TODO(eric.cousineau): Make this private to ensure contract?
+  void use_cpp_lifetime(object&& patient, detail::HolderTypeId holder_type_id) {
+      if (lives_in_cpp()) {
+          throw std::runtime_error("Instance already lives in C++");
+      }
+      holder_type_id_ = holder_type_id;
+      patient_ = std::move(patient);
+      // @note It would be nice to put `revive_python3` here, but this is called by
+      // `PyObject_CallFinalizer`, which will end up reversing its effect anyways.
+  }
+
+  /// To be used by `move_only_holder_caster`.
+  object release_cpp_lifetime() {
+      if (!lives_in_cpp()) {
+          throw std::runtime_error("Instance does not live in C++");
+      }
+      revive_python3();
+      // Remove existing reference.
+      object tmp = std::move(patient_);
+      assert(!patient_);
+      return tmp;
+  }
+
+ protected:
+    // TODO(eric.cousineau): Verify this with an example workflow.
+  void delete_py_if_in_cpp() {
+      if (lives_in_cpp()) {
+          // Ensure that we still are the unique one, such that the Python classes
+          // destructor will be called.
+#ifdef PYBIND11_WARN_DANGLING_UNIQUE_PYREF
+          if (holder_type_id_ == detail::HolderTypeId::UniquePtr) {
+              if (patient_.ref_count() != 1) {
+                  // TODO(eric.cousineau): Add Python class name
+                  std::string class_name = patient_.get_type().str();
+                  std::cerr
+                      << "WARNING(pybind11): When destroying Python subclass (" << class_name << "), "
+                      << "of a pybind11 class using a unique_ptr holder in C++, "
+                      << "ref_count == " << patient_.ref_count() << " != 1, which may cause undefined behavior." << std::endl
+                      << "  Please consider reviewing your code to trim existing references, or use a move-compatible container." << std::endl;
+              }
+          }
+#endif  // PYBIND11_WARN_DANGLING_UNIQUE_HOLDER
+          // Release object.
+          release_cpp_lifetime();
+      }
+  }
+
+  // Python3 unfortunately will not implicitly call `__del__` multiple times,
+  // even if the object is resurrected. This is a dirty workaround.
+  // @see https://bugs.python.org/issue32377
+  inline void revive_python3() {
+#if PY_VERSION_HEX >= 0x03000000
+      // Reverse single-finalization constraint in Python3.
+      if (_PyGC_FINALIZED(patient_.ptr())) {
+        _PyGC_SET_FINALIZED(patient_.ptr(), 0);
+      }
+#endif  // PY_VERSION_HEX >= 0x03000000
+  }
+
+ private:
+  bool lives_in_cpp() const {
+      // NOTE: This is *false* if, for whatever reason, the wrapper class is
+      // constructed in C++... Meh. Not gonna worry about that situation.
+      return static_cast<bool>(patient_);
+  }
+
+  object patient_;
+  detail::HolderTypeId holder_type_id_{detail::HolderTypeId::Unknown};
+};
+
+namespace detail {
+
+// Determines if a class is a base of (or is) an instantiation of a template,
+// as a simple extension to `std::is_base_of`.
+template <template <typename> class Tpl>
+struct is_base_template_of_impl {
+  template <typename Base>
+  static std::true_type check(const Tpl<Base>*);
+  static std::false_type check(void*);
+
+  template <typename Derived>
+  using value_type = decltype(check(std::declval<Derived*>()));
+};
+
+template <template <typename> class Tpl, typename Derived>
+using is_base_template_of =
+    typename is_base_template_of_impl<Tpl>::template value_type<Derived>;
+
+template <typename type, typename alias, bool compatible>
+struct wrapper_interface_impl {
+    static void use_cpp_lifetime(type* cppobj, object&& obj, detail::HolderTypeId holder_type_id) {
+        auto* tr = dynamic_cast<alias*>(cppobj);
+        if (tr == nullptr) {
+            // This has been invoked at too high of a level; should use a
+            // downcast class's `release_to_cpp` mechanism (if it supports it).
+            throw std::runtime_error(
+                "Attempting to release to C++ using pybind11::wrapper<> "
+                "at too high of a level. Use a class type lower in the hierarchy, such that "
+                "the Python-derived instance actually is part of the lineage of "
+                "pybind11::wrapper<downcast_type>");
+        }
+        // Let the external holder take ownership, but keep instance registered.
+        tr->use_cpp_lifetime(std::move(obj), holder_type_id);
+    }
+
+    static object release_cpp_lifetime(type* cppobj) {
+        auto* tr = dynamic_cast<alias*>(cppobj);
+        if (tr == nullptr) {
+            // This shouldn't happen here...
+            throw std::runtime_error("Internal error?");
+        }
+        // Return newly created object.
+        return tr->release_cpp_lifetime();
+    }
+};
+
+template <typename type, typename alias>
+struct wrapper_interface_impl<type, alias, false> {
+    static void use_cpp_lifetime(type*, object&&, detail::HolderTypeId) {
+        // This should be captured by runtime flag.
+        // TODO(eric.cousineau): Runtime flag may not be necessary.
+        throw std::runtime_error("Internal error?");
+    }
+    static object release_cpp_lifetime(type*) {
+        throw std::runtime_error("Internal error?");
+    }
+};
+
+}  // namespace detail
+
 template <typename type_, typename... options>
 class class_ : public detail::generic_type {
     template <typename T> using is_holder = detail::is_holder_type<type_, T>;
@@ -1169,7 +1273,8 @@ public:
     using type = type_;
     using type_alias = detail::exactly_one_t<is_subtype, void, options...>;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
-    constexpr static bool has_wrapper = std::is_base_of<wrapper<type>, type_alias>::value;
+    constexpr static bool has_wrapper =
+        detail::is_base_template_of<wrapper, type_alias>::value;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
     constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 
@@ -1230,7 +1335,7 @@ public:
         return detail::get_type_info(id);
     }
 
-    typedef wrapper_interface_impl<type, has_wrapper> wrapper_interface;
+    using wrapper_interface = detail::wrapper_interface_impl<type, type_alias, has_wrapper>;
     using holder_check = holder_check_impl<holder_type_id>;
 
     static bool allow_destruct(detail::instance* inst, detail::holder_erased holder) {
