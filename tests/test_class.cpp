@@ -232,7 +232,7 @@ TEST_SUBMODULE(class_, m) {
     py::class_<AliasedHasOpNewDelSize, PyAliasedHasOpNewDelSize> aliased(m, "AliasedHasOpNewDelSize");
     aliased.def(py::init<>());
     aliased.attr("size_noalias") = py::int_(sizeof(AliasedHasOpNewDelSize));
-    aliased.attr("size_alias") = py::int_(sizeof(py::alias_wrapper<PyAliasedHasOpNewDelSize>));
+    aliased.attr("size_alias") = py::int_(sizeof(PyAliasedHasOpNewDelSize));
 
     // This test is actually part of test_local_bindings (test_duplicate_local), but we need a
     // definition in a different compilation unit within the same module:
@@ -341,7 +341,7 @@ typedef py::class_<BreaksBase<8>, std::shared_ptr<BreaksBase<8>>> DoesntBreak8;
 #define CHECK_BASE(N) static_assert(std::is_same<typename DoesntBreak##N::type, BreaksBase<N>>::value, \
         "DoesntBreak" #N " has wrong type!")
 CHECK_BASE(1); CHECK_BASE(2); CHECK_BASE(3); CHECK_BASE(4); CHECK_BASE(5); CHECK_BASE(6); CHECK_BASE(7); CHECK_BASE(8);
-#define CHECK_ALIAS(N) static_assert(DoesntBreak##N::has_alias && std::is_same<typename DoesntBreak##N::type_alias, py::alias_wrapper<BreaksTramp<N>>>::value, \
+#define CHECK_ALIAS(N) static_assert(DoesntBreak##N::has_alias && std::is_same<typename DoesntBreak##N::type_alias, BreaksTramp<N>>::value, \
         "DoesntBreak" #N " has wrong type_alias!")
 #define CHECK_NOALIAS(N) static_assert(!DoesntBreak##N::has_alias && std::is_void<typename DoesntBreak##N::type_alias>::value, \
         "DoesntBreak" #N " has type alias, but shouldn't!")
