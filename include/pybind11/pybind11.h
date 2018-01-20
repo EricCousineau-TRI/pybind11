@@ -1225,7 +1225,7 @@ struct wrapper_interface_impl {
             // This has been invoked at too high of a level; should use a
             // downcast class's `release_to_cpp` mechanism (if it supports it).
             throw std::runtime_error(
-                "Attempting to release to C++ using pybind11::wrapper<> "
+                "Attempting to release to C++ using pybind11::alias_wrapper<> "
                 "at too high of a level. Use a class type lower in the hierarchy, such that "
                 "the Python-derived instance actually is part of the lineage of "
                 "pybind11::alias_wrapper<downcast_type>");
@@ -1407,9 +1407,9 @@ public:
                     // This could be relaxed if there is an optional `release` mechanism for holders.
                     // However, there is still slicing.
                     throw std::runtime_error(
-                        "Python-extended C++ class does not inherit from pybind11::wrapper<>, "
+                        "Python-extended C++ class does not inherit from pybind11::alias_wrapper<>, "
                         "and the instance will be sliced. Either avoid this situation, or "
-                        "the type extends pybind11::wrapper<>.");
+                        "the type extends pybind11::alias_wrapper<>.");
                 }
                 auto* cppobj = reinterpret_cast<type*>(v_h.value_ptr());
                 wrapper_interface::use_cpp_lifetime(cppobj, std::move(obj), holder_type_id);

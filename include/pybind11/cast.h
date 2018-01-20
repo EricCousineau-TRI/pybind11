@@ -1562,7 +1562,7 @@ protected:
                     do_release_to_cpp = true;
                 } else {
                     std::cerr << "WARNING! Casting to std::shared_ptr<> will cause Python subclass of pybind11 C++ instance to lose its Python portion. "
-                                 "Make your base class extend from pybind11::wrapper<> to prevent aliasing."
+                                 "Make your base class extend from pybind11::alias_wrapper<> to prevent aliasing."
                               << std::endl;
                 }
             }

@@ -90,7 +90,7 @@ function* slots, which defines the name of function in Python. This is required
 when the C++ and Python versions of the
 function have different names, e.g.  ``operator()`` vs ``__call__``.
 
-The base class ``py::wrapper<>`` is optional, but is recommended as it allows us to attach the lifetime of Python objects directly to C++ objects, explained in :ref:`virtual_inheritance_lifetime`.
+The base class ``py::alias_wrapper<>`` is optional, but is recommended as it allows us to attach the lifetime of Python objects directly to C++ objects, explained in :ref:`virtual_inheritance_lifetime`.
 
 The binding code also needs a few minor adaptations (highlighted):
 
@@ -1051,10 +1051,10 @@ For this example, we will build upon the above code for ``Animal`` with alias ``
         virtual std::string go(int n_times) = 0;
     };
 
-    class PyAnimal : public py::wrapper<Animal> {
+    class PyAnimal : public py::alias_wrapper<Animal> {
     public:
         /* Inherit the constructors */
-        using py::wrapper<Animal>::wrapper;
+        using py::alias_wrapper<Animal>::wrapper;
         std::string go(int n_times) override {
             PYBIND11_OVERLOAD_PURE(std::string, Animal, go, n_times);
         }
