@@ -1201,20 +1201,16 @@ class alias_wrapper : public Base {
 
 namespace detail {
 
-template <typename Alias>
-struct alias_wrapper_of {
-    using type = alias_wrapper<Alias>;
+template <template <typename...> class Tpl>
+struct is_base_template_of_impl {
+  template <typename ... Base>
+  static std::true_type check(const Tpl<Base...>*);
+  static std::false_type check(void*);
 };
 
-template <typename Alias>
-struct alias_wrapper_of<alias_wrapper<Alias>> {
-    using type = alias_wrapper<Alias>;
-};
-
-template <>
-struct alias_wrapper_of<void> {
-    using type = void;
-};
+template <template <typename...> class Tpl, typename Derived>
+using is_base_template_of =
+    decltype(is_base_template_of_impl<Tpl>::check((Derived*){}));
 
 template <typename type, typename alias, bool compatible>
 struct wrapper_interface_impl {
@@ -1269,10 +1265,10 @@ class class_ : public detail::generic_type {
 
 public:
     using type = type_;
-    using type_alias_orig = detail::exactly_one_t<is_subtype, void, options...>;
-    using type_alias = typename detail::alias_wrapper_of<type_alias_orig>::type;
+    using type_alias = detail::exactly_one_t<is_subtype, void, options...>;
     constexpr static bool has_alias = !std::is_void<type_alias>::value;
-    constexpr static bool has_wrapper = has_alias;
+    constexpr static bool has_wrapper =
+        detail::is_base_template_of<alias_wrapper, type_alias>::value;
     using holder_type = detail::exactly_one_t<is_holder, std::unique_ptr<type>, options...>;
     constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 
