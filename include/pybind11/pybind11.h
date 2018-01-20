@@ -1111,12 +1111,11 @@ struct holder_check_impl<detail::HolderTypeId::UniquePtr> : public holder_check_
       }
 };
 
-// Wrapper to permit lifetime of a Python instance which is derived from a C++
-// pybind type to be managed by C++. Useful when adding virtual classes to
-// containers, where Python instance being added may be collected by Python
-// gc / refcounting.
-// @note Do NOT use the methods in this class. ONLY use this class if you need
-// to create a factory method.
+/// Wrapper to permit lifetime of a Python instance which is derived from a C++
+/// pybind type to be managed by C++. Useful when adding virtual classes to
+/// containers, where Python instance being added may be collected by Python
+/// gc / refcounting.
+/// @note Do NOT use the methods in this class.
 template <typename Base>
 class alias_wrapper : public Base {
  protected:

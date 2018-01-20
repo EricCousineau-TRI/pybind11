@@ -56,7 +56,7 @@ object that is passed to this function. There are two ways to do this:
 
     .. note::
 
-        For polymorphic types that inherit from :class:`py::wrapper`, ``pybind11`` *can* warn about these situations.
+        For polymorphic types that inherit from :class:`py::alias_wrapper`, ``pybind11`` *can* warn about these situations.
         You may enable this behavior with ``#define PYBIND11_WARN_DANGLING_UNIQUE_PYREF``. This will print a warning to ``std::err`` if this case is detected.
 
 2.  Pass a Python "move container" (a mutable object that can "release" the reference to the object). This can be a single-item list, or any Python class / instance that has the field ``_is_move_container = True`` and has a ``release()`` function.
