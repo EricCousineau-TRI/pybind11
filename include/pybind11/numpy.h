@@ -465,6 +465,11 @@ public:
         return detail::array_descriptor_proxy(m_ptr)->kind;
     }
 
+    /// Type index for builtin or user-registered dtypes.
+    int num() const {
+        return detail::array_descriptor_proxy(m_ptr)->type_num;
+    }
+
 private:
     static object _dtype_from_pep3118() {
         static PyObject *obj = module::import("numpy.core._internal")
