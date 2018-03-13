@@ -920,7 +920,12 @@ protected:
         }
         else if (rec.bases.size() == 1) {
             auto parent_tinfo = get_type_info((PyTypeObject *) rec.bases[0].ptr());
-            tinfo->simple_ancestors = parent_tinfo->simple_ancestors;
+            if (parent_tinfo) {
+                tinfo->simple_ancestors = parent_tinfo->simple_ancestors;
+            } else {
+                // Inherits from a Python object.
+                tinfo->simple_ancestors = true;
+            }
         }
 
         if (rec.module_local) {
