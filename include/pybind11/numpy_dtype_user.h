@@ -12,14 +12,10 @@
 #include "numpy.h"
 #include "detail/inference.h"
 #include "detail/numpy_ufunc.h"
+
 #include <array>
-#include <cstdlib>
-#include <cstring>
-#include <sstream>
-#include <string>
-#include <functional>
+#include <map>
 #include <utility>
-#include <vector>
 #include <typeindex>
 
 // N.B. For NumPy dtypes, `custom` tends to mean record-like structures, while
@@ -115,7 +111,8 @@ struct dtype_user_instance {
   // Instance finding. Returns empty `object` if nothing is found.
   static object find_existing(const Class* value) {
     auto& entry = dtype_info::get_entry<Class>();
-    auto it = entry.instance_to_py.find((void*)value);
+    void* raw = const_cast<Class*>(value);
+    auto it = entry.instance_to_py.find(raw);
     if (it == entry.instance_to_py.end())
       return {};
     else {
@@ -420,17 +417,17 @@ class dtype_user : public class_<Class_> {
     arrfuncs.compare = (void*)+[](const void* d1, const void* d2, void* arr) {
       return 0;
     };
-    arrfuncs.fill = (void*)+[](void* data_, npy_intp length, void* arr) {
-      Class* data = (Class*)data_;
-      Class delta = data[1] - data[0];
-      Class r = data[1];
-      npy_intp i;
-      for (i = 2; i < length; i++) {
-          r += delta;
-          data[i] = r;
-      }
-      return 0;
-    };
+    // arrfuncs.fill = (void*)+[](void* data_, npy_intp length, void* arr) {
+    //   Class* data = (Class*)data_;
+    //   Class delta = data[1] - data[0];
+    //   Class r = data[1];
+    //   npy_intp i;
+    //   for (i = 2; i < length; i++) {
+    //       r += delta;
+    //       data[i] = r;
+    //   }
+    //   return 0;
+    // };
     arrfuncs.fillwithscalar = (void*)+[](
             void* buffer_raw, npy_intp length, void* value_raw, void* arr) {
         const Class* value = (const Class*)value_raw;
