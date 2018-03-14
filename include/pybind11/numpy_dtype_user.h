@@ -198,7 +198,7 @@ inline const char* get_ufunc_name(detail::op_id id) {
     {op_div, "divide"},
     {op_pow, "power"},
     {op_sub, "subtract"},
-    // https://docs.scipy.org/doc/numpy/reference/routines.logic.htmls
+    // https://docs.scipy.org/doc/numpy/reference/routines.logic.html
     {op_gt, "greater"},
     {op_ge, "greater_equal"},
     {op_lt, "less"},

@@ -125,6 +125,10 @@ void numpy_dtype_user(py::module m) {
         .def_ufunc(-py::self)
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self);
+
+    m.def("same", [](const Custom& a, const Custom& b) {
+        return double{a} == double{b};
+    });
 }
 
 void bind_ConstructorStats(py::module &m);

@@ -28,7 +28,10 @@ def test_scalar_meta():
     assert isinstance(np.dtype(m.Custom), np.dtype)
 
 def test_scalar_op():
-    pass
+    a = m.Custom(1)
+    b = m.Custom(2)
+    assert m.same(a, a)
+    assert not m.same(a, b)
 
 def test_array_creation():
     # Zeros.
@@ -54,10 +57,14 @@ def test_array_cast():
 
 def check_array(actual, expected):
     expected = np.array(expected)
-    if not np.allclose(actual, expected):
+    if actual.shape != expected.shape:
         return False
-    elif actual.dtype != expected.dtype:
+    for a, b in zip(actual.flat, expected.flat):
+        if not m.same(a, b):
+            return False
+    if actual.dtype != expected.dtype:
         return False
+    return True
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
