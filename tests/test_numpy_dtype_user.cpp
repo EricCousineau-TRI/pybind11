@@ -116,8 +116,8 @@ void numpy_dtype_user(py::module m) {
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
         // Operators + ufuncs, with some just-operators (e.g. in-place)
-        .def_ufunc_cast([](const Custom& in) -> double { return in; })
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
+        .def_ufunc_cast([](const Custom& in) -> double { return in; })
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
         .def_ufunc(py::self * py::self)
