@@ -105,7 +105,10 @@ typedef struct {
       uint32_t *iter_flags;
 } PyUFuncObject;
 
-constexpr int NPY_NTYPES = 256; // err...
+// Manually defined :(
+constexpr int NPY_NTYPES = 24;
+constexpr int NPY_NSORTS = 3;
+using NPY_SCALARKIND = int;  // :(
 
 // TODO(eric.cousineau): Fill this out as needed for type safety.
 // TODO(eric.cousineau): Do not define these if NPY headers are present (for debugging).
@@ -305,7 +308,7 @@ private:
         API_PyArray_SetBaseObject = 282,
         // - DTypes
         API_PyGenericArrType_Type = 10,
-        PyArray_RegisterDataType = 192,
+        API_PyArray_RegisterDataType = 192,
         API_PyArray_RegisterCastFunc = 193,
         API_PyArray_RegisterCanCast = 194,
         API_PyArray_InitArrFuncs = 195,
@@ -313,7 +316,7 @@ private:
         API_PyUFunc_RegisterLoopForType = 2,
     };
 
-    static void** get_api_ptr(py::object c) {
+    static void** get_api_ptr(object c) {
 #if PY_MAJOR_VERSION >= 3
         return (void **) PyCapsule_GetPointer(c.ptr(), NULL);
 #else
@@ -1200,7 +1203,7 @@ public:
 template <>
 struct npy_format_descriptor<object> {
     static pybind11::dtype dtype() {
-        if (auto ptr = npy_api::get().PyArray_DescrFromType_(NPY_OBJECT))
+        if (auto ptr = npy_api::get().PyArray_DescrFromType_(npy_api::NPY_OBJECT_))
             return reinterpret_borrow<pybind11::dtype>(ptr);
         pybind11_fail("Unsupported buffer format!");
     }
