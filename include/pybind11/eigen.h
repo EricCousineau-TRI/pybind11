@@ -114,7 +114,7 @@ template <typename PlainObjectType, int Options, typename StrideType>
 struct eigen_extract_stride<Eigen::Ref<PlainObjectType, Options, StrideType>> { using type = StrideType; };
 
 template <typename Scalar> bool is_pyobject_() {
-    return static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::value) == npy_api::NPY_OBJECT_;
+    return static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::dtype().num()) == npy_api::NPY_OBJECT_;
 }
 
 // Helper struct for extracting information from an Eigen type
