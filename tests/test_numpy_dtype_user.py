@@ -60,6 +60,10 @@ def check_array(actual, expected):
     if actual.shape != expected.shape:
         return False
     for a, b in zip(actual.flat, expected.flat):
+        print(type(a))
+        print(type(b))
+        print(a, b)
+        # exit(0)
         if not m.same(a, b):
             return False
     if actual.dtype != expected.dtype:
@@ -76,16 +80,16 @@ def test_array_ufunc():
     assert check_array(x == y, [m.CustomStr("4 == 2")])
     assert check_array(x < y, [False])
 
-# sys.stdout = sys.stderr
+sys.stdout = sys.stderr
 # sys.argv = [__file__, "-s"]
 # pytest.main(args=sys.argv[1:])
 def main():
     pytest.gc_collect = gc.collect
-    test_scalar_ctor()
-    test_scalar_meta()
-    test_scalar_op()
-    test_array_creation()
-    test_array_cast()
+    # test_scalar_ctor()
+    # test_scalar_meta()
+    # test_scalar_op()
+    # test_array_creation()
+    # test_array_cast()
     test_array_ufunc()
 
 import trace
