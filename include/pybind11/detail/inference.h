@@ -11,6 +11,9 @@
 
 #include "common.h"
 
+NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
+NAMESPACE_BEGIN(detail)
+
 // SFINAE for functors.
 // N.B. This *only* distinguished between function / method pointers and
 // lambda objects. It does *not* distinguish among other types.
@@ -30,16 +33,19 @@ struct type_at_impl<N, N, T, Ts...> {
 // Convenient mechanism for passing sets of arguments.
 template <typename ... Ts>
 struct type_pack {
-  static constexpr int size = sizeof...(Ts);
+    static constexpr int size = sizeof...(Ts);
 
-  template <template <typename...> class Tpl>
-  using bind = Tpl<Ts...>;
+    template <template <typename...> class Tpl>
+    using bind = Tpl<Ts...>;
 
     template <size_t N>
-    struct type_at {
+    struct type_at_internal {
       static_assert(N < size, "Invalid type index");
       using type = typename type_at_impl<N, 0, Ts...>::type;
     };
+
+    template <size_t N>
+    using type_at = typename type_at_internal<N>::type;
 };
 
 struct function_inference {

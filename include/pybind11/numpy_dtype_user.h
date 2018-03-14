@@ -235,15 +235,15 @@ class dtype_user : public class_<Class_> {
   dtype_user(handle scope, const char* name) : Base(none()) {
     register_type(name);
     scope.attr(name) = self();
-    auto& entry = dtype_info::get_mutable_entry<Class>(true);
+    auto& entry = detail::dtype_info::get_mutable_entry<Class>(true);
     entry.cls = self();
     // Registry numpy type.
     // (Note that not registering the type will result in infinte recursion).
     entry.dtype_num = register_numpy();
 
     // Register default ufunc cast to `object`.
-    this->def_ufunc_cast([](const Class& self) { return cast(self); });
-    this->def_ufunc_cast([](object self) { return cast<Class>(self); });
+    // this->def_ufunc_cast([](const Class& self) { return cast(self); });
+    // this->def_ufunc_cast([](object self) { return cast<Class>(self); });
   }
 
   ~dtype_user() {
@@ -281,7 +281,7 @@ class dtype_user : public class_<Class_> {
     using Func = decltype(func_infer);
     constexpr int N = Func::Args::size;
     detail::ufunc_register<Class>(
-        detail::get_py_ufunc(ufunc_name), func, const_int<N>{});
+        detail::get_py_ufunc(ufunc_name), func, detail::ufunc_nargs<N>{});
     return *this;
   }
 
@@ -296,7 +296,7 @@ class dtype_user : public class_<Class_> {
 
   template <typename Func_>
   dtype_user& def_ufunc_cast(Func_&& func) {
-    auto func_infer = detail::infer_function_info(func);
+    auto func_infer = detail::function_inference::run(func);
     using Func = decltype(func_infer);
     using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
     using To = detail::intrinsic_t<typename Func::Return>;
@@ -340,7 +340,7 @@ class dtype_user : public class_<Class_> {
 
   void register_type(const char* name) {
     // Ensure we initialize NumPy before accessing `PyGenericArrType_Type`.
-    npy_api::get();
+    auto& api = detail::npy_api::get();
     // Loosely uses https://stackoverflow.com/a/12505371/7829525 as well.
     auto heap_type = (PyHeapTypeObject*)PyType_Type.tp_alloc(&PyType_Type, 0);
     if (!heap_type)
@@ -348,7 +348,7 @@ class dtype_user : public class_<Class_> {
     heap_type->ht_name = str(name).release().ptr();
     // It's painful to inherit from `np.generic`, because it has no `tp_new`.
     auto& ClassObject_Type = heap_type->ht_type;
-    ClassObject_Type.tp_base = &PyGenericArrType_Type;
+    ClassObject_Type.tp_base = api.PyGenericArrType_Type_;
     ClassObject_Type.tp_new = &DTypePyObject::tp_new;
     ClassObject_Type.tp_dealloc = &DTypePyObject::tp_dealloc;
     ClassObject_Type.tp_name = name;  // Er... scope?
@@ -361,12 +361,13 @@ class dtype_user : public class_<Class_> {
   }
 
   int register_numpy() {
+    using detail::npy_api;
     // Adapted from `numpy/core/multiarrya/src/test_rational.c.src`.
     // Define NumPy description.
     auto type = (PyTypeObject*)self().ptr();
     typedef struct { char c; Class r; } align_test;
-    static PyArray_ArrFuncs arrfuncs;
-    static PyArray_Descr descr = {
+    static detail::PyArray_ArrFuncs arrfuncs;
+    static detail::PyArray_Descr descr = {
         PyObject_HEAD_INIT(0)
         type,                   /* typeobj */
         'V',                    /* kind (V = arbitrary) */
@@ -384,23 +385,27 @@ class dtype_user : public class_<Class_> {
         &arrfuncs,  /* f */
     };
 
-    auto &api = npy_api::get();
+    auto& api = npy_api::get();
+    Py_TYPE(&descr) = api.PyArrayDescr_Type_;
+
     api.PyArray_InitArrFuncs_(&arrfuncs);
 
+    using detail::npy_intp;
+
     // https://docs.scipy.org/doc/numpy/reference/c-api.types-and-structures.html
-    arrfuncs.getitem = [](void* in, void* arr) -> PyObject* {
+    arrfuncs.getitem = (void*)+[](void* in, void* arr) -> PyObject* {
         auto item = (const Class*)in;
         return cast(*item).release().ptr();
     };
-    arrfuncs.setitem = [](PyObject* in, void* out, void* arr) {
-        dtype_user_caster<Class> caster;
+    arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* arr) {
+        detail::dtype_user_caster<Class> caster;
         if (!caster.load(in, true))
             pybind11_fail("dtype_user: Could not convert during `setitem`");
         // Cut out the middle-man?
         *(Class*)out = caster;
         return 0;
     };
-    arrfuncs.copyswap = [](void* dst, void* src, int swap, void* arr) {
+    arrfuncs.copyswap = (void*)+[](void* dst, void* src, int swap, void* arr) {
         // TODO(eric.cousineau): Figure out actual purpose of this.
         if (!src) return;
         Class* r_dst = (Class*)dst;
@@ -412,10 +417,10 @@ class dtype_user : public class_<Class_> {
         }
     };
     // - Test and ensure this doesn't overwrite our `equal` unfunc.
-    arrfuncs.compare = [](const void* d1, const void* d2, void* arr) {
+    arrfuncs.compare = (void*)+[](const void* d1, const void* d2, void* arr) {
       return 0;
     };
-    arrfuncs.fill = [](void* data_, npy_intp length, void* arr) {
+    arrfuncs.fill = (void*)+[](void* data_, npy_intp length, void* arr) {
       Class* data = (Class*)data_;
       Class delta = data[1] - data[0];
       Class r = data[1];
@@ -426,7 +431,7 @@ class dtype_user : public class_<Class_> {
       }
       return 0;
     };
-    arrfuncs.fillwithscalar = [](
+    arrfuncs.fillwithscalar = (void*)+[](
             void* buffer_raw, npy_intp length, void* value_raw, void* arr) {
         const Class* value = (const Class*)value_raw;
         Class* buffer = (Class*)buffer_raw;
@@ -435,7 +440,6 @@ class dtype_user : public class_<Class_> {
         }
         return 0;
     };
-    Py_TYPE(&descr) = &PyArrayDescr_Type;
     int dtype_num = api.PyArray_RegisterDataType_(&descr);
     self().attr("dtype") =
         reinterpret_borrow<object>(handle((PyObject*)&descr));

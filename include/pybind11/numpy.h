@@ -82,7 +82,7 @@ using npy_intp = int;
 typedef void (*PyUFuncGenericFunction)(
     char **args, npy_intp *dimensions, npy_intp *strides, void *innerloopdata);
 
-typedef void (*PyArray_VectorUnaryFunc)(
+typedef void (PyArray_VectorUnaryFunc)(
     void* from_, void* to_, npy_intp n, void* fromarr, void* toarr);
 
 typedef struct {
@@ -108,7 +108,6 @@ typedef struct {
 // Manually defined :(
 constexpr int NPY_NTYPES = 24;
 constexpr int NPY_NSORTS = 3;
-using NPY_SCALARKIND = int;  // :(
 
 // TODO(eric.cousineau): Fill this out as needed for type safety.
 // TODO(eric.cousineau): Do not define these if NPY headers are present (for debugging).
@@ -236,6 +235,16 @@ struct npy_api {
         NPY_USE_SETITEM_ = 0x40,
     };
 
+    typedef enum {
+            NPY_NOSCALAR_ = -1,
+            NPY_BOOL_SCALAR_,
+            NPY_INTPOS_SCALAR_,
+            NPY_INTNEG_SCALAR_,
+            NPY_FLOAT_SCALAR_,
+            NPY_COMPLEX_SCALAR_,
+            NPY_OBJECT_SCALAR_
+    } NPY_SCALARKIND;
+
     typedef struct {
         Py_intptr_t *ptr;
         int len;
@@ -276,7 +285,7 @@ struct npy_api {
     PyObject* (*PyArray_Resize_)(PyObject*, PyArray_Dims*, int, int);
 
     // - Dtypes
-    PyObject* PyGenericArrType_Type_;
+    PyTypeObject* PyGenericArrType_Type_;
     int (*PyArray_RegisterDataType_)(PyArray_Descr* dtype);
     int (*PyArray_RegisterCastFunc_)(PyArray_Descr* descr, int totype, PyArray_VectorUnaryFunc* castfunc);
     int (*PyArray_RegisterCanCast_)(PyArray_Descr* descr, int totype, NPY_SCALARKIND scalar);

@@ -41,11 +41,11 @@ void ufunc_register(
 }
 
 template <int N>
-using const_int = std::integral_constant<int, N>;
+using ufunc_nargs = std::integral_constant<int, N>;
 
 // Registers a unary UFunc given a lambda.
 template <typename Type, int N = 1, typename Func = void>
-void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
+void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<1>) {
     auto info = detail::function_inference::run(func);
     using Info = decltype(info);
     using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
@@ -70,7 +70,7 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
 
 // Binary.
 template <typename Type, int N = 2, typename Func = void>
-void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<2>) {
+void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<2>) {
     auto info = detail::function_inference::run(func);
     using Info = decltype(info);
     using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
@@ -98,7 +98,7 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<2>) {
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
   static auto cast_lambda = func;
-  auto cast_func = [](
+  auto cast_func = +[](
         void* from_, void* to_, npy_intp n,
         void* fromarr, void* toarr) {
       const From* from = (From*)from_;
@@ -109,10 +109,10 @@ void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
   auto& api = npy_api::get();
   auto from = npy_format_descriptor<From>::dtype();
   int to_num = npy_format_descriptor<To>::dtype().num();
-  auto* from_raw = from.ptr();
-  if (api.PyArray_RegisterCastFunc_(from, to_num, cast_func) < 0)
+  auto from_raw = (PyArray_Descr*)from.ptr();
+  if (api.PyArray_RegisterCastFunc_(from_raw, to_num, cast_func) < 0)
       pybind11_fail("ufunc: Cannot register cast");
-  if (api.PyArray_RegisterCanCast_(from, to_num, NPY_NOSCALAR) < 0)
+  if (api.PyArray_RegisterCanCast_(from_raw, to_num, npy_api::NPY_NOSCALAR_) < 0)
       pybind11_fail("ufunc: Cannot register castability");
 }
 
