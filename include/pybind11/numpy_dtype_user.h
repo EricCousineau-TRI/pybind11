@@ -72,7 +72,7 @@ struct dtype_info {
 
 // Provides `PyObject`-extension, akin to `detail::instance`.
 template <typename Class>
-struct dtype_py_object {
+struct dtype_user_instance {
   PyObject_HEAD
   // TODO(eric.cousineau): Consider storing a unique_ptr to reduce the number
   // of temporaries.
@@ -80,15 +80,15 @@ struct dtype_py_object {
 
   // Extracts C++ pointer from a given python object. No type checking is done.
   static Class* load_raw(PyObject* src) {
-    dtype_py_object* obj = (dtype_py_object*)src;
+    dtype_user_instance* obj = (dtype_user_instance*)src;
     return &obj->value;
   }
 
   // Allocates an instance.
-  static dtype_py_object* alloc_py() {
+  static dtype_user_instance* alloc_py() {
     auto cls = dtype_info::get_entry<Class>().cls;
     PyTypeObject* cls_raw = (PyTypeObject*)cls.ptr();
-    return (dtype_py_object*)cls_raw->tp_alloc((PyTypeObject*)cls.ptr(), 0);
+    return (dtype_user_instance*)cls_raw->tp_alloc((PyTypeObject*)cls.ptr(), 0);
   }
 
   // Implementation for `tp_new` slot.
@@ -130,11 +130,11 @@ struct cast_is_known_safe<T,
         dtype_user_caster<intrinsic_t<T>>, make_caster<T>>::value>>
     : public std::true_type {};
 
-// Implementation of `type_caster` interface `dtype_py_object<>`s.
+// Implementation of `type_caster` interface `dtype_user_instance<>`s.
 template <typename Class>
 struct dtype_user_caster {
   static constexpr auto name = detail::_<Class>();
-  using DTypePyObject = dtype_py_object<Class>;
+  using DTypePyObject = dtype_user_instance<Class>;
   static handle cast(const Class& src, return_value_policy, handle) {
     object h = DTypePyObject::find_existing(&src);
     // TODO(eric.cousineau): Handle parenting?
@@ -236,10 +236,9 @@ class dtype_user : public class_<Class_> {
  public:
   using Base = class_<Class_>;
   using Class = Class_;
-  using DTypePyObject = detail::dtype_py_object<Class>;
+  using DTypePyObject = detail::dtype_user_instance<Class>;
 
   dtype_user(handle scope, const char* name) : Base(none()) {
-    npy_api::get();  // Ensure we initialize if needed.
     register_type(name);
     scope.attr(name) = self();
     auto& entry = dtype_info::get_mutable_entry<Class>(true);
@@ -322,10 +321,10 @@ class dtype_user : public class_<Class_> {
     // Without these, numpy goes into infinite recursion. Haven't bothered to
     // figure out exactly why.
     if (!d.contains("__repr__")) {
-      throw std::runtime_error("Class is missing explicit __repr__");
+      pybind11_fail("Class is missing explicit __repr__");
     }
     if (!d.contains("__str__")) {
-      throw std::runtime_error("Class is missing explicit __str__");
+      pybind11_fail("Class is missing explicit __str__");
     }
   }
 
@@ -348,6 +347,8 @@ class dtype_user : public class_<Class_> {
   }
 
   void register_type(const char* name) {
+    // Ensure we initialize NumPy before accessing `PyGenericArrType_Type`.
+    npy_api::get();
     // Loosely uses https://stackoverflow.com/a/12505371/7829525 as well.
     auto heap_type = (PyHeapTypeObject*)PyType_Type.tp_alloc(&PyType_Type, 0);
     PY_ASSERT_EX(heap_type, "yar");

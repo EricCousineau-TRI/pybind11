@@ -12,11 +12,14 @@
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+// Gets a NumPy UFunc by name.
 PyUFuncObject* get_py_ufunc(const char* name) {
-  py::module numpy = py::module::import("numpy");
+  // TODO(eric.cousineau): Check type.
+  module numpy = module::import("numpy");
   return (PyUFuncObject*)numpy.attr(name).ptr();
 }
 
+// Registers a function pointer as a UFunc, mapping types to dtype nums.
 template <typename Type, typename ... Args>
 void ufunc_register(
         PyUFuncObject* py_ufunc,
@@ -29,7 +32,7 @@ void ufunc_register(
         N == py_ufunc->nargs, "Argument mismatch, {} != {}",
         N, py_ufunc->nargs);
     PY_ASSERT_EX(
-        PyUFunc_RegisterLoopForType(
+        npy_api::get().PyUFunc_RegisterLoopForType_(
             py_ufunc, dtype, func, dtype_args, data) >= 0,
         "Failed to regstiser ufunc");
 }
@@ -37,7 +40,7 @@ void ufunc_register(
 template <int N>
 using const_int = std::integral_constant<int, N>;
 
-// Unary.
+// Registers a unary UFunc given a lambda.
 template <typename Type, int N = 1, typename Func = void>
 void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
     auto info = detail::infer_function_info(func);
@@ -58,6 +61,7 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
             out += step_out;
         }
     };
+    // N.B. `new Func(...)` will never be destroyed.
     ufunc_register<Type, Arg0, Out>(py_ufunc, ufunc, new Func(func));
 };
 
@@ -84,13 +88,12 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<2>) {
             out += step_out;
         }
     };
+    // N.B. `new Func(...)` will never be destroyed.
     ufunc_register<Type, Arg0, Arg1, Out>(py_ufunc, ufunc, new Func(func));
 };
 
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
-  auto* from = PyArray_DescrFromType(dtype_num<From>());
-  int to = dtype_num<To>();
   static auto cast_lambda = func;
   auto cast_func = [](
         void* from_, void* to_, npy_intp n,
@@ -100,11 +103,15 @@ void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
       for (npy_intp i = 0; i < n; i++)
           to[i] = cast_lambda(from[i]);
   };
+  auto& api = npy_api::get();
+  auto from = npy_format_descriptor<From>::dtype();
+  int to_num = npy_format_descriptor<To>::dtype().num();
+  auto* from_raw = from.ptr();
   PY_ASSERT_EX(
-      PyArray_RegisterCastFunc(from, to, cast_func) >= 0,
+      api.PyArray_RegisterCastFunc_(from, to_num, cast_func) >= 0,
       "Cannot register cast");
   PY_ASSERT_EX(
-      PyArray_RegisterCanCast(from, to, NPY_NOSCALAR) >= 0,
+      api.PyArray_RegisterCanCast_(from, to_num, NPY_NOSCALAR) >= 0,
       "Cannot register castability");
 }
 
