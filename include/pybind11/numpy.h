@@ -105,6 +105,73 @@ typedef struct {
       uint32_t *iter_flags;
 } PyUFuncObject;
 
+constexpr int NPY_NTYPES = 256; // err...
+
+// TODO(eric.cousineau): Fill this out as needed for type safety.
+// TODO(eric.cousineau): Do not define these if NPY headers are present (for debugging).
+using PyArray_GetItemFunc = void;
+using PyArray_SetItemFunc = void;
+using PyArray_CopySwapNFunc = void;
+using PyArray_CopySwapFunc = void;
+using PyArray_CompareFunc = void;
+using PyArray_ArgFunc = void;
+using PyArray_DotFunc = void;
+using PyArray_ScanFunc = void;
+using PyArray_FromStrFunc = void;
+using PyArray_NonzeroFunc = void;
+using PyArray_FillFunc = void;
+using PyArray_FillWithScalarFunc = void;
+using PyArray_SortFunc = void;
+using PyArray_ArgSortFunc = void;
+using PyArray_ScalarKindFunc = void;
+using PyArray_FastClipFunc = void;
+using PyArray_FastPutmaskFunc = void;
+using PyArray_FastTakeFunc = void;
+using PyArray_ArgFunc = void;
+
+typedef struct {
+    PyArray_VectorUnaryFunc *cast[NPY_NTYPES];
+    PyArray_GetItemFunc *getitem;
+    PyArray_SetItemFunc *setitem;
+    PyArray_CopySwapNFunc *copyswapn;
+    PyArray_CopySwapFunc *copyswap;
+    PyArray_CompareFunc *compare;
+    PyArray_ArgFunc *argmax;
+    PyArray_DotFunc *dotfunc;
+    PyArray_ScanFunc *scanfunc;
+    PyArray_FromStrFunc *fromstr;
+    PyArray_NonzeroFunc *nonzero;
+    PyArray_FillFunc *fill;
+    PyArray_FillWithScalarFunc *fillwithscalar;
+    PyArray_SortFunc *sort[NPY_NSORTS];
+    PyArray_ArgSortFunc *argsort[NPY_NSORTS];
+    PyObject *castdict;
+    PyArray_ScalarKindFunc *scalarkind;
+    int **cancastscalarkindto;
+    int *cancastto;
+    PyArray_FastClipFunc *fastclip;
+    PyArray_FastPutmaskFunc *fastputmask;
+    PyArray_FastTakeFunc *fasttake;
+    PyArray_ArgFunc *argmin;
+} PyArray_ArrFuncs;
+
+using PyArray_ArrayDescr = void;
+
+typedef struct {
+    PyObject_HEAD
+    PyTypeObject *typeobj;
+    char kind;
+    char type;
+    char byteorder;
+    char unused;
+    int flags;
+    int type_num;
+    int elsize;
+    int alignment;
+    PyArray_ArrayDescr *subarray;
+    PyObject *fields;
+    PyArray_ArrFuncs *f;
+} PyArray_Descr;
 
 struct numpy_type_info {
     PyObject* dtype_ptr;
@@ -207,6 +274,7 @@ struct npy_api {
 
     // - Dtypes
     PyObject* PyGenericArrType_Type_;
+    int (*PyArray_RegisterDataType_)(PyArray_Descr* dtype);
     int (*PyArray_RegisterCastFunc_)(PyArray_Descr* descr, int totype, PyArray_VectorUnaryFunc* castfunc);
     int (*PyArray_RegisterCanCast_)(PyArray_Descr* descr, int totype, NPY_SCALARKIND scalar);
     void (*PyArray_InitArrFuncs_)(PyArray_ArrFuncs *f);
@@ -237,6 +305,7 @@ private:
         API_PyArray_SetBaseObject = 282,
         // - DTypes
         API_PyGenericArrType_Type = 10,
+        PyArray_RegisterDataType = 192,
         API_PyArray_RegisterCastFunc = 193,
         API_PyArray_RegisterCanCast = 194,
         API_PyArray_InitArrFuncs = 195,
@@ -280,6 +349,7 @@ private:
             DECL_NPY_API(PyArray_SetBaseObject);
             // - Dtypes
             DECL_NPY_API(PyGenericArrType_Type);
+            DECL_NPY_API(PyArray_RegisterDataType);
             DECL_NPY_API(PyArray_InitArrFuncs);
             DECL_NPY_API(PyArray_RegisterCastFunc);
             DECL_NPY_API(PyArray_RegisterCanCast);

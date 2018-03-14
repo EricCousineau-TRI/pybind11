@@ -7,8 +7,8 @@ Functions:
     PyArray_RegisterDataType_
 
 Structs:
-    PyArray_ArrFuncs
-    PyArray_Descr
+    PyArray_ArrFuncs ++
+    PyArray_Descr ++
     PyUFuncObject ++
 
 Types:
