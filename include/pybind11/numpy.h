@@ -1053,6 +1053,15 @@ public:
     static pybind11::dtype dtype() { return base_descr::dtype(); }
 };
 
+template <>
+struct npy_format_descriptor<object> {
+    static pybind11::dtype dtype() {
+        if (auto ptr = npy_api::get().PyArray_DescrFromType_(NPY_OBJECT))
+            return reinterpret_borrow<pybind11::dtype>(ptr);
+        pybind11_fail("Unsupported buffer format!");
+    }
+};
+
 struct field_descriptor {
     const char *name;
     ssize_t offset;
