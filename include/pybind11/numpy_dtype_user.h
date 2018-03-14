@@ -242,8 +242,8 @@ class dtype_user : public class_<Class_> {
     entry.dtype_num = register_numpy();
 
     // Register default ufunc cast to `object`.
-    // this->def_ufunc_cast([](const Class& self) { return cast(self); });
-    // this->def_ufunc_cast([](object self) { return cast<Class>(self); });
+    this->def_ufunc_cast([](const Class& self) { return cast(self); });
+    this->def_ufunc_cast([](object self) { return cast<Class>(self); });
   }
 
   ~dtype_user() {
@@ -362,7 +362,7 @@ class dtype_user : public class_<Class_> {
 
   int register_numpy() {
     using detail::npy_api;
-    // Adapted from `numpy/core/multiarrya/src/test_rational.c.src`.
+    // Adapted from `numpy/core/multiarray/src/test_rational.c.src`.
     // Define NumPy description.
     auto type = (PyTypeObject*)self().ptr();
     typedef struct { char c; Class r; } align_test;

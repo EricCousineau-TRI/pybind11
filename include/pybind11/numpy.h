@@ -106,7 +106,7 @@ typedef struct {
 } PyUFuncObject;
 
 // Manually defined :(
-constexpr int NPY_NTYPES = 24;
+constexpr int NPY_NTYPES_ABI_COMPATIBLE = 21;
 constexpr int NPY_NSORTS = 3;
 
 // TODO(eric.cousineau): Fill this out as needed for type safety.
@@ -132,7 +132,7 @@ using PyArray_FastTakeFunc = void;
 using PyArray_ArgFunc = void;
 
 typedef struct {
-    PyArray_VectorUnaryFunc *cast[NPY_NTYPES];
+    PyArray_VectorUnaryFunc *cast[NPY_NTYPES_ABI_COMPATIBLE];
     PyArray_GetItemFunc *getitem;
     PyArray_SetItemFunc *setitem;
     PyArray_CopySwapNFunc *copyswapn;
