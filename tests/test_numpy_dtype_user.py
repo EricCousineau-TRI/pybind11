@@ -79,10 +79,18 @@ def test_array_ufunc():
 # sys.stdout = sys.stderr
 # sys.argv = [__file__, "-s"]
 # pytest.main(args=sys.argv[1:])
-pytest.gc_collect = gc.collect
-test_scalar_ctor()
-test_scalar_meta()
-test_scalar_op()
-test_array_creation()
-test_array_cast()
-test_array_ufunc()
+def main():
+    pytest.gc_collect = gc.collect
+    test_scalar_ctor()
+    test_scalar_meta()
+    test_scalar_op()
+    test_array_creation()
+    test_array_cast()
+    test_array_ufunc()
+
+import trace
+tracer = trace.Trace(
+    ignoredirs=sys.path,
+    trace=1,
+    count=0)
+tracer.run('main()')
