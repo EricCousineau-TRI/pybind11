@@ -51,8 +51,10 @@ public:
       value_ = other.value_;
       track_copy_created(this);
     }
-    Custom& operator=(const Custom&) {
+    Custom& operator=(const Custom& other) {
         track_copy_assigned(this);
+        value_ = other.value_;
+        return *this;
     }
     operator double() const { return value_; }
 
