@@ -15,6 +15,8 @@
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
+// Utilities
+
 // Gets a NumPy UFunc by name.
 PyUFuncObject* get_py_ufunc(const char* name) {
   // TODO(eric.cousineau): Check type.

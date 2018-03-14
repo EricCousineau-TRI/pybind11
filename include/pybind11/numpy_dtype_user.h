@@ -66,7 +66,7 @@ struct dtype_info {
   using internals = std::map<std::type_index, dtype_info>;
   // TODO(eric.cousineau): Store in internals.
   static internals& get_internals() {
-    static internals* ptr = get_or_create_shared_data<internals>("_numpy_dtype_user_internals");
+    static internals* ptr = &get_or_create_shared_data<internals>("_numpy_dtype_user_internals");
     return *ptr;
   }
 };
@@ -124,13 +124,6 @@ struct dtype_user_instance {
   }
 };
 
-// Ensures that `dtype_user_caster` can cast pointers. See `cast.h`.
-template <typename T>
-struct cast_is_known_safe<T,
-    enable_if_t<std::is_base_of<
-        dtype_user_caster<intrinsic_t<T>>, make_caster<T>>::value>>
-    : public std::true_type {};
-
 // Implementation of `type_caster` interface `dtype_user_instance<>`s.
 template <typename Class>
 struct dtype_user_caster {
@@ -186,12 +179,12 @@ struct dtype_user_caster {
   Class* ptr_{};
 };
 
-// // Initializes NumPy C APi.
-// inline void init_numpy() {
-//   _import_array();
-//   _import_umath();
-//   module::import("numpy");
-// }
+// Ensures that `dtype_user_caster` can cast pointers. See `cast.h`.
+template <typename T>
+struct cast_is_known_safe<T,
+    enable_if_t<std::is_base_of<
+        dtype_user_caster<intrinsic_t<T>>, make_caster<T>>::value>>
+    : public std::true_type {};
 
 // Maps a pybind11 operator (using py::self) to a NumPy UFunc name.
 inline const char* get_ufunc_name(detail::op_id id) {
@@ -321,12 +314,10 @@ class dtype_user : public class_<Class_> {
     dict d = self().attr("__dict__");
     // Without these, numpy goes into infinite recursion. Haven't bothered to
     // figure out exactly why.
-    if (!d.contains("__repr__")) {
+    if (!d.contains("__repr__"))
       pybind11_fail("Class is missing explicit __repr__");
-    }
-    if (!d.contains("__str__")) {
+    if (!d.contains("__str__"))
       pybind11_fail("Class is missing explicit __str__");
-    }
   }
 
   template <typename Func>
