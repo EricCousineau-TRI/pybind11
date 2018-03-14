@@ -1,9 +1,9 @@
 Functions:
     PyUFunc_RegisterLoopForType_
-    PyArray_InitArrFuncs_
+    PyArray_InitArrFuncs_ ++
     PyArray_RegisterCastFunc_
     PyArray_RegisterCanCast_
-    PyArray_DescrFromType_
+    PyArray_DescrFromType_ ++
     PyArray_RegisterDataType_
 
 Structs:
@@ -15,6 +15,6 @@ Types:
     PyGenericArrType_Type
 
 Flags:
-    NPY_NEEDS_PYAPI
-    NPY_USE_GETITEM
-    NPY_USE_SETITEM
+    NPY_NEEDS_PYAPI ++
+    NPY_USE_GETITEM ++
+    NPY_USE_SETITEM ++

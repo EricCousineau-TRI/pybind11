@@ -378,7 +378,9 @@ class dtype_user : public class_<Class_> {
         'V',                    /* kind (V = arbitrary) */
         'r',                    /* type */
         '=',                    /* byteorder */
-        NPY_NEEDS_PYAPI | NPY_USE_GETITEM | NPY_USE_SETITEM, /* flags */
+        // TODO(eric.cousineau): NPY_NEEDS_INIT?
+        npy_api::NPY_NEEDS_PYAPI_ | npy_api::NPY_USE_GETITEM_ |
+            npy_api::NPY_USE_SETITEM_, /* flags */
         0,                      /* type_num */
         sizeof(Class),          /* elsize */
         offsetof(align_test,r), /* alignment */

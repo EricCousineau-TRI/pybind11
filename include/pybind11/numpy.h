@@ -109,7 +109,8 @@ inline numpy_internals& get_numpy_internals() {
 }
 
 struct npy_api {
-    enum constants {
+    enum constants : int {
+        // Array properties
         NPY_ARRAY_C_CONTIGUOUS_ = 0x0001,
         NPY_ARRAY_F_CONTIGUOUS_ = 0x0002,
         NPY_ARRAY_OWNDATA_ = 0x0004,
@@ -117,6 +118,7 @@ struct npy_api {
         NPY_ARRAY_ENSUREARRAY_ = 0x0040,
         NPY_ARRAY_ALIGNED_ = 0x0100,
         NPY_ARRAY_WRITEABLE_ = 0x0400,
+        // Dtypes
         NPY_BOOL_ = 0,
         NPY_BYTE_, NPY_UBYTE_,
         NPY_SHORT_, NPY_USHORT_,
@@ -126,7 +128,11 @@ struct npy_api {
         NPY_FLOAT_, NPY_DOUBLE_, NPY_LONGDOUBLE_,
         NPY_CFLOAT_, NPY_CDOUBLE_, NPY_CLONGDOUBLE_,
         NPY_OBJECT_ = 17,
-        NPY_STRING_, NPY_UNICODE_, NPY_VOID_
+        NPY_STRING_, NPY_UNICODE_, NPY_VOID_,
+        // Descriptor flags
+        NPY_NEEDS_PYAPI_ = 0x10,
+        NPY_USE_GETITEM_ = 0x20,
+        NPY_USE_SETITEM_ = 0x40,
     };
 
     typedef struct {
@@ -146,6 +152,7 @@ struct npy_api {
         return (bool) PyObject_TypeCheck(obj, PyArrayDescr_Type_);
     }
 
+    // Multiarray.
     unsigned int (*PyArray_GetNDArrayCFeatureVersion_)();
     PyObject *(*PyArray_DescrFromType_)(int);
     PyObject *(*PyArray_NewFromDescr_)
@@ -166,6 +173,11 @@ struct npy_api {
     PyObject *(*PyArray_Squeeze_)(PyObject *);
     int (*PyArray_SetBaseObject_)(PyObject *, PyObject *);
     PyObject* (*PyArray_Resize_)(PyObject*, PyArray_Dims*, int, int);
+
+    // - Dtypes
+    void (*PyArray_InitArrFuncs_)(PyArray_ArrFuncs *f);
+
+    // UFuncs.
 private:
     enum functions {
         API_PyArray_GetNDArrayCFeatureVersion = 211,
@@ -184,7 +196,14 @@ private:
         API_PyArray_EquivTypes = 182,
         API_PyArray_GetArrayParamsFromObject = 278,
         API_PyArray_Squeeze = 136,
-        API_PyArray_SetBaseObject = 282
+        API_PyArray_SetBaseObject = 282,
+        // DTypes
+        API_PyArray_InitArrFuncs = 195,
+    };
+
+    emum ufunc_functions {
+        // DTypes
+
     };
 
     static npy_api lookup() {
@@ -192,8 +211,10 @@ private:
         auto c = m.attr("_ARRAY_API");
 #if PY_MAJOR_VERSION >= 3
         void **api_ptr = (void **) PyCapsule_GetPointer(c.ptr(), NULL);
+        // void **api_ufunc_ptr = 
 #else
         void **api_ptr = (void **) PyCObject_AsVoidPtr(c.ptr());
+        // void **api_ufunc_ptr = 
 #endif
         npy_api api;
 #define DECL_NPY_API(Func) api.Func##_ = (decltype(api.Func##_)) api_ptr[API_##Func];
@@ -217,6 +238,7 @@ private:
         DECL_NPY_API(PyArray_Squeeze);
         DECL_NPY_API(PyArray_SetBaseObject);
 #undef DECL_NPY_API
+// #define DECL_NPY_UFUNC_API(Func) api.Func##_ = (decltype(api.Func##_)) api_ufunc_ptr[API_##Func];
         return api;
     }
 };
