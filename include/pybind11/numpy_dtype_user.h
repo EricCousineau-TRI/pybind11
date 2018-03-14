@@ -441,6 +441,8 @@ class dtype_user : public class_<Class_> {
         return 0;
     };
     int dtype_num = api.PyArray_RegisterDataType_(&descr);
+    if (dtype_num < 0)
+        pybind11_fail("dtype_user: Could not register!");
     self().attr("dtype") =
         reinterpret_borrow<object>(handle((PyObject*)&descr));
     return dtype_num;
