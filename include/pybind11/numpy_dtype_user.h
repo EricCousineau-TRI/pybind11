@@ -351,7 +351,8 @@ class dtype_user : public class_<Class_> {
     npy_api::get();
     // Loosely uses https://stackoverflow.com/a/12505371/7829525 as well.
     auto heap_type = (PyHeapTypeObject*)PyType_Type.tp_alloc(&PyType_Type, 0);
-    PY_ASSERT_EX(heap_type, "yar");
+    if (!heap_type)
+        pybind11_fail("dtype_user: Could not register heap type");
     heap_type->ht_name = str(name).release().ptr();
     // It's painful to inherit from `np.generic`, because it has no `tp_new`.
     auto& ClassObject_Type = heap_type->ht_type;
@@ -362,7 +363,8 @@ class dtype_user : public class_<Class_> {
     ClassObject_Type.tp_basicsize = sizeof(DTypePyObject);
     ClassObject_Type.tp_getset = 0;
     ClassObject_Type.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
-    PY_ASSERT_EX(PyType_Ready(&ClassObject_Type) == 0, "");
+    if (PyType_Ready(&ClassObject_Type) != 0)
+        pybind11_fail("dtype_user: Unable to initialize class");
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
   }
 
@@ -400,7 +402,8 @@ class dtype_user : public class_<Class_> {
     };
     arrfuncs.setitem = [](PyObject* in, void* out, void* arr) {
         dtype_user_caster<Class> caster;
-        PY_ASSERT_EX(caster.load(in, true), "Could not convert");
+        if (!caster.load(in, true))
+            pybind11_fail("dtype_user: Could not convert during `setitem`");
         // Cut out the middle-man?
         *(Class*)out = caster;
         return 0;

@@ -28,13 +28,11 @@ void ufunc_register(
     constexpr int N = sizeof...(Args);
     int dtype = npy_format_descriptor<Type>::dtype().num();
     int dtype_args[] = {npy_format_descriptor<Args>::dtype().num()...};
-    PY_ASSERT_EX(
-        N == py_ufunc->nargs, "Argument mismatch, {} != {}",
-        N, py_ufunc->nargs);
-    PY_ASSERT_EX(
-        npy_api::get().PyUFunc_RegisterLoopForType_(
-            py_ufunc, dtype, func, dtype_args, data) >= 0,
-        "Failed to regstiser ufunc");
+    if (N != py_ufunc->nargs)
+        pybind11_fail("ufunc: Argument count mismatch");
+    if (npy_api::get().PyUFunc_RegisterLoopForType_(
+            py_ufunc, dtype, func, dtype_args, data) < 0)
+        pybind11_fail("ufunc: Failed to regstiser ufunc");
 }
 
 template <int N>
@@ -107,12 +105,10 @@ void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
   auto from = npy_format_descriptor<From>::dtype();
   int to_num = npy_format_descriptor<To>::dtype().num();
   auto* from_raw = from.ptr();
-  PY_ASSERT_EX(
-      api.PyArray_RegisterCastFunc_(from, to_num, cast_func) >= 0,
-      "Cannot register cast");
-  PY_ASSERT_EX(
-      api.PyArray_RegisterCanCast_(from, to_num, NPY_NOSCALAR) >= 0,
-      "Cannot register castability");
+  if (api.PyArray_RegisterCastFunc_(from, to_num, cast_func) < 0)
+      pybind11_fail("ufunc: Cannot register cast");
+  if (api.PyArray_RegisterCanCast_(from, to_num, NPY_NOSCALAR) < 0)
+      pybind11_fail("ufunc: Cannot register castability");
 }
 
 NAMESPACE_END(detail)
