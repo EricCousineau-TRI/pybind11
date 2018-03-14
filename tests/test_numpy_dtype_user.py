@@ -1,3 +1,4 @@
+import sys
 import pytest
 from pybind11_tests import ConstructorStats
 from pybind11_tests import numpy_dtype_user as m
@@ -7,4 +8,16 @@ stats_c = ConstructorStats.get(m.Custom)
 
 def test_dtype_intance():
     """ Tests a single scalar instance. """
-    print("wooh")
+    c = m.Custom()
+    c1 = m.Custom(10)
+    c2 = m.Custom(c1)
+    assert id(c) != id(c1)
+    assert id(c) != id(c2)
+    del c
+    del c1
+    del c2
+    pytest.gc_collect()
+    print('wooh')
+
+sys.stdout = sys.stderr
+pytest.main(args=sys.argv[1:])

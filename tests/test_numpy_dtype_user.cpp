@@ -81,6 +81,16 @@ private:
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
 TEST_SUBMODULE(numpy_dtype_user, m) {
+    ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
+        auto& map = py::detail::dtype_info::get_internals();
+        for (auto& iter : map) {
+            auto& entry = iter.second;
+            if (cls.ptr() == entry.cls.ptr())
+                return const_cast<std::type_index*>(&iter.first);
+        }
+        return nullptr;
+    });
+
     try { py::module::import("numpy"); }
     catch (...) { return; }
 

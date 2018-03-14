@@ -41,7 +41,7 @@ struct dtype_info {
   // Provides mutable entry for a registered type, with option to create.
   template <typename T>
   static dtype_info& get_mutable_entry(bool is_new = false) {
-    auto& internals = get_internals();
+    auto& internals = get_mutable_internals();
     std::type_index id(typeid(T));
     if (is_new) {
       if (internals.find(id) != internals.end())
@@ -55,13 +55,17 @@ struct dtype_info {
   // Provides immutable entry for a registered type.
   template <typename T>
   static const dtype_info& get_entry() {
-    return get_internals().at(std::type_index(typeid(T)));
+    return get_mutable_internals().at(std::type_index(typeid(T)));
   }
 
- private:
+  // Preferablly not...
   using internals = std::map<std::type_index, dtype_info>;
+  static const internals& get_internals() {
+    return get_mutable_internals();
+  }
+ private:
   // TODO(eric.cousineau): Store in internals.
-  static internals& get_internals() {
+  static internals& get_mutable_internals() {
     static internals* ptr = &get_or_create_shared_data<internals>("_numpy_dtype_user_internals");
     return *ptr;
   }
