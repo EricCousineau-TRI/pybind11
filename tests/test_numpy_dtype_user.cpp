@@ -13,6 +13,7 @@
 #include "constructor_stats.h"
 #include <pybind11/operators.h>
 #include <pybind11/numpy_dtype_user.h>
+#include <pybind11/embed.h>
 
 namespace py = pybind11;
 
@@ -80,7 +81,8 @@ private:
 
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
-TEST_SUBMODULE(numpy_dtype_user, m) {
+//TEST_SUBMODULE(numpy_dtype_user, m) {
+void numpy_dtype_user(py::module m) {
     ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
         auto& map = py::detail::dtype_info::get_internals();
         for (auto& iter : map) {
@@ -120,4 +122,24 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(-py::self)
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self);
+}
+
+void bind_ConstructorStats(py::module &m);
+
+int main() {
+    py::scoped_interpreter guard;
+
+    py::module m("pybind11_tests");
+    bind_ConstructorStats(m);
+    numpy_dtype_user(m.def_submodule("numpy_dtype_user"));
+    // py::module s = m.def_submodule("numpy_dtype_user");
+    // py::module o = py::module::import("numpy_dtype_user");
+    // s.attr("__dict__").attr("update")(o.attr("__dict__"));
+
+    py::str file = "python/pybind11/tests/test_numpy_dtype_user.py";
+    py::print(file);
+    py::module mm("__main__");
+    mm.attr("__file__") = file;
+    py::eval_file(file);
+    return 0;
 }

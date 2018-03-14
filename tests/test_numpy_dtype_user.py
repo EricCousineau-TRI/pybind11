@@ -19,5 +19,6 @@ def test_dtype_intance():
     pytest.gc_collect()
     print('wooh')
 
-sys.stdout = sys.stderr
+# sys.stdout = sys.stderr
+sys.argv = [__file__, "-s"]
 pytest.main(args=sys.argv[1:])
