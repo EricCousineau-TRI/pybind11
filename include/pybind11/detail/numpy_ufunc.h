@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include "../numpy.h"
+#include "inference.h"
+
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -41,7 +44,7 @@ using const_int = std::integral_constant<int, N>;
 // Registers a unary UFunc given a lambda.
 template <typename Type, int N = 1, typename Func = void>
 void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
-    auto info = detail::infer_function_info(func);
+    auto info = detail::function_inference::run(func);
     using Info = decltype(info);
     using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
     using Out = std::decay_t<typename Info::Return>;
@@ -66,7 +69,7 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<1>) {
 // Binary.
 template <typename Type, int N = 2, typename Func = void>
 void ufunc_register(PyUFuncObject* py_ufunc, Func func, const_int<2>) {
-    auto info = detail::infer_function_info(func);
+    auto info = detail::function_inference::run(func);
     using Info = decltype(info);
     using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
     using Arg1 = std::decay_t<typename Info::Args::template type_at<1>>;

@@ -10,6 +10,7 @@
 #pragma once
 
 #include "numpy.h"
+#include "detail/inference.h"
 #include "detail/numpy_ufunc.h"
 #include <array>
 #include <cstdlib>
@@ -283,7 +284,7 @@ class dtype_user : public class_<Class_> {
     // Define operators.
     this->def(op_impl::name(), func, is_operator(), extra...);
     // Register ufunction.
-    auto func_infer = detail::infer_function_info(func);
+    auto func_infer = detail::function_inference::run(func);
     using Func = decltype(func_infer);
     constexpr int N = Func::Args::size;
     detail::ufunc_register<Class>(
