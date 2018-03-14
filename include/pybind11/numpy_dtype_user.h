@@ -389,7 +389,7 @@ class dtype_user : public class_<Class_> {
     };
 
     auto &api = npy_api::get();
-    api.PyArray_DescrFromType_PyArray_InitArrFuncs_(&arrfuncs);
+    api.PyArray_InitArrFuncs_(&arrfuncs);
 
     // https://docs.scipy.org/doc/numpy/reference/c-api.types-and-structures.html
     arrfuncs.getitem = [](void* in, void* arr) -> PyObject* {
