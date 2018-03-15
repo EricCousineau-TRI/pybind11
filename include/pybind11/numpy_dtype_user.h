@@ -327,6 +327,12 @@ class dtype_user : public class_<Class_> {
     using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
     using To = detail::intrinsic_t<typename Func::Return>;
     detail::ufunc_register_cast<From, To>(func, allow_coercion);
+    // Define implicit conversion on the class.
+    if (allow_coercion && std::is_same<To, Class>::value) {
+      auto& entry = detail::dtype_info::get_mutable_entry<Class>();
+      entry.implicit_conversions.push_back(
+          detail::create_implicit_caster<From, Class>());
+    }
     // TODO(eric.cousineau): When `allow_coercion` is true and `From` is
     // `Class`, register the implicit conversion.
     return *this;
