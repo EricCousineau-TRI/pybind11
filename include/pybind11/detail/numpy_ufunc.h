@@ -96,7 +96,8 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<2>) {
 };
 
 template <typename From, typename To, typename Func>
-void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
+void ufunc_register_cast(
+    Func&& func, bool allow_coercion, type_pack<From, To> = {}) {
   static auto cast_lambda = func;
   auto cast_func = +[](
         void* from_, void* to_, npy_intp n,
@@ -112,8 +113,12 @@ void ufunc_register_cast(Func&& func, type_pack<From, To> = {}) {
   auto from_raw = (PyArray_Descr*)from.ptr();
   if (api.PyArray_RegisterCastFunc_(from_raw, to_num, cast_func) < 0)
       pybind11_fail("ufunc: Cannot register cast");
-  if (api.PyArray_RegisterCanCast_(from_raw, to_num, npy_api::NPY_NOSCALAR_) < 0)
-      pybind11_fail("ufunc: Cannot register castability");
+  if (allow_coercion) {
+    if (api.PyArray_RegisterCanCast_(
+            from_raw, to_num, npy_api::NPY_NOSCALAR_) < 0)
+        pybind11_fail(
+            "ufunc: Cannot register implicit / coercion cast capability");
+  }
 }
 
 NAMESPACE_END(detail)

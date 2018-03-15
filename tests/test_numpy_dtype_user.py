@@ -9,6 +9,20 @@ from pybind11_tests import numpy_dtype_user as m
 stats = ConstructorStats.get(m.Custom)
 # stats_str = ConstructorStats.get(m.CustomStr)
 
+def check_array(actual, expected):
+    expected = np.array(expected)
+    if actual.shape != expected.shape:
+        return False
+    # TODO(eric.cousineau): Implement this as a UFunc (or just use vectorize?)
+    # N.B. Is it possible to make a flexible ufunc?
+    for a, b in zip(actual.flat, expected.flat):
+        if not m.same(a, b):
+            return False
+    if actual.dtype != expected.dtype:
+        print(actual.dtype, expected.dtype)
+        return False
+    return True
+
 def test_scalar_ctor():
     """ Tests a single scalar instance. """
     c = m.Custom()
@@ -55,21 +69,15 @@ def test_array_cast():
     check(float)
     check(object)
 
-def check_array(actual, expected):
-    expected = np.array(expected)
-    if actual.shape != expected.shape:
-        return False
-    for a, b in zip(actual.flat, expected.flat):
-        print(type(a))
-        print(type(b))
-        print(a, b)
-        # exit(0)
-        if not m.same(a, b):
-            return False
-    if actual.dtype != expected.dtype:
-        print(actual.dtype, expected.dtype)
-        return False
-    return True
+def test_array_cast_implicit():
+    a = np.array([1, 2], dtype=m.Custom)
+    print(a)
+    # We did not allow implicit coercion, and did not register `Custom{} * double{}`.
+    with pytest.raises(TypeError) as excinfo:
+        a *= 2
+    # Still not implicit coercion, but we did register `Custom{} + double{}`.
+    a += 2
+    print(a)
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
@@ -90,8 +98,9 @@ def main():
     # test_scalar_meta()
     # test_scalar_op()
     # test_array_creation()
-    # test_array_cast()
-    test_array_ufunc()
+    test_array_cast()
+    test_array_cast_implicit()
+    # test_array_ufunc()
     # x = m.Custom(4)
 
 import trace

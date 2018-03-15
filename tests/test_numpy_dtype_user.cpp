@@ -64,6 +64,8 @@ public:
 
     Custom operator+(const Custom& rhs) const { return Custom(*this) += rhs.value_; }
     Custom& operator+=(const Custom& rhs) { value_ += rhs.value_; return *this; }
+    Custom operator+(double rhs) const { return Custom(*this) += rhs; }
+    Custom& operator+=(double rhs) { value_ += rhs; return *this; }
     Custom operator*(const Custom& rhs) const { return value_ * rhs.value_; }
     Custom operator-(const Custom& rhs) const { return value_ - rhs.value_; }
 
@@ -87,13 +89,7 @@ PYBIND11_NUMPY_DTYPE_USER(Custom);
 //TEST_SUBMODULE(numpy_dtype_user, m) {
 void numpy_dtype_user(py::module m) {
     ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
-        auto& map = py::detail::dtype_info::get_internals();
-        for (auto& iter : map) {
-            auto& entry = iter.second;
-            if (cls.ptr() == entry.cls.ptr())
-                return const_cast<std::type_index*>(&iter.first);
-        }
-        return nullptr;
+        return const_cast<std::type_index*>(py::detail::dtype_info::find_entry(cls));
     });
 
     try { py::module::import("numpy"); }
@@ -111,8 +107,7 @@ void numpy_dtype_user(py::module m) {
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
-        // ISSUE: Copy constructor here is actually causing recursion...
-        // .def(py::init<Custom>())  // Must define copy ctor first!
+        // ISSUE: Adding a copy constructor here is actually causing recursion...
         .def(py::init<double>())
         .def("__repr__", [](const Custom* self) {
             return py::str("<Custom({})>").format(double{*self});
@@ -122,11 +117,14 @@ void numpy_dtype_user(py::module m) {
         })
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
-        // Operators + ufuncs, with some just-operators (e.g. in-place)
+        // Casting.
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast([](const Custom& in) -> double { return in; })
+        // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
+        .def_ufunc(py::self + double{})
+        .def(py::self += double{})
         .def_ufunc(py::self * py::self)
         .def_ufunc(py::self - py::self)
         .def_ufunc(-py::self)

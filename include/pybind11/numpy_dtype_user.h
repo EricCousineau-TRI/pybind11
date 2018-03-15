@@ -58,12 +58,27 @@ struct dtype_info {
     return get_mutable_internals().at(std::type_index(typeid(T)));
   }
 
-  // Preferablly not...
+  static const dtype_info& get_entry(std::type_index id) {
+    return get_mutable_internals().at(id);
+  }
+
+  static const std::type_index* find_entry(py::object cls) {
+    auto& map = get_internals();
+    for (auto& iter : map) {
+      auto& entry = iter.second;
+      if (cls.ptr() == entry.cls.ptr())
+        return &iter.first;
+    }
+    return nullptr;
+  }
+
+ private:
+  // Preferablly not to have to define this......
   using internals = std::map<std::type_index, dtype_info>;
   static const internals& get_internals() {
     return get_mutable_internals();
   }
- private:
+
   // TODO(eric.cousineau): Store in internals.
   static internals& get_mutable_internals() {
     static internals* ptr = &get_or_create_shared_data<internals>("_numpy_dtype_user_internals");
@@ -298,12 +313,14 @@ class dtype_user : public class_<Class_> {
   }
 
   template <typename Func_>
-  dtype_user& def_ufunc_cast(Func_&& func) {
+  dtype_user& def_ufunc_cast(Func_&& func, bool allow_coercion = false) {
     auto func_infer = detail::function_inference::run(func);
     using Func = decltype(func_infer);
     using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
     using To = detail::intrinsic_t<typename Func::Return>;
-    detail::ufunc_register_cast<From, To>(func);
+    detail::ufunc_register_cast<From, To>(func, allow_coercion);
+    // TODO(eric.cousineau): When `allow_coercion` is true and `From` is
+    // `Class`, register the implicit conversion.
     return *this;
   }
 
