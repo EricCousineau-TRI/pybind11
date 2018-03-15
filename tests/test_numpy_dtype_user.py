@@ -67,6 +67,7 @@ def check_array(actual, expected):
         if not m.same(a, b):
             return False
     if actual.dtype != expected.dtype:
+        print(actual.dtype, expected.dtype)
         return False
     return True
 
@@ -91,10 +92,8 @@ def main():
     # test_array_creation()
     # test_array_cast()
     test_array_ufunc()
+    # x = m.Custom(4)
 
 import trace
-tracer = trace.Trace(
-    ignoredirs=sys.path,
-    trace=1,
-    count=0)
+tracer = trace.Trace(trace=1, count=0, ignoredirs=sys.path)
 tracer.run('main()')

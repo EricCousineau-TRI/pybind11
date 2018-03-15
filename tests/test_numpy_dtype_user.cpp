@@ -31,6 +31,9 @@ public:
     std::string str() const {
         return buffer;
     }
+    bool operator==(const CustomStr& other) const {
+        return str() == other.str();
+    }
 private:
     char buffer[len];
 };
@@ -70,7 +73,7 @@ public:
         // Return non-boolean dtype.
         return CustomStr("%g == %g", value_, rhs.value_);
     }
-    Custom operator<(const Custom& rhs) const {
+    bool operator<(const Custom& rhs) const {
         // Return boolean value.
         return value_ < rhs.value_;
     }
@@ -100,13 +103,16 @@ void numpy_dtype_user(py::module m) {
     py::dtype_user<CustomStr>(m, "CustomStr")
         .def(py::init<const char*>())
         .def("__str__", &CustomStr::str)
-        .def("__repr__", &CustomStr::str);
+        .def("__repr__", &CustomStr::str)
+        .def_ufunc_cast([](const CustomStr& in) -> double {
+            py::pybind11_fail("Cannot cast");
+        });
 
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
         // ISSUE: Copy constructor here is actually causing recursion...
-        .def(py::init<Custom>())  // Must define copy ctor first!
+        // .def(py::init<Custom>())  // Must define copy ctor first!
         .def(py::init<double>())
         .def("__repr__", [](const Custom* self) {
             return py::str("<Custom({})>").format(double{*self});
@@ -129,6 +135,9 @@ void numpy_dtype_user(py::module m) {
 
     m.def("same", [](const Custom& a, const Custom& b) {
         return double{a} == double{b};
+    });
+    m.def("same", [](const CustomStr& a, const CustomStr& b) {
+        return a == b;
     });
 }
 
