@@ -104,6 +104,10 @@ void numpy_dtype_user(py::module m) {
             py::pybind11_fail("Cannot cast");
         });
 
+    // Not explicitly convertible: `double`
+    // Explicitly convertible: `char[4]` (artibrary)
+    using char4 = std::array<char, 4>;
+
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
@@ -120,6 +124,8 @@ void numpy_dtype_user(py::module m) {
         // Casting.
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast([](const Custom& in) -> double { return in; })
+        .def_ufunc_cast([](const char4& in) -> Custom { return Custom(4); }, true)
+        .def_ufunc_cast([](const Custom& in) -> char4 { return {'a', 'b', 'c', 'd'}; }, true)
         // TODO(eric.cousineau): Figure out type for implicit coercion.
         // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)

@@ -70,14 +70,18 @@ def test_array_cast():
     check(object)
 
 def test_array_cast_implicit():
-    a = np.array([1, 2], dtype=m.Custom)
-    print(a)
-    # We did not allow implicit coercion, and did not register `Custom{} * double{}`.
-    with pytest.raises(TypeError) as excinfo:
+    a = np.array([1, 2]).astype(m.Custom)
+    # We do not allow implicit coercion for `double`:    
+    with pytest.raises(TypeError):
+        b = np.array([1, 2], dtype=m.Custom)
+    with pytest.raises(TypeError):
         a *= 2
-    # Still not implicit coercion, but we did register `Custom{} + double{}`.
+    # - We did register `Custom{} + double{}`.
     a += 2
-    print(a)
+    assert check_array(a, [m.Custom(3.), m.Custom(4.)])
+    # Try an implicit conversion, registered for `std::array<char, 4>` (S4).
+    c = np.array([b'abcd', b'efgh'], dtpye=m.Custom)
+    print(c)
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
@@ -99,7 +103,7 @@ def main():
     # test_scalar_op()
     # test_array_creation()
     test_array_cast()
-    test_array_cast_implicit()
+    # test_array_cast_implicit()
     # test_array_ufunc()
     # x = m.Custom(4)
 
