@@ -260,8 +260,10 @@ class dtype_user : public class_<Class_> {
   template <typename ... Args, typename... Extra>
   dtype_user& def(detail::initimpl::constructor<Args...>&& init, const Extra&... extra) {
     // See notes in `add_init`.
-    add_init([](Class* self, Args... args) {
+    // N.B. Do NOT use `Class*` as the argument, since that may incur recursion.
+    add_init([](object py_self, Args... args) {
       // Old-style. No factories for now.
+        Class* self = DTypePyObject::load_raw(py_self.ptr());
       new (self) Class(std::forward<Args>(args)...);
     });
     return *this;
@@ -333,7 +335,7 @@ class dtype_user : public class_<Class_> {
       auto func = cpp_function(
           [init](handle self, args args, kwargs kwargs) {
             // Dispatch.
-            self.attr("_dtype_init")(*args, **kwargs);
+            init(self, *args, **kwargs);
           }, is_method(self()));
       self().attr("__init__") = func;
     }

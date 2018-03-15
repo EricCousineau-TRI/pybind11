@@ -40,20 +40,20 @@ PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 class Custom {
 public:
     Custom() {
-        track_created(this);
+        print_created(this);
     }
     ~Custom() {
-        track_destroyed(this);
+        print_destroyed(this);
     }
     Custom(double value) : value_{value} {
-        track_created(this, value);
+        print_created(this, value);
     }
     Custom(const Custom& other) {
-      value_ = other.value_;
-      track_copy_created(this);
+        value_ = other.value_;
+        print_copy_created(this);
     }
     Custom& operator=(const Custom& other) {
-        track_copy_assigned(this);
+        print_copy_assigned(this);
         value_ = other.value_;
         return *this;
     }
@@ -105,6 +105,7 @@ void numpy_dtype_user(py::module m) {
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
+        // ISSUE: Copy constructor here is actually causing recursion...
         .def(py::init<Custom>())  // Must define copy ctor first!
         .def(py::init<double>())
         .def("__repr__", [](const Custom* self) {
