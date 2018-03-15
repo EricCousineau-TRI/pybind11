@@ -37,6 +37,7 @@ struct dtype_info {
   handle cls;
   int dtype_num{-1};
   std::map<void*, PyObject*> instance_to_py;
+  std::vector<type_info::implicit_conversion_func> implicit_conversions;
 
   // Provides mutable entry for a registered type, with option to create.
   template <typename T>
@@ -168,23 +169,30 @@ struct dtype_user_caster {
   }
 
   bool load(handle src, bool convert) {
-    auto cls = dtype_info::get_entry<Class>().cls;
+    auto& entry = dtype_info::get_entry<Class>();
+    auto cls = entry.cls;
     object obj;
     if (!isinstance(src, cls)) {
       if (convert) {
-        // Just try to call it.
-        // TODO(eric.cousineau): Take out the Python middle man?
-        // Use registered ufuncs? See how `implicitly_convertible` is
-        // implemented.
-        obj = cls(src);
-      } else {
-        return false;
+        // Try implicit conversions.
+        for (auto& converter : entry.implicit_conversions) {
+          auto temp = converter(src.ptr(), (PyTypeObject*)cls.ptr());
+          if (temp) {
+            obj = reinterpret_steal<object>(temp);
+            break;
+          }
+        }
       }
     } else {
       obj = reinterpret_borrow<object>(src);
     }
-    ptr_ = DTypePyObject::load_raw(obj.ptr());
-    return true;
+    if (!obj) {
+      return false;
+    }
+    else {
+      ptr_ = DTypePyObject::load_raw(obj.ptr());
+      return true;
+    }
   }
   // Copy `type_caster_base`.
   template <typename T_> using cast_op_type =

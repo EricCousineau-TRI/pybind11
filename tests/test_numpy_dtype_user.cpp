@@ -120,6 +120,7 @@ void numpy_dtype_user(py::module m) {
         // Casting.
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast([](const Custom& in) -> double { return in; })
+        // TODO(eric.cousineau): Figure out type for implicit coercion.
         // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
