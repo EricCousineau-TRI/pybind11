@@ -13,13 +13,9 @@ def check_array(actual, expected):
     expected = np.array(expected)
     if actual.shape != expected.shape:
         return False
-    # TODO(eric.cousineau): Implement this as a UFunc (or just use vectorize?)
-    # N.B. Is it possible to make a flexible ufunc?
-    for a, b in zip(actual.flat, expected.flat):
-        if not m.same(a, b):
-            return False
+    if not m.same(actual, expected).all():
+        return False
     if actual.dtype != expected.dtype:
-        print(actual.dtype, expected.dtype)
         return False
     return True
 
