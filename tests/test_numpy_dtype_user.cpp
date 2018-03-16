@@ -130,7 +130,7 @@ public:
     }
     CustomStr operator==(const Custom& rhs) const {
         // Return non-boolean dtype.
-        return CustomStr("%g == %g && %s == %s", value_, rhs.value_, str().c_str(), rhs.str().c_str());
+        return CustomStr("%g == %g && '%s' == '%s'", value_, rhs.value_, str().c_str(), rhs.str().c_str());
     }
     bool operator<(const Custom& rhs) const {
         // Return boolean value.
@@ -212,14 +212,24 @@ void numpy_dtype_user(py::module m) {
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self);
 
+    // Define other stuff.
+    py::ufunc::get_builtin("power").def_loop<Custom>(
+        [](const Custom& a, const Custom& b) {
+            return CustomStr("%g ^ %g", double{a}, double{b});
+        });
+
     // `py::vectorize` does not seem to allow custom types due to sfinae constraints :(
-    py::ufunc(m, "same")
+    py::ufunc x(m, "same");
+    x
         .def_loop<Custom>([](const Custom& a, const Custom& b) {
             return a.same_as(b);
         })
         .def_loop<CustomStr>([](const CustomStr& a, const CustomStr& b) {
             return a == b;
         });
+    x
+        // Define this for checking logicals.
+        .def_loop<void>([](bool a, bool b) { return a == b; });
 }
 
 void bind_ConstructorStats(py::module &m);

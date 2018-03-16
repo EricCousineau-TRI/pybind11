@@ -14,6 +14,8 @@ def check_array(actual, expected):
     if actual.shape != expected.shape:
         return False
     if not m.same(actual, expected).all():
+        print(actual)
+        print(expected)
         return False
     if actual.dtype != expected.dtype:
         return False
@@ -93,6 +95,9 @@ def test_array_cast_implicit():
     # - Test array construction (numpy coercion)
     c = np.array([m.SimpleStruct(10), m.SimpleStruct(11)], dtype=m.Custom)
     assert check_array(c, [m.Custom(10), m.Custom(11)])
+    # - Test implicit cast via coercion.
+    c *= m.SimpleStruct(2)
+    assert check_array(c, [m.Custom(20), m.Custom(22)])
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
@@ -101,8 +106,9 @@ def test_array_ufunc():
     assert check_array(x * y, [m.Custom(8)])
     assert check_array(x - y, [m.Custom(2)])
     assert check_array(-x, [m.Custom(-4)])
-    assert check_array(x == y, [m.CustomStr("4 == 2")])
+    assert check_array(x == y, [m.CustomStr("4 == 2 && '' == ''")])
     assert check_array(x < y, [False])
+    assert check_array(np.power(x, y), [m.CustomStr("4 ^ 2")])
 
 sys.stdout = sys.stderr
 # sys.argv = [__file__, "-s"]
@@ -114,8 +120,8 @@ def main():
     # test_scalar_op()
     # test_array_creation()
     # test_array_cast()
-    test_array_cast_implicit()
-    # test_array_ufunc()
+    # test_array_cast_implicit()
+    test_array_ufunc()
     # x = m.Custom(4)
 
 import trace
