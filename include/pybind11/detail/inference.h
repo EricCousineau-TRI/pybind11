@@ -77,19 +77,19 @@ struct function_inference {
     // Infers `inferred_info<>` from a mutable method pointer.
     template <typename Return, typename Class, typename ... Args>
     static auto run(Return (Class::*method)(Args...)) {
-      auto func = [method](Class* self, Args... args) {
-        return (self->*method)(std::forward<Args>(args)...);
+      auto func = [method](Class& self, Args... args) {
+        return (self.*method)(std::forward<Args>(args)...);
       };
-      return make_inferred_info<Return, Class*, Args...>(func);
+      return make_inferred_info<Return, Class&, Args...>(func);
     }
 
     // Infers `inferred_info<>` from a const method pointer.
     template <typename Return, typename Class, typename ... Args>
     static auto run(Return (Class::*method)(Args...) const) {
-      auto func = [method](const Class* self, Args... args) {
-        return (self->*method)(std::forward<Args>(args)...);
+      auto func = [method](const Class& self, Args... args) {
+        return (self.*method)(std::forward<Args>(args)...);
       };
-      return make_inferred_info<Return, const Class*, Args...>(func);
+      return make_inferred_info<Return, const Class&, Args...>(func);
     }
 
     // Helpers for general functor objects.

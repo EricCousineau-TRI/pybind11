@@ -40,6 +40,9 @@ private:
 
 PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 
+// Explicitly convertible: `char[4]` (artibrary)
+using char4 = std::array<char, 4>;
+
 class Custom {
 public:
     Custom() {
@@ -55,12 +58,17 @@ public:
         value_ = other.value_;
         print_copy_created(this, other.value_);
     }
+    Custom(const char4& other) {
+        value_ = 4;
+        print_copy_created(this, other);
+    }
     Custom& operator=(const Custom& other) {
         print_copy_assigned(this, other.value_);
         value_ = other.value_;
         return *this;
     }
     operator double() const { return value_; }
+    operator char4() const { return {{'a', 'b', 'c', 'd'}}; }
 
     Custom operator+(const Custom& rhs) const {
         py::print("add: ", value_, rhs.value_);
@@ -125,14 +133,13 @@ void numpy_dtype_user(py::module m) {
         });
 
     // Not explicitly convertible: `double`
-    // Explicitly convertible: `char[4]` (artibrary)
-    using char4 = std::array<char, 4>;
 
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
         // ISSUE: Adding a copy constructor here is actually causing recursion...
         .def(py::init<double>())
+        .def(py::init<const char4&>())
         .def("__repr__", [](const Custom* self) {
             return py::str("<Custom({})>").format(double{*self});
         })
@@ -143,9 +150,9 @@ void numpy_dtype_user(py::module m) {
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
         // Casting.
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
-        .def_ufunc_cast([](const Custom& in) -> double { return in; })
+        .def_ufunc_cast(&Custom::operator double)
         .def_ufunc_cast([](const char4& in) -> Custom { return Custom(4); }, true)
-        .def_ufunc_cast([](const Custom& in) -> char4 { return {{'a', 'b', 'c', 'd'}}; }, true)
+        .def_ufunc_cast(&Custom::operator char4, true)
         // TODO(eric.cousineau): Figure out type for implicit coercion.
         // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)

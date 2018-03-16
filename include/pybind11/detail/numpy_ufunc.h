@@ -98,7 +98,7 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<2>) {
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(
     Func&& func, bool allow_coercion, type_pack<From, To> = {}) {
-  static auto cast_lambda = func;
+  static auto cast_lambda = detail::function_inference::run(func).func;
   auto cast_func = +[](
         void* from_, void* to_, npy_intp n,
         void* fromarr, void* toarr) {
