@@ -129,6 +129,7 @@ public:
     template <typename Type, typename Func>
     ufunc& def_loop(Func func) {
         do_register<Type>(detail::ufunc_to_ptr(func));
+        return *this;
     }
 
     detail::PyUFuncObject* ptr() const {
