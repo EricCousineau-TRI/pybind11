@@ -30,8 +30,8 @@ def test_scalar_op():
     a = m.Custom(1)
     assert repr(a) == "Custom(1.0, '')"
     assert str(a) == "C<1.0, ''>"
-    b = m.Custom(2)
     assert m.same(a, a)
+    b = m.Custom(2)
     assert not m.same(a, b)
     # Implicit casting is not easily testable here; see array tests.
     # Operators.
@@ -45,13 +45,12 @@ def test_scalar_op():
     a += 1
     assert m.same(a, m.Custom(6))
     a = m.Custom(6)
+    # Others.
     assert m.same(a * b, m.Custom(12))
     assert m.same(a - b, m.Custom(4))
     assert m.same(-a, m.Custom(-6))
-    print(repr(a == b))
-    s = "6 == 2 && '' == ''"
-    print(m.CustomStr(s))
-    print (a == b) == m.CustomStr(s)  # Why is this not working???
+    # Logical.
+    assert m.same(a == b, m.CustomStr("6 == 2 && '' == ''"))
     assert m.same(a < b, False)
 
 def test_array_creation():

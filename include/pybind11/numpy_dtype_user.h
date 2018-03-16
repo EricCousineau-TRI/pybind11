@@ -291,7 +291,9 @@ class dtype_user : public class_<Class_> {
 
     // Register default ufunc cast to `object`.
     this->def_ufunc_cast([](const Class& self) { return cast(self); });
-    this->def_ufunc_cast([](object self) { return cast<Class>(self); });
+    this->def_ufunc_cast([](object self) {
+      return cast<Class>(self);
+    });
   }
 
   ~dtype_user() {
