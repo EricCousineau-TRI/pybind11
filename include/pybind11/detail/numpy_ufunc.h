@@ -17,39 +17,17 @@ NAMESPACE_BEGIN(detail)
 
 // Utilities
 
-// Gets a NumPy UFunc by name.
-PyUFuncObject* get_py_ufunc(const char* name) {
-  // TODO(eric.cousineau): Check type.
-  module numpy = module::import("numpy");
-  return (PyUFuncObject*)numpy.attr(name).ptr();
-}
+// Builtins registered using numpy/build/{...}/numpy/core/include/numpy/__umath_generated.c
 
-// Registers a function pointer as a UFunc, mapping types to dtype nums.
-template <typename Type, typename ... Args>
-void ufunc_register(
-        PyUFuncObject* py_ufunc,
-        PyUFuncGenericFunction func,
-        void* data) {
-    constexpr int N = sizeof...(Args);
-    int dtype = dtype::of<Type>().num();
-    int dtype_args[] = {dtype::of<Args>().num()...};
-    if (N != py_ufunc->nargs)
-        pybind11_fail("ufunc: Argument count mismatch");
-    if (npy_api::get().PyUFunc_RegisterLoopForType_(
-            py_ufunc, dtype, func, dtype_args, data) < 0)
-        pybind11_fail("ufunc: Failed to regstiser ufunc");
-}
+template <typename... Args>
+struct ufunc_ptr {
+  PyUFuncGenericFunction func{};
+  void* data{};
+};
 
-template <int N>
-using ufunc_nargs = std::integral_constant<int, N>;
-
-// Registers a unary UFunc given a lambda.
-template <typename Type, int N = 1, typename Func = void>
-void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<1>) {
-    auto info = detail::function_inference::run(func);
-    using Info = decltype(info);
-    using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
-    using Out = std::decay_t<typename Info::Return>;
+// Unary ufunc.
+template <typename Arg0, typename Out, typename Func>
+auto ufunc_to_ptr(Func func, type_pack<Arg0, Out>) {
     auto ufunc = [](
             char** args, npy_intp* dimensions, npy_intp* steps, void* data) {
         Func& func = *(Func*)data;
@@ -65,17 +43,12 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<1>) {
         }
     };
     // N.B. `new Func(...)` will never be destroyed.
-    ufunc_register<Type, Arg0, Out>(py_ufunc, ufunc, new Func(func));
-};
+    return ufunc_ptr<Arg0, Out>{ufunc, new Func(func)};
+}
 
-// Binary.
-template <typename Type, int N = 2, typename Func = void>
-void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<2>) {
-    auto info = detail::function_inference::run(func);
-    using Info = decltype(info);
-    using Arg0 = std::decay_t<typename Info::Args::template type_at<0>>;
-    using Arg1 = std::decay_t<typename Info::Args::template type_at<1>>;
-    using Out = std::decay_t<typename Info::Return>;
+// Binary ufunc.
+template <typename Arg0, typename Arg1, typename Out, typename Func = void>
+auto ufunc_to_ptr(Func func, type_pack<Arg0, Arg1, Out>) {
     auto ufunc = [](char** args, npy_intp* dimensions, npy_intp* steps, void* data) {
         Func& func = *(Func*)data;
         int step_0 = steps[0];
@@ -92,8 +65,20 @@ void ufunc_register(PyUFuncObject* py_ufunc, Func func, ufunc_nargs<2>) {
         }
     };
     // N.B. `new Func(...)` will never be destroyed.
-    ufunc_register<Type, Arg0, Arg1, Out>(py_ufunc, ufunc, new Func(func));
-};
+    return ufunc_ptr<Arg0, Arg1, Out>{ufunc, new Func(func)};
+}
+
+// Generic dispatch.
+template <typename Func>
+auto ufunc_to_ptr(Func func) {
+    auto info = detail::function_inference::run(func);
+    using Info = decltype(info);
+    auto type_args = type_pack_apply<std::decay_t>(
+        type_pack_concat(
+            typename Info::Args{},
+            type_pack<typename Info::Return>{}));
+    return ufunc_to_ptr(func, type_args);
+}
 
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(
@@ -122,5 +107,67 @@ void ufunc_register_cast(
 }
 
 NAMESPACE_END(detail)
+
+class ufunc : public object {
+public:
+    ufunc(object ptr) : object(ptr) {
+        // TODO(eric.cousineau): Check type.
+    }
+
+    ufunc(detail::PyUFuncObject* ptr)
+        : object(reinterpret_borrow<object>((PyObject*)ptr))
+    {}
+
+    ufunc(handle scope, const char* name) : scope_{scope}, name_{name} {}
+
+    // Gets a NumPy UFunc by name.
+    static ufunc get_builtin(const char* name) {
+        module numpy = module::import("numpy");
+        return ufunc(numpy.attr(name));
+    }
+
+    template <typename Type, typename Func>
+    ufunc& def_loop(Func func) {
+        do_register<Type>(detail::ufunc_to_ptr(func));
+    }
+
+    detail::PyUFuncObject* ptr() const {
+        return (detail::PyUFuncObject*)self().ptr();
+    }
+
+private:
+    object& self() { return *this; }
+    const object& self() const { return *this; }
+
+    // Registers a function pointer as a UFunc, mapping types to dtype nums.
+    template <typename Type, typename ... Args>
+    void do_register(detail::ufunc_ptr<Args...> user) {
+        constexpr int N = sizeof...(Args);
+        constexpr int nin = N - 1;
+        constexpr int nout = N;
+        int dtype = dtype::of<Type>().num();
+        int dtype_args[] = {dtype::of<Args>().num()...};
+        // Determine if we need to make a new ufunc.
+        auto& api = detail::npy_api::get();
+        if (!self()) {
+            if (!name_)
+                pybind11_fail("dtype: unspecified name");
+            pybind11_fail("Not implemented");
+            // auto h = api.PyUFunc_FromFuncAndData_(
+            //     nullptr, nullptr, nullptr, 0,
+            //     nin, nout, PyUFunc_None, name_, "", 0);
+            // self() = reinterpret_borrow<object>((PyObject*)h);
+        }
+        if (N != ptr()->nargs)
+            pybind11_fail("ufunc: Argument count mismatch");
+        if (api.PyUFunc_RegisterLoopForType_(
+                ptr(), dtype, user.func, dtype_args, user.data) < 0)
+            pybind11_fail("ufunc: Failed to regstiser ufunc");
+    }
+
+    // These are only used if we have something new.
+    const char* name_{};
+    handle scope_{}; 
+};
 
 NAMESPACE_END(PYBIND11_NAMESPACE)

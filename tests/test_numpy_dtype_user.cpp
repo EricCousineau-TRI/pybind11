@@ -125,6 +125,9 @@ public:
 
     Custom operator-() const { return -value_; }
 
+    bool same_as(const Custom& rhs) const {
+        return value_ == rhs.value_ && str() == rhs.str();
+    }
     CustomStr operator==(const Custom& rhs) const {
         // Return non-boolean dtype.
         return CustomStr("%g == %g && %s == %s", value_, rhs.value_, str().c_str(), rhs.str().c_str());
@@ -209,13 +212,21 @@ void numpy_dtype_user(py::module m) {
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self);
 
-    m.def("same", [](const Custom& a, const Custom& b) {
-        return double{a} == double{b};
-    });
-    m.def("same", [](const CustomStr& a, const CustomStr& b) {
-        return a == b;
-    });
+    // py::ufunc(m, "same")
+    //     .def_loop([](const Custom& a, const Custom& b) {
+    //         return a.same_as(b);
+    //     })
+    //     .def_loop([](const CustomStr& a, const CustomStr& b) {
+    //         return a == b;
+    //     });
 
+    // // `py::vectorize` does not seem to allow custom types :(
+    // m.def("same", py::vectorize([](const Custom& a, const Custom& b) {
+    //     return double{a} == double{b};
+    // }));
+    // m.def("same", py::vectorize([](const CustomStr& a, const CustomStr& b) {
+    //     return a == b;
+    // }));
 }
 
 void bind_ConstructorStats(py::module &m);

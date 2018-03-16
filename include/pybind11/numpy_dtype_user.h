@@ -310,15 +310,11 @@ class dtype_user : public class_<Class_> {
     using op_ = detail::op_<id, ot, L, R>;
     using op_impl = typename op_::template info<dtype_user>::op;
     auto func = &op_impl::execute;
-    const char* ufunc_name = get_ufunc_name(id);
     // Define operators.
     this->def(op_impl::name(), func, is_operator(), extra...);
-    // Register ufunction.
-    auto func_infer = detail::function_inference::run(func);
-    using Func = decltype(func_infer);
-    constexpr int N = Func::Args::size;
-    detail::ufunc_register<Class>(
-        detail::get_py_ufunc(ufunc_name), func, detail::ufunc_nargs<N>{});
+    // Register ufunction with builtin name.
+    const char* ufunc_name = get_ufunc_name(id);
+    ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
     return *this;
   }
 

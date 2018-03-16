@@ -48,6 +48,16 @@ struct type_pack {
     using type_at = typename type_at_internal<N>::type;
 };
 
+template <typename... A, typename... B>
+auto type_pack_concat(type_pack<A...> = {}, type_pack<B...> = {}) {
+  return type_pack<A..., B...>{};
+}
+
+template <template <typename> class Apply, typename... T>
+auto type_pack_apply(type_pack<T...> = {}) {
+  return type_pack<Apply<T>...>{};
+}
+
 struct function_inference {
     // Collects both a functor object and its signature for ease of inference.
     template <typename Func, typename ReturnT, typename ... ArgsT>
