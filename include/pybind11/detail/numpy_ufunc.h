@@ -145,19 +145,22 @@ private:
     void do_register(detail::ufunc_ptr<Args...> user) {
         constexpr int N = sizeof...(Args);
         constexpr int nin = N - 1;
-        constexpr int nout = N;
+        constexpr int nout = 1;
         int dtype = dtype::of<Type>().num();
         int dtype_args[] = {dtype::of<Args>().num()...};
         // Determine if we need to make a new ufunc.
+        using constants = detail::npy_api::constants;
         auto& api = detail::npy_api::get();
         if (!self()) {
             if (!name_)
                 pybind11_fail("dtype: unspecified name");
-            pybind11_fail("Not implemented");
-            // auto h = api.PyUFunc_FromFuncAndData_(
-            //     nullptr, nullptr, nullptr, 0,
-            //     nin, nout, PyUFunc_None, name_, "", 0);
-            // self() = reinterpret_borrow<object>((PyObject*)h);
+            // TODO(eric.cousineau): Fix unfreed memory with `name`.
+            auto leak = new std::string(name_);
+            auto h = api.PyUFunc_FromFuncAndData_(
+                nullptr, nullptr, nullptr, 0,
+                nin, nout, constants::PyUFunc_None_, &(*leak)[0], "", 0);
+            self() = reinterpret_borrow<object>((PyObject*)h);
+            scope_.attr(name_) = self();
         }
         if (N != ptr()->nargs)
             pybind11_fail("ufunc: Argument count mismatch");

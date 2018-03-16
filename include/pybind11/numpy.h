@@ -234,6 +234,8 @@ struct npy_api {
         NPY_NEEDS_PYAPI_ = 0x10,
         NPY_USE_GETITEM_ = 0x20,
         NPY_USE_SETITEM_ = 0x40,
+        // UFunc
+        PyUFunc_None_ = -1,
     };
 
     typedef enum {
@@ -293,8 +295,13 @@ struct npy_api {
     void (*PyArray_InitArrFuncs_)(PyArray_ArrFuncs *f);
 
     // UFuncs.
+    PyObject* (*PyUFunc_FromFuncAndData_)(
+        PyUFuncGenericFunction* func, void** data, char* types, int ntypes,
+        int nin, int nout, int identity, char* name, char* doc, int unused);
+
     int (*PyUFunc_RegisterLoopForType_)(
         PyUFuncObject* ufunc, int usertype, PyUFuncGenericFunction function, int* arg_types, void* data);
+
 private:
     // TODO(eric.cousineau): Rename to `items` or something, since this now applies to types.
     enum functions {
@@ -323,6 +330,7 @@ private:
         API_PyArray_RegisterCanCast = 194,
         API_PyArray_InitArrFuncs = 195,
         // umath
+        API_PyUFunc_FromFuncAndData = 1,
         API_PyUFunc_RegisterLoopForType = 2,
     };
 
@@ -371,6 +379,7 @@ private:
         {
             module umath = module::import("numpy.core.umath");
             auto api_ptr = get_api_ptr(umath.attr("_UFUNC_API"));
+            DECL_NPY_API(PyUFunc_FromFuncAndData);
             DECL_NPY_API(PyUFunc_RegisterLoopForType);
         }
 #undef DECL_NPY_API

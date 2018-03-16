@@ -212,13 +212,13 @@ void numpy_dtype_user(py::module m) {
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self);
 
-    // py::ufunc(m, "same")
-    //     .def_loop([](const Custom& a, const Custom& b) {
-    //         return a.same_as(b);
-    //     })
-    //     .def_loop([](const CustomStr& a, const CustomStr& b) {
-    //         return a == b;
-    //     });
+    py::ufunc(m, "same")
+        .def_loop<Custom>([](const Custom& a, const Custom& b) {
+            return a.same_as(b);
+        })
+        .def_loop<CustomStr>([](const CustomStr& a, const CustomStr& b) {
+            return a == b;
+        });
 
     // // `py::vectorize` does not seem to allow custom types :(
     // m.def("same", py::vectorize([](const Custom& a, const Custom& b) {
