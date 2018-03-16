@@ -175,7 +175,7 @@ private:
                 }
             }
             auto h = api.PyUFunc_FromFuncAndData_(
-                dummy_funcs, dummy_data, dummy_types, 0,
+                dummy_funcs, dummy_data, dummy_types, ntypes,
                 nin, nout, constants::PyUFunc_None_, &(*leak)[0], "", 0);
             self() = reinterpret_borrow<object>((PyObject*)h);
             scope_.attr(name_) = self();
@@ -197,6 +197,7 @@ private:
                 if (ptr()->functions[i] == user.func) {
                     found = true;
                     ptr()->data[i] = user.data;
+                    break;
                 }
             }
             if (!found)
