@@ -7,39 +7,37 @@ from pybind11_tests import ConstructorStats
 from pybind11_tests import numpy_dtype_user as m
 
 stats = ConstructorStats.get(m.Custom)
-# stats_str = ConstructorStats.get(m.CustomStr)
 
 def check_array(actual, expected):
+    """Checks if two arrays are exactly similar (shape, type, and data)."""
     expected = np.array(expected)
     if actual.shape != expected.shape:
         return False
     if not m.same(actual, expected).all():
-        print(actual)
-        print(expected)
         return False
     if actual.dtype != expected.dtype:
         return False
     return True
 
 def test_scalar_ctor():
-    """ Tests a single scalar instance. """
+    """Tests instance lifetime management since we had to redo the instance
+    registry to inherit from `np.generic` :( """
     c = m.Custom()
-    c1 = m.Custom(10)
-    c2 = m.Custom(c1)
+    c1 = m.Custom(c)
     assert id(c) != id(c1)
-    assert id(c) != id(c2)
+    assert id(c.self()) == id(c)
     del c
     del c1
-    del c2
     pytest.gc_collect()
-    print('wooh')
     assert stats.alive() == 0
  
 def test_scalar_meta():
+    """Tests basic metadata."""
     assert issubclass(m.Custom, np.generic)
     assert isinstance(np.dtype(m.Custom), np.dtype)
 
 def test_scalar_op():
+    """Tests scalar operators."""
     a = m.Custom(1)
     b = m.Custom(2)
     assert m.same(a, a)
@@ -53,22 +51,33 @@ def test_array_creation():
     assert x.shape == (2, 2)
     assert x.dtype == m.Custom
     # Generic creation.
-    x = np.array([m.Custom(1)])
+    x = np.array([m.Custom(1, "Howdy")])
     assert x.dtype == m.Custom
     # - Limitation on downcasting when mixing types.
     x = np.array([m.Custom(10), 1.])
     assert x.dtype == object
+    # - At present, we will be leaking memory. This doesn't show up in instance
+    # count, since these items are only mutated via `operator=`; however, we're
+    # gonna be leaking.
 
 def test_array_cast():
     def check(x, dtype):
         dx = x.astype(dtype)
         assert dx.dtype == dtype, dtype
         assert dx.astype(m.Custom).dtype == m.Custom
+    # Custom -> {Custom, float, object}
     x = np.array([m.Custom(1)])
     check(x, m.Custom)
     check(x, float)
     check(x, object)
+    # float -> Custom
     x = np.array([1., 2.])
+    check(x, m.Custom)
+    # object -> Custom
+    # N.B. Only explicit casts are allowed here. Can't supply floats.
+    # TODO(eric.cousineau): This *will* be annoying. See if there's a way
+    # around this.
+    x = np.array([m.Custom(10), m.SimpleStruct(100)], dtype=object)
     check(x, m.Custom)
 
 def test_array_cast_implicit():
@@ -121,13 +130,13 @@ def test_array_ufunc():
 sys.stdout = sys.stderr
 def main():
     pytest.gc_collect = gc.collect
-    test_scalar_ctor()
-    test_scalar_meta()
-    test_scalar_op()
-    test_array_creation()
+    # test_scalar_ctor()
+    # test_scalar_meta()
+    # test_scalar_op()
+    # test_array_creation()
     test_array_cast()
-    test_array_cast_implicit()
-    test_array_ufunc()
+    # test_array_cast_implicit()
+    # test_array_ufunc()
 
 import trace
 tracer = trace.Trace(trace=1, count=0, ignoredirs=sys.path)
