@@ -249,6 +249,17 @@ struct dtype_user_npy_format_descriptor {
 
 NAMESPACE_END(detail)
 
+/**
+Defines a user-defined dtype.
+
+Constraints:
+* The type must be copy-constructible and assignable.
+* The type *may* not have its constructor called; however, its memory *will* be
+initialized to zero, so it's assignment should be robust against being assigned
+from zero memory.
+* The type *won't* always be destroyed, because NumPy does not have slots to
+define this yet.
+ */
 template <typename Class_>
 class dtype_user : public class_<Class_> {
  public:
@@ -412,7 +423,8 @@ class dtype_user : public class_<Class_> {
         '=',                    /* byteorder */
         // TODO(eric.cousineau): NPY_NEEDS_INIT?
         npy_api::NPY_NEEDS_PYAPI_ | npy_api::NPY_USE_GETITEM_ |
-            npy_api::NPY_USE_SETITEM_, /* flags */
+            npy_api::NPY_USE_SETITEM_ |
+            npy_api::NPY_NEEDS_INIT_, /* flags */
         0,                      /* type_num */
         sizeof(Class),          /* elsize */
         offsetof(align_test,r), /* alignment */

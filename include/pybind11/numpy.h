@@ -230,6 +230,7 @@ struct npy_api {
         NPY_OBJECT_ = 17,
         NPY_STRING_, NPY_UNICODE_, NPY_VOID_,
         // Descriptor flags
+        NPY_NEEDS_INIT_ = 0x08,
         NPY_NEEDS_PYAPI_ = 0x10,
         NPY_USE_GETITEM_ = 0x20,
         NPY_USE_SETITEM_ = 0x40,
