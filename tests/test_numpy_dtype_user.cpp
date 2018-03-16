@@ -41,10 +41,15 @@ private:
 
 PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 
-// Explicitly convertible: record struct (artibrary choice, TBH)
+// Basic structure, meant to be an implicitly convertible value for `Custom`.
+// Would have used a struct type, but the scalars are only tuples.
 struct SimpleStruct {
     double value;
+
+    SimpleStruct(double value_in) : value(value_in) {}
 };
+
+PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
 
 class Custom {
 public:
@@ -115,25 +120,6 @@ private:
     double value_{};
 };
 
-// From `test_numpy_dtypes`
-template <typename T>
-py::array mkarray_via_buffer(size_t n) {
-    return py::array(py::buffer_info(nullptr, sizeof(T),
-                                     py::format_descriptor<T>::format(),
-                                     1, { n }, { sizeof(T) }));
-}
-
-template <typename S>
-py::array_t<S, 0> create_recarray(size_t n) {
-    auto arr = mkarray_via_buffer<S>(n);
-    auto req = arr.request();
-    auto ptr = static_cast<S*>(req.ptr);
-    for (size_t i = 0; i < n; i++) {
-        new (&ptr[i]) S{static_cast<double>(i)};
-    }
-    return arr;
-}
-
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
 //TEST_SUBMODULE(numpy_dtype_user, m) {
@@ -155,13 +141,13 @@ void numpy_dtype_user(py::module m) {
         });
 
     // Not explicitly convertible: `double`
-    py::class_<SimpleStruct>(m, "SimpleStruct")
-        .def(py::init([](double x) { return SimpleStruct{x}; }))
-        .def("__repr__", [](const SimpleStruct& self) {
-            return py::str("SimpleStruct({})").format(self.value);
-        });
-
-    PYBIND11_NUMPY_DTYPE(SimpleStruct, value);
+    auto ss_str = [](const SimpleStruct& self) {
+        return py::str("SimpleStruct({})").format(self.value);
+    };
+    py::dtype_user<SimpleStruct>(m, "SimpleStruct")
+        .def(py::init<double>())
+        .def("__str__", ss_str)
+        .def("__repr__", ss_str);
 
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
@@ -202,9 +188,6 @@ void numpy_dtype_user(py::module m) {
         return a == b;
     });
 
-    m.def("simple_array", []() {
-        return create_recarray<SimpleStruct>(2);
-    });
 }
 
 void bind_ConstructorStats(py::module &m);

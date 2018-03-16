@@ -90,18 +90,13 @@ def test_array_cast_implicit():
     # with pytest.raises(TypeError):
     #     a *= 2
     #     print(a)
-    # Try an implicit conversion, registered for `std::array<char, 4>` (S4).
-    s = m.SimpleStruct(1000)
-    sa = m.simple_array()
-    s1 = np.array(sa[0], dtype=sa.dtype)
-    print(repr(s1))
-    print(repr(sa[0]))
-    assert sa.dtype == [('value', '<f8')]
-    # Test nominal implicit conversion.
-    # a[0] = s1
-    # Test array construction.
-    c = np.array([s1, s1], dtype=m.Custom)
-    print(c)
+    # Try an implicit conversion.
+    # - Nominal pybind implicit conversion
+    a[0] = m.SimpleStruct(9)
+    assert check_array(a, [m.Custom(9)])
+    # - Test array construction (numpy coercion)
+    c = np.array([m.SimpleStruct(10), m.SimpleStruct(11)], dtype=m.Custom)
+    assert check_array(c, [m.Custom(10), m.Custom(11)])
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
