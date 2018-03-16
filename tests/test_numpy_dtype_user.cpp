@@ -16,6 +16,10 @@
 #include <pybind11/numpy_dtype_user.h>
 #include <pybind11/embed.h>
 
+using std::make_unique;
+using std::string;
+using std::unique_ptr;
+
 namespace py = pybind11;
 
 // Trivial string class.
@@ -51,6 +55,14 @@ struct SimpleStruct {
 
 PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
 
+template <typename T>
+void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
+    if (!src)
+        dst.reset();
+    else
+        dst = make_unique<T>(*src);
+}
+
 class Custom {
 public:
     Custom() {
@@ -62,8 +74,13 @@ public:
     Custom(double value) : value_{value} {
         print_created(this, value);
     }
+    Custom(double value, string str)
+        : value_{value}, str_{make_unique<string>(str)} {
+        print_created(this, value, str);
+    }
     Custom(const Custom& other) {
         value_ = other.value_;
+        clone(other.str_, str_);
         print_copy_created(this, other.value_);
     }
     Custom(const SimpleStruct& other) {
@@ -73,6 +90,7 @@ public:
     Custom& operator=(const Custom& other) {
         print_copy_assigned(this, other.value_);
         value_ = other.value_;
+        clone(other.str_, str_);
         return *this;
     }
     operator double() const { return value_; }
@@ -109,15 +127,24 @@ public:
 
     CustomStr operator==(const Custom& rhs) const {
         // Return non-boolean dtype.
-        return CustomStr("%g == %g", value_, rhs.value_);
+        return CustomStr("%g == %g && %s == %s", value_, rhs.value_, str().c_str(), rhs.str().c_str());
     }
     bool operator<(const Custom& rhs) const {
         // Return boolean value.
         return value_ < rhs.value_;
     }
 
+    std::string str() const {
+        if (str_)
+            return *str_;
+        else
+            return {};
+    }
+
 private:
     double value_{};
+    // Use non-trivial data object, but something that is memcpy-movable.
+    std::unique_ptr<string> str_;
 };
 
 PYBIND11_NUMPY_DTYPE_USER(Custom);
@@ -164,6 +191,7 @@ void numpy_dtype_user(py::module m) {
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
         // Casting.
+        // - Explicit casting (e.g., we have additional arguments).
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast(&Custom::operator double)
         // - Implicit coercion + conversion
