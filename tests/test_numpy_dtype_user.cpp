@@ -187,10 +187,10 @@ void numpy_dtype_user(py::module m) {
         .def(py::init<const SimpleStruct&>())
         .def(py::init<Custom>())
         .def("__repr__", [](const Custom* self) {
-            return py::str("<Custom({})>").format(double{*self});
+            return py::str("Custom({}, '{}')").format(double{*self}, self->str());
         })
         .def("__str__", [](const Custom* self) {
-            return py::str("Custom({})").format(double{*self});
+            return py::str("C<{}, '{}'>").format(double{*self}, self->str());
         })
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)

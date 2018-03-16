@@ -8,16 +8,10 @@ from pybind11_tests import numpy_dtype_user as m
 
 stats = ConstructorStats.get(m.Custom)
 
-def check_array(actual, expected):
-    """Checks if two arrays are exactly similar (shape, type, and data)."""
-    expected = np.array(expected)
-    if actual.shape != expected.shape:
-        return False
-    if not m.same(actual, expected).all():
-        return False
-    if actual.dtype != expected.dtype:
-        return False
-    return True
+def test_scalar_meta():
+    """Tests basic metadata."""
+    assert issubclass(m.Custom, np.generic)
+    assert isinstance(np.dtype(m.Custom), np.dtype)
 
 def test_scalar_ctor():
     """Tests instance lifetime management since we had to redo the instance
@@ -31,19 +25,34 @@ def test_scalar_ctor():
     pytest.gc_collect()
     assert stats.alive() == 0
  
-def test_scalar_meta():
-    """Tests basic metadata."""
-    assert issubclass(m.Custom, np.generic)
-    assert isinstance(np.dtype(m.Custom), np.dtype)
-
 def test_scalar_op():
     """Tests scalar operators."""
     a = m.Custom(1)
+    assert repr(a) == "Custom(1.0, '')"
+    assert str(a) == "C<1.0, ''>"
     b = m.Custom(2)
     assert m.same(a, a)
     assert not m.same(a, b)
-    a += 2
+    # Implicit casting is not easily testable here; see array tests.
+    # Operators.
+    # - self + self
+    assert m.same(a + b, m.Custom(3))
+    a += b
     assert m.same(a, m.Custom(3))
+    # - self + double (and int, implicitly)
+    assert m.same(a + 2, m.Custom(5))
+    a += 2.
+    a += 1
+    assert m.same(a, m.Custom(6))
+    a = m.Custom(6)
+    assert m.same(a * b, m.Custom(12))
+    assert m.same(a - b, m.Custom(4))
+    assert m.same(-a, m.Custom(-6))
+    print(a == b)
+    s = "6 == 2 && '' == ''"
+    print(m.CustomStr(s))
+    print (a == b) == m.CustomStr(s)  # Why is this not working???
+    assert m.same(a < b, False)
 
 def test_array_creation():
     # Zeros.
@@ -59,6 +68,17 @@ def test_array_creation():
     # - At present, we will be leaking memory. This doesn't show up in instance
     # count, since these items are only mutated via `operator=`; however, we're
     # gonna be leaking.
+
+def check_array(actual, expected):
+    """Checks if two arrays are exactly similar (shape, type, and data)."""
+    expected = np.array(expected)
+    if actual.shape != expected.shape:
+        return False
+    if not m.same(actual, expected).all():
+        return False
+    if actual.dtype != expected.dtype:
+        return False
+    return True
 
 def test_array_cast():
     def check(x, dtype):
@@ -130,11 +150,11 @@ def test_array_ufunc():
 sys.stdout = sys.stderr
 def main():
     pytest.gc_collect = gc.collect
-    # test_scalar_ctor()
     # test_scalar_meta()
-    # test_scalar_op()
+    # test_scalar_ctor()
+    test_scalar_op()
     # test_array_creation()
-    test_array_cast()
+    # test_array_cast()
     # test_array_cast_implicit()
     # test_array_ufunc()
 
