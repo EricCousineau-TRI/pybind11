@@ -437,7 +437,7 @@ class dtype_user : public class_<Class_> {
     arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* arr) {
         detail::dtype_user_caster<Class> caster;
         if (!caster.load(in, true))
-            pybind11_fail("dtype_user: Could not convert during `setitem`");
+            throw py::cast_error("dtype_user: Could not convert during `setitem`");
         // Cut out the middle-man?
         *(Class*)out = caster;
         return 0;

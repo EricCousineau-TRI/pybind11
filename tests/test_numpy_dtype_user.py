@@ -60,20 +60,22 @@ def test_array_creation():
     assert x.dtype == object
 
 def test_array_cast():
-    x = np.array([m.Custom(1)])
-    def check(dtype):
+    def check(x, dtype):
         dx = x.astype(dtype)
         assert dx.dtype == dtype, dtype
         assert dx.astype(m.Custom).dtype == m.Custom
-    check(m.Custom)
-    check(float)
-    check(object)
+    x = np.array([m.Custom(1)])
+    check(x, m.Custom)
+    check(x, float)
+    check(x, object)
+    x = np.array([1., 2.])
+    check(x, m.Custom)
 
 def test_array_cast_implicit():
-    a = np.array([1, 2]).astype(m.Custom)
+    a = np.array([1., 2]).astype(m.Custom)
     # We do not allow implicit coercion for `double`:    
     with pytest.raises(TypeError):
-        b = np.array([1, 2], dtype=m.Custom)
+        b = np.array([1., 2.], dtype=m.Custom)
     with pytest.raises(TypeError):
         a *= 2
     # - We did register `Custom{} + double{}`.
@@ -103,7 +105,7 @@ def main():
     # test_scalar_op()
     # test_array_creation()
     test_array_cast()
-    # test_array_cast_implicit()
+    test_array_cast_implicit()
     # test_array_ufunc()
     # x = m.Custom(4)
 
