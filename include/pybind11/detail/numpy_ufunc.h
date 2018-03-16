@@ -156,17 +156,52 @@ private:
                 pybind11_fail("dtype: unspecified name");
             // TODO(eric.cousineau): Fix unfreed memory with `name`.
             auto leak = new std::string(name_);
+            // Preallocate to allow replacement?
+            constexpr int ntypes = 4;
+            static char tinker_types[ntypes] = {
+                constants::NPY_BOOL_,
+                constants::NPY_INT_,
+                constants::NPY_FLOAT_,
+                constants::NPY_DOUBLE_,
+            };
+            auto dummy_funcs = new detail::PyUFuncGenericFunction[ntypes];
+            auto dummy_data = new void*[ntypes];
+            constexpr int ntotal = (nin + nout) * ntypes;
+            auto dummy_types = new char[ntotal];
+            for (int it = 0; it < ntypes; ++it) {
+                for (int iarg = 0; iarg < nin + nout; ++iarg) {
+                    int i = it * (nin + nout) + iarg;
+                    dummy_types[i] = tinker_types[it];
+                }
+            }
             auto h = api.PyUFunc_FromFuncAndData_(
-                nullptr, nullptr, nullptr, 0,
+                dummy_funcs, dummy_data, dummy_types, 0,
                 nin, nout, constants::PyUFunc_None_, &(*leak)[0], "", 0);
             self() = reinterpret_borrow<object>((PyObject*)h);
             scope_.attr(name_) = self();
         }
         if (N != ptr()->nargs)
             pybind11_fail("ufunc: Argument count mismatch");
-        if (api.PyUFunc_RegisterLoopForType_(
-                ptr(), dtype, user.func, dtype_args, user.data) < 0)
-            pybind11_fail("ufunc: Failed to regstiser ufunc");
+        if (dtype >= constants::NPY_USERDEF_) {
+            if (api.PyUFunc_RegisterLoopForType_(
+                    ptr(), dtype, user.func, dtype_args, user.data) < 0)
+                pybind11_fail("ufunc: Failed to register custom ufunc");
+        } else {
+            // Hack because NumPy API doesn't allow us convenience for builtin types :(
+            if (api.PyUFunc_ReplaceLoopBySignature_(
+                    ptr(), user.func, dtype_args, nullptr) < 0)
+                pybind11_fail("ufunc: Failed ot register builtin ufunc");
+            // Now that we've registered, ensure that we replace the data.
+            bool found{};
+            for (int i = 0; i < ptr()->ntypes; ++i) {
+                if (ptr()->functions[i] == user.func) {
+                    found = true;
+                    ptr()->data[i] = user.data;
+                }
+            }
+            if (!found)
+                pybind11_fail("Can't hack and slash");
+        }
     }
 
     // These are only used if we have something new.

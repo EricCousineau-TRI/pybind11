@@ -229,6 +229,7 @@ struct npy_api {
         NPY_CFLOAT_, NPY_CDOUBLE_, NPY_CLONGDOUBLE_,
         NPY_OBJECT_ = 17,
         NPY_STRING_, NPY_UNICODE_, NPY_VOID_,
+        NPY_USERDEF_ = 256,
         // Descriptor flags
         NPY_NEEDS_INIT_ = 0x08,
         NPY_NEEDS_PYAPI_ = 0x10,
@@ -302,6 +303,9 @@ struct npy_api {
     int (*PyUFunc_RegisterLoopForType_)(
         PyUFuncObject* ufunc, int usertype, PyUFuncGenericFunction function, int* arg_types, void* data);
 
+    int (*PyUFunc_ReplaceLoopBySignature_)(
+        PyUFuncObject *func, PyUFuncGenericFunction newfunc,
+        int *signature, PyUFuncGenericFunction *oldfunc);
 private:
     // TODO(eric.cousineau): Rename to `items` or something, since this now applies to types.
     enum functions {
@@ -332,6 +336,7 @@ private:
         // umath
         API_PyUFunc_FromFuncAndData = 1,
         API_PyUFunc_RegisterLoopForType = 2,
+        API_PyUFunc_ReplaceLoopBySignature = 30,
     };
 
     static void** get_api_ptr(object c) {
@@ -381,6 +386,7 @@ private:
             auto api_ptr = get_api_ptr(umath.attr("_UFUNC_API"));
             DECL_NPY_API(PyUFunc_FromFuncAndData);
             DECL_NPY_API(PyUFunc_RegisterLoopForType);
+            DECL_NPY_API(PyUFunc_ReplaceLoopBySignature);
         }
 #undef DECL_NPY_API
         return api;
