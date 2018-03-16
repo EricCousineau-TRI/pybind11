@@ -183,6 +183,7 @@ void numpy_dtype_user(py::module m) {
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
         .def(py::init<double>())
+        .def(py::init<double, string>())
         .def(py::init<const SimpleStruct&>())
         .def(py::init<Custom>())
         .def("__repr__", [](const Custom* self) {
@@ -226,10 +227,9 @@ void numpy_dtype_user(py::module m) {
         })
         .def_loop<CustomStr>([](const CustomStr& a, const CustomStr& b) {
             return a == b;
-        });
-    x
+        })
         // Define this for checking logicals.
-        .def_loop<void>([](bool a, bool b) { return a == b; });
+        .def_loop<bool>([](bool a, bool b) { return a == b; });
 }
 
 void bind_ConstructorStats(py::module &m);

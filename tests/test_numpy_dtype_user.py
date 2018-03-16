@@ -55,8 +55,8 @@ def test_array_creation():
     # Generic creation.
     x = np.array([m.Custom(1)])
     assert x.dtype == m.Custom
-    # - Limitation on downcasting.
-    x = np.array([m.Custom(1), 1])
+    # - Limitation on downcasting when mixing types.
+    x = np.array([m.Custom(10), 1.])
     assert x.dtype == object
 
 def test_array_cast():
@@ -98,31 +98,36 @@ def test_array_cast_implicit():
     # - Test implicit cast via coercion.
     c *= m.SimpleStruct(2)
     assert check_array(c, [m.Custom(20), m.Custom(22)])
+    # - Show dangers of implicit conversion (info loss).
+    ds = m.Custom(100, "Hello")
+    d = np.array([ds])
+    e = np.array([m.SimpleStruct(0)])
+    e[:] = d
+    d[:] = e
+    assert not check_array(d, [ds])
+    assert check_array(d, [m.Custom(100)])
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
-    y = np.array([m.Custom(2)])
+    y = np.array([m.Custom(2, "World")])
     assert check_array(x + y, [m.Custom(6)])
     assert check_array(x * y, [m.Custom(8)])
     assert check_array(x - y, [m.Custom(2)])
     assert check_array(-x, [m.Custom(-4)])
-    assert check_array(x == y, [m.CustomStr("4 == 2 && '' == ''")])
+    assert check_array(x == y, [m.CustomStr("4 == 2 && '' == 'World'")])
     assert check_array(x < y, [False])
     assert check_array(np.power(x, y), [m.CustomStr("4 ^ 2")])
 
 sys.stdout = sys.stderr
-# sys.argv = [__file__, "-s"]
-# pytest.main(args=sys.argv[1:])
 def main():
     pytest.gc_collect = gc.collect
-    # test_scalar_ctor()
-    # test_scalar_meta()
-    # test_scalar_op()
-    # test_array_creation()
-    # test_array_cast()
-    # test_array_cast_implicit()
+    test_scalar_ctor()
+    test_scalar_meta()
+    test_scalar_op()
+    test_array_creation()
+    test_array_cast()
+    test_array_cast_implicit()
     test_array_ufunc()
-    # x = m.Custom(4)
 
 import trace
 tracer = trace.Trace(trace=1, count=0, ignoredirs=sys.path)

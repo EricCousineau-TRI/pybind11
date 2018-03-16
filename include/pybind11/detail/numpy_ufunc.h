@@ -156,6 +156,9 @@ private:
                 pybind11_fail("dtype: unspecified name");
             // TODO(eric.cousineau): Fix unfreed memory with `name`.
             auto leak = new std::string(name_);
+            // The following dummy stuff is to allow monkey-patching existing ufuncs.
+            // This is a bit sketchy, as calling the wrong thing may cause a segfault.
+            // TODO(eric.cousineau): Figure out how to more elegantly specify preallocation...
             // Preallocate to allow replacement?
             constexpr int ntypes = 4;
             static char tinker_types[ntypes] = {
