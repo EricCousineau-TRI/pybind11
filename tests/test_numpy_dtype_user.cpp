@@ -152,9 +152,9 @@ void numpy_dtype_user(py::module m) {
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
-        // ISSUE: Adding a copy constructor here is actually causing recursion...
         .def(py::init<double>())
         .def(py::init<const SimpleStruct&>())
+        .def(py::init<Custom>())
         .def("__repr__", [](const Custom* self) {
             return py::str("<Custom({})>").format(double{*self});
         })

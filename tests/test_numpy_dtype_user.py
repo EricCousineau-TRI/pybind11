@@ -75,22 +75,22 @@ def test_array_cast():
 
 def test_array_cast_implicit():
     a = np.array([1.]).astype(m.Custom)
-    # # - We registered `Custom{} + double{}`.
-    # a += 2
-    # assert check_array(a, [m.Custom(3.)])
-    # # - Try multiple elements.
-    # a = np.array([1., 2.]).astype(m.Custom)
-    # a += 2.
-    # assert check_array(a, [m.Custom(3.), m.Custom(4.)])
-    # # We do not allow implicit coercion for `double`:    
-    # with pytest.raises(TypeError):
-    #     a[0] = 1.
-    # with pytest.raises(TypeError):
-    #     b = np.array([1., 2.], dtype=m.Custom)
-    # with pytest.raises(TypeError):
-    #     a *= 2
-    #     print(a)
+    # - We registered `Custom{} + double{}`.
+    a += 2
+    assert check_array(a, [m.Custom(3.)])
+    # - Try multiple elements.
+    a = np.array([1., 2.]).astype(m.Custom)
+    a += 2.
+    assert check_array(a, [m.Custom(3.), m.Custom(4.)])
+    # We do not allow implicit coercion for `double`:    
+    with pytest.raises(TypeError):
+        a[0] = 1.
+    with pytest.raises(TypeError):
+        b = np.array([1., 2.], dtype=m.Custom)
+    with pytest.raises(TypeError):
+        a *= 2
     # Try an implicit conversion.
+    a = np.array([1.]).astype(m.Custom)
     # - Nominal pybind implicit conversion
     a[0] = m.SimpleStruct(9)
     assert check_array(a, [m.Custom(9)])
