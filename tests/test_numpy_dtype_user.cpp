@@ -168,7 +168,8 @@ void numpy_dtype_user(py::module m) {
         .def("__repr__", &CustomStr::str)
         .def_ufunc_cast([](const CustomStr& in) -> double {
             py::pybind11_fail("Cannot cast");
-        });
+        })
+        .def(py::self == py::self);
 
     // Not explicitly convertible: `double`
     auto ss_str = [](const SimpleStruct& self) {

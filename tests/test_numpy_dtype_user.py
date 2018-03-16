@@ -48,7 +48,7 @@ def test_scalar_op():
     assert m.same(a * b, m.Custom(12))
     assert m.same(a - b, m.Custom(4))
     assert m.same(-a, m.Custom(-6))
-    print(a == b)
+    print(repr(a == b))
     s = "6 == 2 && '' == ''"
     print(m.CustomStr(s))
     print (a == b) == m.CustomStr(s)  # Why is this not working???
