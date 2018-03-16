@@ -77,7 +77,7 @@ struct PyVoidScalarObject_Proxy {
 };
 
 // UFuncs.
-using npy_intp = int;
+using npy_intp = Py_intptr_t;
 
 typedef void (*PyUFuncGenericFunction)(
     char **args, npy_intp *dimensions, npy_intp *strides, void *innerloopdata);
