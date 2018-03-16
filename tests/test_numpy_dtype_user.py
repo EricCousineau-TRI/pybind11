@@ -84,6 +84,7 @@ def test_array_cast():
         dx = x.astype(dtype)
         assert dx.dtype == dtype, dtype
         assert dx.astype(m.Custom).dtype == m.Custom
+        return dx
     # Custom -> {Custom, float, object}
     x = np.array([m.Custom(1)])
     check(x, m.Custom)
@@ -93,11 +94,11 @@ def test_array_cast():
     x = np.array([1., 2.])
     check(x, m.Custom)
     # object -> Custom
-    # N.B. Only explicit casts are allowed here. Can't supply floats.
-    # TODO(eric.cousineau): This *will* be annoying. See if there's a way
-    # around this.
-    x = np.array([m.Custom(10), m.SimpleStruct(100)], dtype=object)
-    check(x, m.Custom)
+    # - See notes in the C++ code for defining the ufunc cast for `object` to
+    # `Class`.
+    x = np.array([1., m.Custom(10), m.SimpleStruct(100)], dtype=object)
+    dx = check(x, m.Custom)
+    assert check_array(dx, [m.Custom(1), m.Custom(10), m.Custom(100)])
 
 def test_array_cast_implicit():
     a = np.array([1.]).astype(m.Custom)
@@ -151,9 +152,9 @@ def main():
     pytest.gc_collect = gc.collect
     # test_scalar_meta()
     # test_scalar_ctor()
-    test_scalar_op()
+    # test_scalar_op()
     # test_array_creation()
-    # test_array_cast()
+    test_array_cast()
     # test_array_cast_implicit()
     # test_array_ufunc()
 

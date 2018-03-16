@@ -290,9 +290,21 @@ class dtype_user : public class_<Class_> {
     entry.dtype_num = register_numpy();
 
     // Register default ufunc cast to `object`.
+    // N.B. Given how general this is, it should *NEVER* be implicit, as it
+    // would interfere with more meaningful casts.
     this->def_ufunc_cast([](const Class& self) { return cast(self); });
-    this->def_ufunc_cast([](object self) {
-      return cast<Class>(self);
+    object cls = self();
+    this->def_ufunc_cast([cls](object obj) -> Class {
+      // N.B. We use the *constructor* rather than implicit conversions because
+      // implicit conversions may not be sufficient when dealing with `object`
+      // dtypes. As an example, a class can only explicitly cast to float, but
+      // the array is constructed as `np.array([1., Class(2)])`. The inferred
+      // dtype in this case will be `object`.
+      if (!isinstance(obj, cls)) {
+        // This will catch type mismatch errors.
+        obj = cls(obj);
+      }
+      return obj.cast<Class>();
     });
   }
 
