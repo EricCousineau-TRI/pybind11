@@ -53,19 +53,39 @@ public:
     }
     Custom(const Custom& other) {
         value_ = other.value_;
-        print_copy_created(this);
+        print_copy_created(this, other.value_);
     }
     Custom& operator=(const Custom& other) {
-        print_copy_assigned(this);
+        print_copy_assigned(this, other.value_);
         value_ = other.value_;
         return *this;
     }
     operator double() const { return value_; }
 
-    Custom operator+(const Custom& rhs) const { return Custom(*this) += rhs.value_; }
-    Custom& operator+=(const Custom& rhs) { value_ += rhs.value_; return *this; }
-    Custom operator+(double rhs) const { return Custom(*this) += rhs; }
-    Custom& operator+=(double rhs) { value_ += rhs; return *this; }
+    Custom operator+(const Custom& rhs) const {
+        py::print("add: ", value_, rhs.value_);
+        auto tmp = Custom(value_ + rhs.value_);
+        py::print(" = ", tmp.value_);
+        return tmp;
+    }
+    Custom& operator+=(const Custom& rhs) {
+        py::print("iadd: ", value_, rhs.value_);
+        value_ += rhs.value_;
+        py::print(" = ", value_);
+        return *this;
+    }
+    Custom operator+(double rhs) const {
+        py::print("add: ", value_, rhs);
+        auto tmp = Custom(value_ + rhs);
+        py::print(" = ", tmp.value_);
+        return tmp;
+    }
+    Custom& operator+=(double rhs) {
+        py::print("iadd: ", value_, rhs);
+        value_ += rhs;
+        py::print(" = ", value_);
+        return *this;
+    }
     Custom operator*(const Custom& rhs) const { return value_ * rhs.value_; }
     Custom operator-(const Custom& rhs) const { return value_ - rhs.value_; }
 
@@ -125,7 +145,7 @@ void numpy_dtype_user(py::module m) {
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast([](const Custom& in) -> double { return in; })
         .def_ufunc_cast([](const char4& in) -> Custom { return Custom(4); }, true)
-        .def_ufunc_cast([](const Custom& in) -> char4 { return {'a', 'b', 'c', 'd'}; }, true)
+        .def_ufunc_cast([](const Custom& in) -> char4 { return {{'a', 'b', 'c', 'd'}}; }, true)
         // TODO(eric.cousineau): Figure out type for implicit coercion.
         // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
