@@ -31,8 +31,8 @@ void ufunc_register(
         PyUFuncGenericFunction func,
         void* data) {
     constexpr int N = sizeof...(Args);
-    int dtype = npy_format_descriptor<Type>::dtype().num();
-    int dtype_args[] = {npy_format_descriptor<Args>::dtype().num()...};
+    int dtype = dtype::of<Type>().num();
+    int dtype_args[] = {dtype::of<Args>().num()...};
     if (N != py_ufunc->nargs)
         pybind11_fail("ufunc: Argument count mismatch");
     if (npy_api::get().PyUFunc_RegisterLoopForType_(

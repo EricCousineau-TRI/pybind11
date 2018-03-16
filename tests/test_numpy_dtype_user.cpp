@@ -11,6 +11,7 @@
 
 #include "pybind11_tests.h"
 #include "constructor_stats.h"
+#include <pybind11/stl.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy_dtype_user.h>
 #include <pybind11/embed.h>
@@ -40,8 +41,10 @@ private:
 
 PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 
-// Explicitly convertible: `char[4]` (artibrary)
-using char4 = std::array<char, 4>;
+// Explicitly convertible: record struct (artibrary choice, TBH)
+struct SimpleStruct {
+    double value;
+};
 
 class Custom {
 public:
@@ -58,8 +61,8 @@ public:
         value_ = other.value_;
         print_copy_created(this, other.value_);
     }
-    Custom(const char4& other) {
-        value_ = 4;
+    Custom(const SimpleStruct& other) {
+        value_ = other.value;
         print_copy_created(this, other);
     }
     Custom& operator=(const Custom& other) {
@@ -68,7 +71,7 @@ public:
         return *this;
     }
     operator double() const { return value_; }
-    operator char4() const { return {{'a', 'b', 'c', 'd'}}; }
+    operator SimpleStruct() const { return {value_}; }
 
     Custom operator+(const Custom& rhs) const {
         py::print("add: ", value_, rhs.value_);
@@ -112,6 +115,25 @@ private:
     double value_{};
 };
 
+// From `test_numpy_dtypes`
+template <typename T>
+py::array mkarray_via_buffer(size_t n) {
+    return py::array(py::buffer_info(nullptr, sizeof(T),
+                                     py::format_descriptor<T>::format(),
+                                     1, { n }, { sizeof(T) }));
+}
+
+template <typename S>
+py::array_t<S, 0> create_recarray(size_t n) {
+    auto arr = mkarray_via_buffer<S>(n);
+    auto req = arr.request();
+    auto ptr = static_cast<S*>(req.ptr);
+    for (size_t i = 0; i < n; i++) {
+        new (&ptr[i]) S{static_cast<double>(i)};
+    }
+    return arr;
+}
+
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
 //TEST_SUBMODULE(numpy_dtype_user, m) {
@@ -133,13 +155,20 @@ void numpy_dtype_user(py::module m) {
         });
 
     // Not explicitly convertible: `double`
+    py::class_<SimpleStruct>(m, "SimpleStruct")
+        .def(py::init([](double x) { return SimpleStruct{x}; }))
+        .def("__repr__", [](const SimpleStruct& self) {
+            return py::str("SimpleStruct({})").format(self.value);
+        });
+
+    PYBIND11_NUMPY_DTYPE(SimpleStruct, value);
 
     // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
         // ISSUE: Adding a copy constructor here is actually causing recursion...
         .def(py::init<double>())
-        .def(py::init<const char4&>())
+        .def(py::init<const SimpleStruct&>())
         .def("__repr__", [](const Custom* self) {
             return py::str("<Custom({})>").format(double{*self});
         })
@@ -151,8 +180,9 @@ void numpy_dtype_user(py::module m) {
         // Casting.
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         .def_ufunc_cast(&Custom::operator double)
-        .def_ufunc_cast([](const char4& in) -> Custom { return Custom(4); }, true)
-        .def_ufunc_cast(&Custom::operator char4, true)
+        // - Implicit coercion + conversion
+        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
+        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
         // TODO(eric.cousineau): Figure out type for implicit coercion.
         // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
@@ -170,6 +200,10 @@ void numpy_dtype_user(py::module m) {
     });
     m.def("same", [](const CustomStr& a, const CustomStr& b) {
         return a == b;
+    });
+
+    m.def("simple_array", []() {
+        return create_recarray<SimpleStruct>(2);
     });
 }
 
