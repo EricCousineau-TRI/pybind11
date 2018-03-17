@@ -236,19 +236,15 @@ void numpy_dtype_user(py::module m) {
 void bind_ConstructorStats(py::module &m);
 
 int main() {
+    // Hack to allow easier debugging of the binary due to limitations with CLion debugging.
     py::scoped_interpreter guard;
 
     py::module m("pybind11_tests");
     bind_ConstructorStats(m);
     numpy_dtype_user(m.def_submodule("numpy_dtype_user"));
-    // py::module s = m.def_submodule("numpy_dtype_user");
-    // py::module o = py::module::import("numpy_dtype_user");
-    // s.attr("__dict__").attr("update")(o.attr("__dict__"));
 
     py::str file = "python/pybind11/tests/test_numpy_dtype_user.py";
-    py::print(file);
-    py::module mm("__main__");
-    mm.attr("__file__") = file;
+    py::globals()["__file__"] = file;  // Without this line, `trace` won't print anything out.
     py::eval_file(file);
     return 0;
 }
