@@ -152,8 +152,7 @@ private:
 
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
-//TEST_SUBMODULE(numpy_dtype_user, m) {
-void numpy_dtype_user(py::module m) {
+TEST_SUBMODULE(numpy_dtype_user, m) {
     ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
         return const_cast<std::type_index*>(py::detail::dtype_info::find_entry(cls));
     });
@@ -231,20 +230,4 @@ void numpy_dtype_user(py::module m) {
         })
         // Define this for checking logicals.
         .def_loop<bool>([](bool a, bool b) { return a == b; });
-}
-
-void bind_ConstructorStats(py::module &m);
-
-int main() {
-    // Hack to allow easier debugging of the binary due to limitations with CLion debugging.
-    py::scoped_interpreter guard;
-
-    py::module m("pybind11_tests");
-    bind_ConstructorStats(m);
-    numpy_dtype_user(m.def_submodule("numpy_dtype_user"));
-
-    py::str file = "python/pybind11/tests/test_numpy_dtype_user.py";
-    py::globals()["__file__"] = file;  // Without this line, `trace` won't print anything out.
-    py::eval_file(file);
-    return 0;
 }

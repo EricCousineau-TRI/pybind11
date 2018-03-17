@@ -1,12 +1,15 @@
-import gc
-import sys
-import numpy as np
-
 import pytest
-from pybind11_tests import ConstructorStats
-from pybind11_tests import numpy_dtype_user as m
 
-stats = ConstructorStats.get(m.Custom)
+from pybind11_tests import ConstructorStats
+
+pytestmark = pytest.requires_numpy
+
+with pytest.suppress(ImportError):
+    import numpy as np
+
+    from pybind11_tests import numpy_dtype_user as m
+    stats = ConstructorStats.get(m.Custom)
+
 
 def test_scalar_meta():
     """Tests basic metadata."""
@@ -24,7 +27,7 @@ def test_scalar_ctor():
     del c1
     pytest.gc_collect()
     assert stats.alive() == 0
- 
+
 def test_scalar_op():
     """Tests scalar operators."""
     a = m.Custom(1)
@@ -109,7 +112,7 @@ def test_array_cast_implicit():
     a = np.array([1., 2.]).astype(m.Custom)
     a += 2.
     assert check_array(a, [m.Custom(3.), m.Custom(4.)])
-    # We do not allow implicit coercion for `double`:    
+    # We do not allow implicit coercion for `double`:
     with pytest.raises(TypeError):
         a[0] = 1.
     with pytest.raises(TypeError):
@@ -146,18 +149,3 @@ def test_array_ufunc():
     assert check_array(x == y, [m.CustomStr("4 == 2 && '' == 'World'")])
     assert check_array(x < y, [False])
     assert check_array(np.power(x, y), [m.CustomStr("4 ^ 2")])
-
-sys.stdout = sys.stderr
-def main():
-    pytest.gc_collect = gc.collect
-    # test_scalar_meta()
-    # test_scalar_ctor()
-    # test_scalar_op()
-    # test_array_creation()
-    test_array_cast()
-    # test_array_cast_implicit()
-    # test_array_ufunc()
-
-import trace
-tracer = trace.Trace(trace=1, count=0, ignoredirs=sys.path)
-tracer.run('main()')

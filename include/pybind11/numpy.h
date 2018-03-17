@@ -67,7 +67,6 @@ struct PyArray_Proxy {
     int flags;
 };
 
-
 struct PyVoidScalarObject_Proxy {
     PyObject_VAR_HEAD
     char *obval;
@@ -1229,6 +1228,17 @@ template <>
 struct npy_format_descriptor<object> {
     static pybind11::dtype dtype() {
         if (auto ptr = npy_api::get().PyArray_DescrFromType_(npy_api::NPY_OBJECT_))
+            return reinterpret_borrow<pybind11::dtype>(ptr);
+        pybind11_fail("Unsupported buffer format!");
+    }
+};
+
+template <>
+struct npy_format_descriptor<void> {
+    static constexpr auto name = detail::_<void>();
+    static pybind11::dtype dtype() {
+        if (auto ptr = detail::npy_api::get().PyArray_DescrFromType_(
+              detail::npy_api::constants::NPY_VOID_))
             return reinterpret_borrow<pybind11::dtype>(ptr);
         pybind11_fail("Unsupported buffer format!");
     }

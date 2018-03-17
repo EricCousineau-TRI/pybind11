@@ -247,17 +247,6 @@ struct dtype_user_npy_format_descriptor {
     }
 };
 
-template <>
-struct npy_format_descriptor<void> {
-    static constexpr auto name = detail::_<void>();
-    static pybind11::dtype dtype() {
-        if (auto ptr = detail::npy_api::get().PyArray_DescrFromType_(
-              detail::npy_api::constants::NPY_VOID_))
-            return reinterpret_borrow<pybind11::dtype>(ptr);
-        pybind11_fail("Unsupported buffer format!");
-    }
-};
-
 NAMESPACE_END(detail)
 
 /**
@@ -309,7 +298,7 @@ class dtype_user : public class_<Class_> {
   }
 
   ~dtype_user() {
-    check();    
+    check();
   }
 
   template <typename ... Args>
