@@ -6,6 +6,8 @@ from pybind11_tests import numpy_dtype_user as m
 np = None
 with pytest.suppress(ImportError):
     import numpy as np
+    import sys
+    sys.stderr.write("numpy version: {} {}\n".format(np.version.full_version, np.version.git_revision))
 
 pytestmark = pytest.mark.skipif(not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
 
