@@ -1,5 +1,5 @@
 /*
-    pybind11/numpy_dtype_user.h: User-defined data types for NumPy
+    pybind11/numpy_dtypes_user.h: User-defined data types for NumPy
 
     Copyright (c) 2018 Eric Cousineau <eric.cousineau@tri.global>
 
@@ -10,8 +10,8 @@
 #pragma once
 
 #include "numpy.h"
+#include "numpy_ufunc.h"
 #include "detail/inference.h"
-#include "detail/numpy_ufunc.h"
 
 #include <array>
 #include <map>

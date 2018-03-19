@@ -1,5 +1,5 @@
 /*
-    pybind11/detail/numpy_ufunc.h: Simple glue for Python UFuncs
+    pybind11/numpy_ufunc.h: Simple glue for Python UFuncs
 
     Copyright (c) 2018 Eric Cousineau <eric.cousineau@tri.global>
 
@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "../numpy.h"
-#include "inference.h"
+#include "numpy.h"
+#include "detail/inference.h"
 
 #if defined(PYBIND11_CPP14)
 

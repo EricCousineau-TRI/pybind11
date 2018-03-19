@@ -48,7 +48,7 @@ set(PYBIND11_TEST_FILES
   # test_multiple_inheritance.cpp
   # test_numpy_array.cpp
   test_numpy_dtypes.cpp
-  test_numpy_dtype_user.cpp
+  test_numpy_dtypes_user.cpp
   # test_numpy_vectorize.cpp
   # test_opaque_types.cpp
   # test_operator_overloading.cpp
