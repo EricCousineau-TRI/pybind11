@@ -14,7 +14,6 @@
 #include <pybind11/stl.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy_dtype_user.h>
-#include <pybind11/embed.h>
 
 using std::string;
 using std::unique_ptr;
