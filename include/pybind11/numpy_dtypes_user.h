@@ -363,6 +363,29 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
+  // Need to figure out how to generalize these...
+  template <typename Defer = void>
+  dtype_user& def_dot() {
+    if (arrfuncs_->dotfunc)
+      pybind11_fail("dtype: Cannot redefine `dot`");
+    using detail::npy_intp;
+    arrfuncs_->dotfunc = (void*)+[](
+        void* ip0_, npy_intp is0, void* ip1_, npy_intp is1,
+        void* op, npy_intp n, void* /*arr*/) {
+      const char *ip0 = (char*)ip0_, *ip1 = (char*)ip1_;
+      Class r{};
+      for (npy_intp i = 0; i < n; i++) {
+        const Class& v1 = *(const Class*)ip0;
+        const Class& v2 = *(const Class*)ip1;
+          r += v1 * v2;
+          ip0 += is0;
+          ip1 += is1;
+        }
+        *(Class*)op = r;
+    };
+    return *this;
+  }
+
  private:
   Base& base() { return *this; }
   object& self() { return *this; }
@@ -503,8 +526,11 @@ class dtype_user : public class_<Class_> {
         pybind11_fail("dtype_user: Could not register!");
     self().attr("dtype") =
         reinterpret_borrow<object>(handle((PyObject*)&descr));
+    arrfuncs_ = &arrfuncs;
     return dtype_num;
   }
+
+  detail::PyArray_ArrFuncs* arrfuncs_{};
 };
 
 NAMESPACE_END(PYBIND11_NAMESPACE)

@@ -198,7 +198,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
         // Casting.
         // - Explicit casting (e.g., we have additional arguments).
-        .def_ufunc_cast([](const double& in) -> Custom { return in; })
+        .def_ufunc_cast([](const double& in) -> Custom { return in; }, true)
         .def_ufunc_cast(&Custom::operator double)
         // - Implicit coercion + conversion
         .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
@@ -213,7 +213,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(py::self - py::self)
         .def_ufunc(-py::self)
         .def_ufunc(py::self == py::self)
-        .def_ufunc(py::self < py::self);
+        .def_ufunc(py::self < py::self)
+        .def_dot();
+
+    // N.B. We should not define a boolean operator for `equal`, as NumPy will
+    // use this, even if we define it "afterwards", due to how it is stored.
 
     // Define other stuff.
     py::ufunc::get_builtin("power").def_loop<Custom>(

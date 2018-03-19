@@ -80,6 +80,11 @@ def test_array_creation():
     # See https://github.com/numpy/numpy/issues/10721 for more information.
 
 
+def test_array_creation_extended():
+    x = np.ones((1, 2), dtype=m.Custom)
+    assert check_array(x, [[m.Custom(1), m.Custom(1)]])
+
+
 def check_array(actual, expected):
     """Checks if two arrays are exactly similar (shape, type, and data)."""
     expected = np.array(expected)
@@ -161,3 +166,7 @@ def test_array_ufunc():
     assert check_array(x == y, [m.CustomStr("4 == 2 && '' == 'World'")])
     assert check_array(x < y, [False])
     assert check_array(np.power(x, y), [m.CustomStr("4 ^ 2")])
+    assert check_array(np.dot(x, y), m.Custom(8))
+    assert check_array(np.dot([x], [y]), [[m.Custom(8)]])
+
+
