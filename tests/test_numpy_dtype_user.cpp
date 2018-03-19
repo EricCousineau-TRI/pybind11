@@ -21,6 +21,8 @@ using std::unique_ptr;
 
 namespace py = pybind11;
 
+namespace {
+
 // Trivial string class.
 class CustomStr {
 public:
@@ -144,6 +146,8 @@ private:
     // Use non-trivial data object, but something that is memcpy-movable.
     std::unique_ptr<string> str_;
 };
+
+}  // namespace
 
 #if defined(PYBIND11_CPP14)
 
