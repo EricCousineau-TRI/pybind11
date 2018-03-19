@@ -18,6 +18,8 @@
 #include <utility>
 #include <typeindex>
 
+#if defined(PYBIND11_CPP14)
+
 // N.B. For NumPy dtypes, `custom` tends to mean record-like structures, while
 // `user-defined` means teaching NumPy about previously opaque C structures.
 
@@ -517,3 +519,5 @@ NAMESPACE_END(PYBIND11_NAMESPACE)
         struct npy_format_descriptor<Type> \
             : public dtype_user_npy_format_descriptor<Type> {}; \
     }}
+
+#endif  // defined(PYBIND11_CPP14)

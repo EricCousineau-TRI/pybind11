@@ -16,7 +16,6 @@
 #include <pybind11/numpy_dtype_user.h>
 #include <pybind11/embed.h>
 
-using std::make_unique;
 using std::string;
 using std::unique_ptr;
 
@@ -43,8 +42,6 @@ private:
     char buffer[len];
 };
 
-PYBIND11_NUMPY_DTYPE_USER(CustomStr);
-
 // Basic structure, meant to be an implicitly convertible value for `Custom`.
 // Would have used a struct type, but the scalars are only tuples.
 struct SimpleStruct {
@@ -53,14 +50,12 @@ struct SimpleStruct {
     SimpleStruct(double value_in) : value(value_in) {}
 };
 
-PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
-
 template <typename T>
 void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
     if (!src)
         dst.reset();
     else
-        dst = make_unique<T>(*src);
+        dst.reset(new T(*src));
 }
 
 class Custom {
@@ -75,7 +70,7 @@ public:
         print_created(this, value);
     }
     Custom(double value, string str)
-        : value_{value}, str_{make_unique<string>(str)} {
+        : value_{value}, str_{unique_ptr<string>(new string(str))} {
         print_created(this, value, str);
     }
     Custom(const Custom& other) {
@@ -150,6 +145,10 @@ private:
     std::unique_ptr<string> str_;
 };
 
+#if defined(PYBIND11_CPP14)
+
+PYBIND11_NUMPY_DTYPE_USER(CustomStr);
+PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
 TEST_SUBMODULE(numpy_dtype_user, m) {
@@ -231,3 +230,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         // Define this for checking logicals.
         .def_loop<bool>([](bool a, bool b) { return a == b; });
 }
+
+#else  // defined(PYBIND11_CPP14)
+
+TEST_SUBMODULE(numpy_dtype_user, m) {
+    (void)m;
+}
+
+#endif  // defined(PYBIND11_CPP14)

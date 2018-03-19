@@ -48,6 +48,9 @@ struct type_pack {
     using type_at = typename type_at_internal<N>::type;
 };
 
+
+#if defined(PYBIND11_CPP14)
+
 template <typename... A, typename... B>
 auto type_pack_concat(type_pack<A...> = {}, type_pack<B...> = {}) {
   return type_pack<A..., B...>{};
@@ -135,6 +138,8 @@ struct function_inference {
           infer_helper::infer_function_ptr<std::decay_t<Func>>());
     }
 };
+
+#endif  // defined(PYBIND_CPP14)
 
 NAMESPACE_END(detail)
 

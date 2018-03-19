@@ -12,6 +12,8 @@
 #include "../numpy.h"
 #include "inference.h"
 
+#if defined(PYBIND11_CPP14)
+
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 NAMESPACE_BEGIN(detail)
 
@@ -215,3 +217,5 @@ private:
 };
 
 NAMESPACE_END(PYBIND11_NAMESPACE)
+
+#endif  // defined(PYBIND11_CPP14)
