@@ -7,15 +7,18 @@ np = None
 with pytest.suppress(ImportError):
     import numpy as np
     import sys
-    sys.stderr.write("numpy version: {} {}\n".format(np.version.full_version, np.version.git_revision))
+    sys.stderr.write("numpy version: {} {}\n".format(
+        np.version.full_version, np.version.git_revision))
 
-pytestmark = pytest.mark.skipif(not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
+pytestmark = pytest.mark.skipif(
+    not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
 
 
 def test_scalar_meta():
     """Tests basic metadata."""
     assert issubclass(m.Custom, np.generic)
     assert isinstance(np.dtype(m.Custom), np.dtype)
+
 
 def test_scalar_ctor():
     """Tests instance lifetime management since we had to redo the instance
@@ -29,6 +32,7 @@ def test_scalar_ctor():
     pytest.gc_collect()
     stats = ConstructorStats.get(m.Custom)
     assert stats.alive() == 0
+
 
 def test_scalar_op():
     """Tests scalar operators."""
@@ -58,6 +62,7 @@ def test_scalar_op():
     assert m.same(a == b, m.CustomStr("6 == 2 && '' == ''"))
     assert m.same(a < b, False)
 
+
 def test_array_creation():
     # Zeros.
     x = np.zeros((2, 2), dtype=m.Custom)
@@ -70,8 +75,10 @@ def test_array_creation():
     x = np.array([m.Custom(10), 1.])
     assert x.dtype == object
     # - At present, we will be leaking memory. This doesn't show up in instance
-    # count, since these items are only mutated via `operator=`; however, we're
-    # gonna be leaking.
+    # count, since these items are only mutated via `operator=`; however, it will
+    # still be the case for resizing.
+    # See https://github.com/numpy/numpy/issues/10721 for more information.
+
 
 def check_array(actual, expected):
     """Checks if two arrays are exactly similar (shape, type, and data)."""
@@ -83,6 +90,7 @@ def check_array(actual, expected):
     if actual.dtype != expected.dtype:
         return False
     return True
+
 
 def test_array_cast():
     def check(x, dtype):
@@ -104,6 +112,7 @@ def test_array_cast():
     x = np.array([1., m.Custom(10), m.SimpleStruct(100)], dtype=object)
     dx = check(x, m.Custom)
     assert check_array(dx, [m.Custom(1), m.Custom(10), m.Custom(100)])
+
 
 def test_array_cast_implicit():
     a = np.array([1.]).astype(m.Custom)
@@ -140,6 +149,7 @@ def test_array_cast_implicit():
     d[:] = e
     assert not check_array(d, [ds])
     assert check_array(d, [m.Custom(100)])
+
 
 def test_array_ufunc():
     x = np.array([m.Custom(4)])
