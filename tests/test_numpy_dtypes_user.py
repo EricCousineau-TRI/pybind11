@@ -72,6 +72,8 @@ def test_array_creation():
     x = np.array([m.Custom(1, "Howdy")])
     assert x.dtype == m.Custom
     # - Limitation on downcasting when mixing types.
+    # This could be alleviated by allowing doubles to be implicitly casted for
+    # the type, but it's best to avoid that.
     x = np.array([m.Custom(10), 1.])
     assert x.dtype == object
     # - At present, we will be leaking memory. This doesn't show up in instance
@@ -83,6 +85,8 @@ def test_array_creation():
 def test_array_creation_extended():
     x = np.ones((1, 2), dtype=m.Custom)
     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
+    x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
+    assert check_array(x, [[m.Custom(10), m.Custom(10)]])
 
 
 def check_array(actual, expected):
