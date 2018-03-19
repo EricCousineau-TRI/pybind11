@@ -109,7 +109,7 @@ struct dtype_user_instance {
   }
 
   // Implementation for `tp_new` slot.
-  static PyObject* tp_new(PyTypeObject* type, PyObject* args, PyObject* kwds) {
+  static PyObject* tp_new(PyTypeObject* /*type*/, PyObject* /*args*/, PyObject* /*kwds*/) {
     // N.B. `__init__` should call the in-place constructor.
     auto obj = alloc_py();
     // // Register.
@@ -308,7 +308,7 @@ class dtype_user : public class_<Class_> {
   }
 
   template <typename ... Args, typename... Extra>
-  dtype_user& def(detail::initimpl::constructor<Args...>&& init, const Extra&... extra) {
+  dtype_user& def(detail::initimpl::constructor<Args...>&&, const Extra&... extra) {
     // See notes in `add_init`.
     // N.B. Do NOT use `Class*` as the argument, since that may incur recursion.
     add_init([](object py_self, Args... args) {
@@ -322,7 +322,7 @@ class dtype_user : public class_<Class_> {
   template <detail::op_id id, detail::op_type ot,
       typename L, typename R, typename... Extra>
   dtype_user& def_ufunc(
-      const detail::op_<id, ot, L, R>& op, const Extra&... extra) {
+      const detail::op_<id, ot, L, R>&, const Extra&... extra) {
     using op_ = detail::op_<id, ot, L, R>;
     using op_impl = typename op_::template info<dtype_user>::op;
     auto func = &op_impl::execute;
@@ -433,7 +433,6 @@ class dtype_user : public class_<Class_> {
         'V',                    /* kind (V = arbitrary) */
         'r',                    /* type */
         '=',                    /* byteorder */
-        // TODO(eric.cousineau): NPY_NEEDS_INIT?
         npy_api::NPY_NEEDS_PYAPI_ | npy_api::NPY_USE_GETITEM_ |
             npy_api::NPY_USE_SETITEM_ |
             npy_api::NPY_NEEDS_INIT_, /* flags */
@@ -454,11 +453,11 @@ class dtype_user : public class_<Class_> {
     using detail::npy_intp;
 
     // https://docs.scipy.org/doc/numpy/reference/c-api.types-and-structures.html
-    arrfuncs.getitem = (void*)+[](void* in, void* arr) -> PyObject* {
+    arrfuncs.getitem = (void*)+[](void* in, void* /*arr*/) -> PyObject* {
         auto item = (const Class*)in;
         return cast(*item).release().ptr();
     };
-    arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* arr) {
+    arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* /*arr*/) {
         detail::dtype_user_caster<Class> caster;
         if (!caster.load(in, true)) {
           PyErr_SetString(
@@ -470,7 +469,7 @@ class dtype_user : public class_<Class_> {
         print("setitem: in = ", handle(in));
         return 0;
     };
-    arrfuncs.copyswap = (void*)+[](void* dst, void* src, int swap, void* arr) {
+    arrfuncs.copyswap = (void*)+[](void* dst, void* src, int swap, void* /*arr*/) {
         // TODO(eric.cousineau): Figure out actual purpose of this.
         if (!src) return;
         Class* r_dst = (Class*)dst;
@@ -484,23 +483,12 @@ class dtype_user : public class_<Class_> {
             *r_dst = *r_src;
         }
     };
-    // - Test and ensure this doesn't overwrite our `equal` unfunc.
-    arrfuncs.compare = (void*)+[](const void* d1, const void* d2, void* arr) {
-      return 0;
+    // - Ensure this doesn't overwrite our `equal` unfunc.
+    arrfuncs.compare = (void*)+[](const void* /*d1*/, const void* /*d2*/, void* /*arr*/) {
+      pybind11_fail("dtype: `compare` should not be called for pybind11 custom dtype");
     };
-    // arrfuncs.fill = (void*)+[](void* data_, npy_intp length, void* arr) {
-    //   Class* data = (Class*)data_;
-    //   Class delta = data[1] - data[0];
-    //   Class r = data[1];
-    //   npy_intp i;
-    //   for (i = 2; i < length; i++) {
-    //       r += delta;
-    //       data[i] = r;
-    //   }
-    //   return 0;
-    // };
     arrfuncs.fillwithscalar = (void*)+[](
-            void* buffer_raw, npy_intp length, void* value_raw, void* arr) {
+            void* buffer_raw, npy_intp length, void* value_raw, void* /*arr*/) {
         const Class* value = (const Class*)value_raw;
         Class* buffer = (Class*)buffer_raw;
         for (int k = 0; k < length; k++) {

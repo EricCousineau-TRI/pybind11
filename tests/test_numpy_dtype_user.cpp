@@ -165,7 +165,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init<const char*>())
         .def("__str__", &CustomStr::str)
         .def("__repr__", &CustomStr::str)
-        .def_ufunc_cast([](const CustomStr& in) -> double {
+        .def_ufunc_cast([](const CustomStr&) -> double {
             py::pybind11_fail("Cannot cast");
         })
         .def(py::self == py::self);

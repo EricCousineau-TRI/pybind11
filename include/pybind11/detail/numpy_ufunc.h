@@ -31,11 +31,11 @@ auto ufunc_to_ptr(Func func, type_pack<Arg0, Out>) {
     auto ufunc = [](
             char** args, npy_intp* dimensions, npy_intp* steps, void* data) {
         Func& func = *(Func*)data;
-        int step_0 = steps[0];
-        int step_out = steps[1];
-        int n = *dimensions;
+        npy_intp step_0 = steps[0];
+        npy_intp step_out = steps[1];
+        npy_intp n = *dimensions;
         char *in_0 = args[0], *out = args[1];
-        for (int k = 0; k < n; k++) {
+        for (npy_intp k = 0; k < n; k++) {
             // TODO(eric.cousineau): Support pointers being changed.
             *(Out*)out = func(*(Arg0*)in_0);
             in_0 += step_0;
@@ -51,12 +51,12 @@ template <typename Arg0, typename Arg1, typename Out, typename Func = void>
 auto ufunc_to_ptr(Func func, type_pack<Arg0, Arg1, Out>) {
     auto ufunc = [](char** args, npy_intp* dimensions, npy_intp* steps, void* data) {
         Func& func = *(Func*)data;
-        int step_0 = steps[0];
-        int step_1 = steps[1];
-        int step_out = steps[2];
-        int n = *dimensions;
+        npy_intp step_0 = steps[0];
+        npy_intp step_1 = steps[1];
+        npy_intp step_out = steps[2];
+        npy_intp n = *dimensions;
         char *in_0 = args[0], *in_1 = args[1], *out = args[2];
-        for (int k = 0; k < n; k++) {
+        for (npy_intp k = 0; k < n; k++) {
             // TODO(eric.cousineau): Support pointers being fed in.
             *(Out*)out = func(*(Arg0*)in_0, *(Arg1*)in_1);
             in_0 += step_0;
@@ -86,7 +86,7 @@ void ufunc_register_cast(
   static auto cast_lambda = detail::function_inference::run(func).func;
   auto cast_func = +[](
         void* from_, void* to_, npy_intp n,
-        void* fromarr, void* toarr) {
+        void* /*fromarr*/, void* /*toarr*/) {
       const From* from = (From*)from_;
       To* to = (To*)to_;
       for (npy_intp i = 0; i < n; i++)
@@ -156,6 +156,7 @@ private:
                 pybind11_fail("dtype: unspecified name");
             // TODO(eric.cousineau): Fix unfreed memory with `name`.
             auto leak = new std::string(name_);
+            char* name = (char*)&(*leak)[0];
             // The following dummy stuff is to allow monkey-patching existing ufuncs.
             // This is a bit sketchy, as calling the wrong thing may cause a segfault.
             // TODO(eric.cousineau): Figure out how to more elegantly specify preallocation...
@@ -179,7 +180,7 @@ private:
             }
             auto h = api.PyUFunc_FromFuncAndData_(
                 dummy_funcs, dummy_data, dummy_types, ntypes,
-                nin, nout, constants::PyUFunc_None_, &(*leak)[0], "", 0);
+                nin, nout, constants::PyUFunc_None_, name, nullptr, 0);
             self() = reinterpret_borrow<object>((PyObject*)h);
             scope_.attr(name_) = self();
         }
@@ -209,8 +210,8 @@ private:
     }
 
     // These are only used if we have something new.
-    const char* name_{};
     handle scope_{}; 
+    const char* name_{};
 };
 
 NAMESPACE_END(PYBIND11_NAMESPACE)
