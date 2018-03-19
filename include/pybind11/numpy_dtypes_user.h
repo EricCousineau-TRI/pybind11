@@ -309,8 +309,8 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
-  template <typename ... Args, typename... Extra>
-  dtype_user& def(detail::initimpl::constructor<Args...>&&, const Extra&... extra) {
+  template <typename ... Args>
+  dtype_user& def(detail::initimpl::constructor<Args...>&&) {
     // See notes in `add_init`.
     // N.B. Do NOT use `Class*` as the argument, since that may incur recursion.
     add_init([](object py_self, Args... args) {
