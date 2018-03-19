@@ -197,14 +197,15 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
         // Casting.
+        // - Define this value to enable `ones`
+        // --- placement matters... But dunno where to put it...
+        // TODO(eric.cousineau): Verify that this dtype is NPY_INT64...
+        .def_ufunc_cast([](const int64_t& in) { return Custom(static_cast<double>(in)); }, true)
         // - Explicit casting (e.g., we have additional arguments).
         .def_ufunc_cast(&Custom::operator double)
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
         // - Implicit coercion + conversion
         .def_ufunc_cast(&Custom::operator SimpleStruct, true)
-        // - Define this value to enable `ones`
-        // --- placement matters... But dunno where to put it...
-        .def_ufunc_cast([](int64_t in) { return Custom(static_cast<double>(in)); }, true)
         // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
         .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
         // TODO(eric.cousineau): Figure out type for implicit coercion.
