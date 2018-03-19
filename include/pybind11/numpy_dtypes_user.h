@@ -264,6 +264,7 @@ define this yet.
  */
 // TODO(eric.cousineau): When defining operator overloads, it'd be nice if
 // things like `operator==` didn't have its own implicit behavior...
+// TODO(eric.cousineau): Use composition, not inheritance.
 template <typename Class_>
 class dtype_user : public class_<Class_> {
  public:
