@@ -234,7 +234,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 #else  // defined(PYBIND11_CPP14)
 
 TEST_SUBMODULE(numpy_dtype_user, m) {
-    (void)m;
+    m.attr("DISABLED") = true;
 }
 
 #endif  // defined(PYBIND11_CPP14)

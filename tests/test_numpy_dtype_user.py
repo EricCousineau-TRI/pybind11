@@ -1,14 +1,13 @@
 import pytest
 
 from pybind11_tests import ConstructorStats
+from pybind11_tests import numpy_dtype_user as m
 
-pytestmark = pytest.requires_numpy
-
+np = None
 with pytest.suppress(ImportError):
     import numpy as np
 
-    from pybind11_tests import numpy_dtype_user as m
-    stats = ConstructorStats.get(m.Custom)
+pytestmark = pytest.mark.skipif(not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
 
 
 def test_scalar_meta():
@@ -26,6 +25,7 @@ def test_scalar_ctor():
     del c
     del c1
     pytest.gc_collect()
+    stats = ConstructorStats.get(m.Custom)
     assert stats.alive() == 0
 
 def test_scalar_op():
