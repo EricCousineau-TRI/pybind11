@@ -9,14 +9,14 @@ with pytest.suppress(ImportError):
 
 def test_dtypes():
     # See issue #1328.
-    # - Concrete sizes.
-    for check in m.get_concrete_dtype_checks():
-        print(check)
-        assert check.num_numpy == check.num_pybind11, check
     # - Platform-dependent sizes.
     for size_check in m.get_platform_dtype_size_checks():
         print(size_check)
         assert size_check.size_cpp == size_check.size_numpy, size_check
+    # - Concrete sizes.
+    for check in m.get_concrete_dtype_checks():
+        print(check)
+        assert check.num_numpy == check.num_pybind11, check
 
 
 @pytest.fixture(scope='function')
