@@ -16,26 +16,20 @@
 
 // Size / dtype checks.
 struct DtypeCheck {
-    std::string name{};
-    int num_numpy{};
-    int num_pybind11{};
+    py::dtype numpy{};
+    py::dtype pybind11{};
 };
 
 template <typename T>
 DtypeCheck get_dtype_check(const char* name) {
     py::module np = py::module::import("numpy");
     DtypeCheck check{};
-    check.name = name;
-    check.num_numpy = np.attr("dtype")(np.attr(name)).attr("num").cast<int>();
-    check.num_pybind11 = py::dtype::of<T>().attr("num").template cast<int>();
+    check.numpy = np.attr("dtype")(np.attr(name));
+    check.pybind11 = py::dtype::of<T>();
     return check;
 }
 
 std::vector<DtypeCheck> get_concrete_dtype_checks() {
-    // - NB For whatever reason, platform-dependent types, like `np.int`,
-    // do not necessarily correspond to an `int` in  C. Because of this, we
-    // skip checking precise naming for `short`, `int`, `long`, `long long`,
-    // and their unsigned counterparts.
     return {
         // Normalization
         get_dtype_check<int8_t>("int8"),
@@ -141,12 +135,11 @@ TEST_SUBMODULE(numpy_array, sm) {
 
     // test_dtypes
     py::class_<DtypeCheck>(sm, "DtypeCheck")
-        .def_readonly("name", &DtypeCheck::name)
-        .def_readonly("num_numpy", &DtypeCheck::num_numpy)
-        .def_readonly("num_pybind11", &DtypeCheck::num_pybind11)
+        .def_readonly("numpy", &DtypeCheck::numpy)
+        .def_readonly("pybind11", &DtypeCheck::pybind11)
         .def("__repr__", [](const DtypeCheck& self) {
-            return py::str("<DtypeCheck name='{}' num_numpy={} num_pybind11={}>").format(
-                self.name, self.num_numpy, self.num_pybind11);
+            return py::str("<DtypeCheck numpy={} pybind11={}>").format(
+                self.numpy, self.pybind11);
         });
     sm.def("get_concrete_dtype_checks", &get_concrete_dtype_checks);
 

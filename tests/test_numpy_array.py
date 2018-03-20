@@ -16,7 +16,10 @@ def test_dtypes():
     # - Concrete sizes.
     for check in m.get_concrete_dtype_checks():
         print(check)
-        assert check.num_numpy == check.num_pybind11, check
+        assert check.numpy == check.pybind11, check
+        if check.numpy.num != check.pybind11.num:
+            print("NOTE: typenum mismatch for {}: {} != {}".format(
+                check, check.numpy.num, check.pybind11.num))
 
 
 @pytest.fixture(scope='function')
