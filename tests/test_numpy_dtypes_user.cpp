@@ -181,7 +181,6 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def("__str__", ss_str)
         .def("__repr__", ss_str);
 
-    // Somewhat more expressive.
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
         .def(py::init<double>())
@@ -201,8 +200,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
             // - Explicit casting (e.g., we have additional arguments).
         .def_ufunc_cast(&Custom::operator double)
+        .def_ufunc_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion
-        .def_ufunc_cast([](const double& in) -> Custom { return in; }, true)
         .def_ufunc_cast(&Custom::operator SimpleStruct, true)
             // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
         .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
@@ -218,6 +217,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self)
         .def_dot();
+    // Somewhat more expressive.
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
