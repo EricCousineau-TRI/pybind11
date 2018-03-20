@@ -83,13 +83,15 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_array_creation_extended():
-    # print("Hello")
-    a = np.empty((2, 2), m.Custom)
-    np.copyto(a, 1, casting='unsafe')
-    # x = np.ones((1, 2), dtype=m.Custom)
+    # with pytest.raises(ValueError):
+    #     # Fails due to shenanigans with `np.copyto`.
+    #     x = np.ones((2, 2), dtype=m.Custom)
+    # x = np.ones((1, 2)).astype(m.Custom)
     # assert check_array(x, [[m.Custom(1), m.Custom(1)]])
     # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
     # assert check_array(x, [[m.Custom(10), m.Custom(10)]])
+    x = np.eye(2, dtype=m.Custom)
+    print(x)
 
 
 def check_array(actual, expected):
