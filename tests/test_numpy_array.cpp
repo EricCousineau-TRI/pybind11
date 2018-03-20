@@ -14,6 +14,73 @@
 
 #include <cstdint>
 
+// Size / dtype checks.
+struct DtypeCheck {
+    std::string name{};
+    int num_numpy{};
+    int num_pybind11{};
+};
+
+template <typename T>
+DtypeCheck get_dtype_check(const char* name) {
+    py::module np = py::module::import("numpy");
+    DtypeCheck check{};
+    check.name = name;
+    check.num_numpy = np.attr("dtype")(np.attr(name)).attr("num").cast<int>();
+    check.num_pybind11 = py::dtype::of<T>().attr("num").template cast<int>();
+    return check;
+}
+
+std::vector<DtypeCheck> get_concrete_dtype_checks() {
+    // - NB For whatever reason, platform-dependent types, like `np.int`,
+    // do not necessarily correspond to an `int` in  C. Because of this, we
+    // skip checking precise naming for `short`, `int`, `long`, `long long`,
+    // and their unsigned counterparts.
+    return {
+        // Normalization
+        get_dtype_check<int8_t>("int8"),
+        get_dtype_check<uint8_t>("uint8"),
+        get_dtype_check<int16_t>("int16"),
+        get_dtype_check<uint16_t>("uint16"),
+        get_dtype_check<int32_t>("int32"),
+        get_dtype_check<uint32_t>("uint32"),
+        get_dtype_check<int64_t>("int64"),
+        get_dtype_check<uint64_t>("uint64")
+    };
+}
+
+struct DtypeSizeCheck {
+    std::string name{};
+    int size_cpp{};
+    int size_numpy{};
+    // For debugging.
+    py::dtype dtype{};
+};
+
+template <typename T>
+DtypeSizeCheck get_dtype_size_check() {
+    DtypeSizeCheck check{};
+    check.name = py::type_id<T>();
+    check.size_cpp = sizeof(T);
+    check.dtype = py::dtype::of<T>();
+    check.size_numpy = check.dtype.attr("alignment").template cast<int>();
+    return check;
+}
+
+std::vector<DtypeSizeCheck> get_platform_dtype_size_checks() {
+    return {
+        get_dtype_size_check<short>(),
+        get_dtype_size_check<ushort>(),
+        get_dtype_size_check<int>(),
+        get_dtype_size_check<uint>(),
+        get_dtype_size_check<long>(),
+        get_dtype_size_check<unsigned long>(),
+        get_dtype_size_check<long long>(),
+        get_dtype_size_check<unsigned long long>(),
+    };
+}
+
+// Arrays.
 using arr = py::array;
 using arr_t = py::array_t<uint16_t, 0>;
 static_assert(std::is_same<arr_t::value_type, uint16_t>::value, "");
@@ -71,6 +138,27 @@ template <typename T, typename T2> py::handle auxiliaries(T &&r, T2 &&r2) {
 TEST_SUBMODULE(numpy_array, sm) {
     try { py::module::import("numpy"); }
     catch (...) { return; }
+
+    // test_dtypes
+    py::class_<DtypeCheck>(sm, "DtypeCheck")
+        .def_readonly("name", &DtypeCheck::name)
+        .def_readonly("num_numpy", &DtypeCheck::num_numpy)
+        .def_readonly("num_pybind11", &DtypeCheck::num_pybind11)
+        .def("__repr__", [](const DtypeCheck& self) {
+            return py::str("<DtypeCheck name='{}' num_numpy={} num_pybind11={}>").format(
+                self.name, self.num_numpy, self.num_pybind11);
+        });
+    sm.def("get_concrete_dtype_checks", &get_concrete_dtype_checks);
+
+    py::class_<DtypeSizeCheck>(sm, "DtypeSizeCheck")
+        .def_readonly("name", &DtypeSizeCheck::name)
+        .def_readonly("size_cpp", &DtypeSizeCheck::size_cpp)
+        .def_readonly("size_numpy", &DtypeSizeCheck::size_numpy)
+        .def("__repr__", [](const DtypeSizeCheck& self) {
+            return py::str("<DtypeSizeCheck name='{}' size_cpp={} size_numpy={} dtype={}>").format(
+                self.name, self.size_cpp, self.size_numpy, self.dtype);
+        });
+    sm.def("get_platform_dtype_size_checks", &get_platform_dtype_size_checks);
 
     // test_array_attributes
     sm.def("ndim", [](const arr& a) { return a.ndim(); });

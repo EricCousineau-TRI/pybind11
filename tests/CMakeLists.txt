@@ -35,7 +35,7 @@ set(PYBIND11_TEST_FILES
   # test_constants_and_functions.cpp
   # test_copy_move.cpp
   # test_docstring_options.cpp
-  test_eigen.cpp
+  # test_eigen.cpp
   # test_enum.cpp
   # test_eval.cpp
   # test_exceptions.cpp
@@ -47,8 +47,8 @@ set(PYBIND11_TEST_FILES
   # test_modules.cpp
   # test_multiple_inheritance.cpp
   test_numpy_array.cpp
-  test_numpy_dtypes.cpp
-  test_numpy_vectorize.cpp
+  # test_numpy_dtypes.cpp
+  # test_numpy_vectorize.cpp
   # test_opaque_types.cpp
   # test_operator_overloading.cpp
   # test_pickling.cpp
