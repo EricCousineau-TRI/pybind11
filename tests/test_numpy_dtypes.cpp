@@ -9,6 +9,7 @@
 
 #include "pybind11_tests.h"
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 #ifdef __GNUC__
 #define PYBIND11_PACKED(cls) cls __attribute__((__packed__))
@@ -17,6 +18,42 @@
 #endif
 
 namespace py = pybind11;
+
+struct DtypeCheck {
+    const char* name;
+    int num_numpy{};
+    int num_pybind11{};
+};
+
+template <typename T>
+DtypeCheck get_dtype_check(const char* name) {
+    py::module np = py::module::import("numpy");
+    DtypeCheck entry{};
+        entry.name = name;
+        entry.num_numpy = np.attr("dtype")(np.attr(name)).attr("num").cast<int>();
+        entry.num_pybind11 = py::dtype::of<T>().attr("num").template cast<int>();
+        return entry;
+}
+
+std::vector<DtypeCheck> get_all_dtype_checks() {
+    return {
+        // Platform-dependent
+        get_dtype_check<short>("short"),
+        get_dtype_check<ushort>("ushort"),
+        // - NB For whatever reason, `np.int` does not necessarily correspond
+        // to an `int` in C. Because of this, we skip checking precise naming
+        // for `int`, `long`, `long long`, and their unsigned counterparts.
+        // Normalization
+        get_dtype_check<int8_t>("int8"),
+        get_dtype_check<uint8_t>("uint8"),
+        get_dtype_check<int16_t>("int16"),
+        get_dtype_check<uint16_t>("uint16"),
+        get_dtype_check<int32_t>("int32"),
+        get_dtype_check<uint32_t>("uint32"),
+        get_dtype_check<int64_t>("int64"),
+        get_dtype_check<uint64_t>("uint64")
+    };
+}
 
 struct SimpleStruct {
     bool bool_;
@@ -250,6 +287,16 @@ struct B {};
 TEST_SUBMODULE(numpy_dtypes, m) {
     try { py::module::import("numpy"); }
     catch (...) { return; }
+
+    py::class_<DtypeCheck>(m, "DtypeCheck")
+        .def_readonly("name", &DtypeCheck::name)
+        .def_readonly("num_numpy", &DtypeCheck::num_numpy)
+        .def_readonly("num_pybind11", &DtypeCheck::num_pybind11)
+        .def("__repr__", [](const DtypeCheck& self) {
+            return py::str("<DtypeCheck name={} num_numpy={} num_pybind11={}>").format(
+                self.name, self.num_numpy, self.num_pybind11);
+        });
+    m.def("get_all_dtype_checks", &get_all_dtype_checks);
 
     // typeinfo may be registered before the dtype descriptor for scalar casts to work...
     py::class_<SimpleStruct>(m, "SimpleStruct");

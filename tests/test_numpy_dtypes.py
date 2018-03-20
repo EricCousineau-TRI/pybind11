@@ -8,6 +8,11 @@ with pytest.suppress(ImportError):
     import numpy as np
 
 
+def test_all_dtypes_check():
+    for check in m.get_all_dtype_checks():
+        assert check.num_numpy == check.num_pybind11, check
+
+
 @pytest.fixture(scope='module')
 def simple_dtype():
     ld = np.dtype('longdouble')
