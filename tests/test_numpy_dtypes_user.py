@@ -83,9 +83,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_array_creation_extended():
-    print("Hello")
-    # x = np.ones((1, 2), dtype=m.Custom)
-    # assert check_array(x, [[m.Custom(1), m.Custom(1)]])
+    # print("Hello")
+    x = np.ones((1, 2), dtype=m.Custom)
+    assert check_array(x, [[m.Custom(1), m.Custom(1)]])
     # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
     # assert check_array(x, [[m.Custom(10), m.Custom(10)]])
 
