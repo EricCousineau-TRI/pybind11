@@ -108,6 +108,15 @@ inline numpy_internals& get_numpy_internals() {
     return *ptr;
 }
 
+// Lookup a type according to its size, and return a value corresponding to the NumPy typenum.
+template <typename Concrete,
+    typename Check1, typename Check2, typename Check3 = Check2>
+constexpr int platform_lookup(int check1, int check2, int check3 = -1) {
+    return (sizeof(Concrete) == sizeof(Check1)) ? check1 :
+               (sizeof(Concrete) == sizeof(Check2)) ? check2 :
+                 (sizeof(Concrete) == sizeof(Check3)) ? check3 : -1;
+}
+
 struct npy_api {
     enum constants {
         NPY_ARRAY_C_CONTIGUOUS_ = 0x0001,
@@ -126,7 +135,20 @@ struct npy_api {
         NPY_FLOAT_, NPY_DOUBLE_, NPY_LONGDOUBLE_,
         NPY_CFLOAT_, NPY_CDOUBLE_, NPY_CLONGDOUBLE_,
         NPY_OBJECT_ = 17,
-        NPY_STRING_, NPY_UNICODE_, NPY_VOID_
+        NPY_STRING_, NPY_UNICODE_, NPY_VOID_,
+        // Platform-dependent normalization
+        NPY_INT8_ = NPY_BYTE_,
+        NPY_UINT8_ = NPY_UBYTE_,
+        NPY_INT16_ = NPY_SHORT_,
+        NPY_UINT16_ = NPY_USHORT_,
+        NPY_INT32_ = platform_lookup<int32_t, short, int, long>(
+            NPY_SHORT_, NPY_INT_, NPY_LONG_),
+        NPY_UINT32_ = platform_lookup<uint32_t, unsigned short, unsigned int, unsigned long>(
+            NPY_USHORT_, NPY_UINT_, NPY_ULONG_),
+        NPY_INT64_ = platform_lookup<int64_t, int, long, long long>(
+            NPY_INT_, NPY_LONG_, NPY_LONGLONG_),
+        NPY_UINT64_ = platform_lookup<uint64_t, uint, unsigned long, unsigned long long>(
+            NPY_UINT_, NPY_ULONG_, NPY_ULONGLONG_),
     };
 
     typedef struct {
@@ -1003,8 +1025,8 @@ private:
     // NB: the order here must match the one in common.h
     constexpr static const int values[15] = {
         npy_api::NPY_BOOL_,
-        npy_api::NPY_BYTE_,   npy_api::NPY_UBYTE_,   npy_api::NPY_SHORT_,    npy_api::NPY_USHORT_,
-        npy_api::NPY_INT_,    npy_api::NPY_UINT_,    npy_api::NPY_LONGLONG_, npy_api::NPY_ULONGLONG_,
+        npy_api::NPY_BYTE_,   npy_api::NPY_UBYTE_,   npy_api::NPY_INT16_,    npy_api::NPY_UINT16_,
+        npy_api::NPY_INT32_,  npy_api::NPY_UINT32_,  npy_api::NPY_INT64_,    npy_api::NPY_UINT64_,
         npy_api::NPY_FLOAT_,  npy_api::NPY_DOUBLE_,  npy_api::NPY_LONGDOUBLE_,
         npy_api::NPY_CFLOAT_, npy_api::NPY_CDOUBLE_, npy_api::NPY_CLONGDOUBLE_
     };
