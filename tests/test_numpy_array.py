@@ -7,6 +7,20 @@ with pytest.suppress(ImportError):
     import numpy as np
 
 
+def test_dtypes():
+    # See issue #1328.
+    # - Platform-dependent sizes.
+    for size_check in m.get_platform_dtype_size_checks():
+        print(size_check)
+        assert size_check.size_cpp == size_check.size_numpy, size_check
+    # - Concrete sizes.
+    for check in m.get_concrete_dtype_checks():
+        print(check)
+        assert check.numpy == check.pybind11, check
+        # NumPy normalizes some checks. Explicitly check here.
+        assert check.numpy.num == check.pybind11.num, check
+
+
 @pytest.fixture(scope='function')
 def arr():
     return np.array([[1, 2, 3], [4, 5, 6]], '=u2')
