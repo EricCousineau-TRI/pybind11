@@ -202,13 +202,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             // - Explicit casting (e.g., we have additional arguments).
         .def_ufunc_cast(&Custom::operator double)
             // - Implicit coercion + conversion
-        .def_ufunc_cast([](const double& in) -> Custom {
-            return in;
-        }, true)
-        // Needed for `np.eye`, as implicit casting does not "stack".
-        .def_ufunc_cast([](int in) -> Custom {
-            return in;
-        }, true)
+        .def_ufunc_cast([](const double& in) -> Custom { return in; }, true)
         .def_ufunc_cast(&Custom::operator SimpleStruct, true)
             // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
         .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)

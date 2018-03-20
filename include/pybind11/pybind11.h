@@ -2002,7 +2002,7 @@ template <return_value_policy Policy = return_value_policy::reference_internal,
 
 NAMESPACE_BEGIN(detail)
 
-template <typename InputType, typename OutputType>
+template <typename InputType, typename OutputType, bool transitive_convert = false>
 type_info::implicit_conversion_func create_implicit_caster() {
     struct set_flag {
         bool &flag;
@@ -2014,7 +2014,7 @@ type_info::implicit_conversion_func create_implicit_caster() {
         if (currently_used) // implicit conversions are non-reentrant
             return nullptr;
         set_flag flag_helper(currently_used);
-        if (!detail::make_caster<InputType>().load(obj, false))
+        if (!detail::make_caster<InputType>().load(obj, transitive_convert))
             return nullptr;
         tuple args(1);
         args[0] = obj;

@@ -357,7 +357,7 @@ class dtype_user : public class_<Class_> {
     if (allow_coercion && std::is_same<To, Class>::value) {
       auto& entry = detail::dtype_info::get_mutable_entry<Class>();
       entry.implicit_conversions.push_back(
-          detail::create_implicit_caster<From, Class>());
+          detail::create_implicit_caster<From, Class, true>());
     }
     // TODO(eric.cousineau): When `allow_coercion` is true and `From` is
     // `Class`, register the implicit conversion.
