@@ -82,16 +82,16 @@ pytestmark = pytest.mark.skipif(
 #     # See https://github.com/numpy/numpy/issues/10721 for more information.
 
 
-def test_array_creation_extended():
-    # with pytest.raises(ValueError):
-    #     # Fails due to shenanigans with `np.copyto`.
-    #     x = np.ones((2, 2), dtype=m.Custom)
-    # x = np.ones((1, 2)).astype(m.Custom)
-    # assert check_array(x, [[m.Custom(1), m.Custom(1)]])
-    # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
-    # assert check_array(x, [[m.Custom(10), m.Custom(10)]])
-    x = np.eye(2, dtype=m.Custom)
-    print(x)
+# def test_array_creation_extended():
+#     with pytest.raises(ValueError):
+#         # Fails due to shenanigans with `np.copyto`.
+#         x = np.ones((2, 2), dtype=m.Custom)
+#     x = np.ones((1, 2)).astype(m.Custom)
+#     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
+#     x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
+#     assert check_array(x, [[m.Custom(10), m.Custom(10)]])
+#     x = np.eye(2, dtype=m.Custom)
+#     assert check_array(x, [[m.Custom(1), m.Custom(0)], [m.Custom(0), m.Custom(1)]])
 
 
 def check_array(actual, expected):
@@ -128,41 +128,41 @@ def check_array(actual, expected):
 #     assert check_array(dx, [m.Custom(1), m.Custom(10), m.Custom(100)])
 
 
-# def test_array_cast_implicit():
-#     a = np.array([1.]).astype(m.Custom)
-#     # - We registered `Custom{} + double{}`.
-#     a += 2
-#     assert check_array(a, [m.Custom(3.)])
-#     # - Try multiple elements.
-#     a = np.array([1., 2.]).astype(m.Custom)
-#     a += 2.
-#     assert check_array(a, [m.Custom(3.), m.Custom(4.)])
-#     # We do not allow implicit coercion for `double`:
-#     with pytest.raises(TypeError):
-#         a[0] = 1.
-#     with pytest.raises(TypeError):
-#         b = np.array([1., 2.], dtype=m.Custom)
-#     with pytest.raises(TypeError):
-#         a *= 2
-#     # Try an implicit conversion.
-#     a = np.array([1.]).astype(m.Custom)
-#     # - Nominal pybind implicit conversion
-#     a[0] = m.SimpleStruct(9)
-#     assert check_array(a, [m.Custom(9)])
-#     # - Test array construction (numpy coercion)
-#     c = np.array([m.SimpleStruct(10), m.SimpleStruct(11)], dtype=m.Custom)
-#     assert check_array(c, [m.Custom(10), m.Custom(11)])
-#     # - Test implicit cast via coercion.
-#     c *= m.SimpleStruct(2)
-#     assert check_array(c, [m.Custom(20), m.Custom(22)])
-#     # - Show dangers of implicit conversion (info loss).
-#     ds = m.Custom(100, "Hello")
-#     d = np.array([ds])
-#     e = np.array([m.SimpleStruct(0)])
-#     e[:] = d
-#     d[:] = e
-#     assert not check_array(d, [ds])
-#     assert check_array(d, [m.Custom(100)])
+def test_array_cast_implicit():
+    # a = np.array([1.]).astype(m.Custom)
+    # # - We registered `Custom{} + double{}`.
+    # a += 2
+    # assert check_array(a, [m.Custom(3.)])
+    # # - Try multiple elements.
+    # a = np.array([1., 2.]).astype(m.Custom)
+    # a += 2.
+    # assert check_array(a, [m.Custom(3.), m.Custom(4.)])
+    # We do not allow implicit coercion for `double`:
+    # with pytest.raises(TypeError):
+    #     a[0] = 1.
+    # with pytest.raises(TypeError):
+    #     b = np.array([1., 2.], dtype=m.Custom)
+    # with pytest.raises(TypeError):
+    #     a *= 2
+    # Try an implicit conversion.
+    a = np.array([1.]).astype(m.Custom)
+    # - Nominal pybind implicit conversion
+    a[0] = m.SimpleStruct(9)
+    # assert check_array(a, [m.Custom(9)])
+    # # - Test array construction (numpy coercion)
+    # c = np.array([m.SimpleStruct(10), m.SimpleStruct(11)], dtype=m.Custom)
+    # assert check_array(c, [m.Custom(10), m.Custom(11)])
+    # # - Test implicit cast via coercion.
+    # c *= m.SimpleStruct(2)
+    # assert check_array(c, [m.Custom(20), m.Custom(22)])
+    # # - Show dangers of implicit conversion (info loss).
+    # ds = m.Custom(100, "Hello")
+    # d = np.array([ds])
+    # e = np.array([m.SimpleStruct(0)])
+    # e[:] = d
+    # d[:] = e
+    # assert not check_array(d, [ds])
+    # assert check_array(d, [m.Custom(100)])
 
 
 # def test_array_ufunc():
