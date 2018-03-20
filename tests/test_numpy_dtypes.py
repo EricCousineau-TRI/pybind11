@@ -8,9 +8,16 @@ with pytest.suppress(ImportError):
     import numpy as np
 
 
-def test_all_dtypes_check():
-    for check in m.get_all_dtype_checks():
+def test_concrete_dtypes():
+    # See issue #1328.
+    for check in m.get_concrete_dtype_checks():
         assert check.num_numpy == check.num_pybind11, check
+
+
+def test_platform_dtype_sizes():
+    # See issue #1328.
+    for check in m.get_platform_dtype_size_checks():
+        assert check.size_cpp == check.size_numpy, check
 
 
 @pytest.fixture(scope='module')
