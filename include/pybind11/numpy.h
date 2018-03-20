@@ -108,6 +108,20 @@ inline numpy_internals& get_numpy_internals() {
     return *ptr;
 }
 
+template <typename Concrete,
+    typename Check1, typename Check2, typename Check3 = Check2>
+constexpr int platform_lookup(int check1, int check2, int check3 = -1) {
+    constexpr int size = sizeof(Concrete);
+    if (size == sizeof(Check1))
+        return check1;
+    else if (size == sizeof(Check2))
+        return check2;
+    else if (size == sizeof(Check3))
+        return check3;
+    else
+        return -1;
+}
+
 struct npy_api {
     enum constants {
         NPY_ARRAY_C_CONTIGUOUS_ = 0x0001,
@@ -126,7 +140,20 @@ struct npy_api {
         NPY_FLOAT_, NPY_DOUBLE_, NPY_LONGDOUBLE_,
         NPY_CFLOAT_, NPY_CDOUBLE_, NPY_CLONGDOUBLE_,
         NPY_OBJECT_ = 17,
-        NPY_STRING_, NPY_UNICODE_, NPY_VOID_
+        NPY_STRING_, NPY_UNICODE_, NPY_VOID_,
+        // Platform-dependent normalization
+        NPY_INT8_ = NPY_BYTE_,
+        NPY_UINT8_ = NPY_UBYTE_,
+        NPY_INT16_ = NPY_SHORT_,
+        NPY_UINT16_ = NPY_USHORT_,
+        NPY_INT32_ = platform_lookup<int32_t, short, int, long>(
+            NPY_SHORT_, NPY_INT_, NPY_LONG_),
+        NPY_UINT32_ = platform_lookup<uint32_t, unsigned short, unsigned int, unsigned long>(
+            NPY_USHORT_, NPY_UINT_, NPY_ULONG_),
+        NPY_INT64_ = platform_lookup<int64_t, int, long, long long>(
+            NPY_INT_, NPY_LONG_, NPY_LONGLONG_),
+        NPY_UINT64_ = platform_lookup<int64_t, uint, unsigned long, unsigned long long>(
+            NPY_INT_, NPY_LONG_, NPY_ULONGLONG_),
     };
 
     typedef struct {
