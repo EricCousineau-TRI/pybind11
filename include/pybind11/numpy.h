@@ -108,18 +108,13 @@ inline numpy_internals& get_numpy_internals() {
     return *ptr;
 }
 
+// Lookup a type according to its size, and return a value corresponding to the NumPy typenum.
 template <typename Concrete,
     typename Check1, typename Check2, typename Check3 = Check2>
 constexpr int platform_lookup(int check1, int check2, int check3 = -1) {
-    constexpr int size = sizeof(Concrete);
-    if (size == sizeof(Check1))
-        return check1;
-    else if (size == sizeof(Check2))
-        return check2;
-    else if (size == sizeof(Check3))
-        return check3;
-    else
-        return -1;
+    return (sizeof(Concrete) == sizeof(Check1)) ? check1 :
+               (sizeof(Concrete) == sizeof(Check2)) ? check2 :
+                 (sizeof(Concrete) == sizeof(Check3)) ? check3 : -1;
 }
 
 struct npy_api {
@@ -152,8 +147,8 @@ struct npy_api {
             NPY_USHORT_, NPY_UINT_, NPY_ULONG_),
         NPY_INT64_ = platform_lookup<int64_t, int, long, long long>(
             NPY_INT_, NPY_LONG_, NPY_LONGLONG_),
-        NPY_UINT64_ = platform_lookup<int64_t, uint, unsigned long, unsigned long long>(
-            NPY_INT_, NPY_LONG_, NPY_ULONGLONG_),
+        NPY_UINT64_ = platform_lookup<uint64_t, uint, unsigned long, unsigned long long>(
+            NPY_UINT_, NPY_ULONG_, NPY_ULONGLONG_),
     };
 
     typedef struct {
