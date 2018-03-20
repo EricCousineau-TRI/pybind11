@@ -500,7 +500,7 @@ class dtype_user : public class_<Class_> {
         if (!src) return;
         Class* r_dst = (Class*)dst;
         Class* r_src = (Class*)src;
-        print("copyswap: src = ", r_src);
+        print("copyswap: src = ", *r_src);
         if (swap) {
             PyErr_SetString(
                 PyExc_NotImplementedError,
