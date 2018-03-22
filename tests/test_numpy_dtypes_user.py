@@ -13,6 +13,7 @@ with pytest.suppress(ImportError):
 pytestmark = pytest.mark.skipif(
     not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
 
+
 def test_scalar_meta():
     """Tests basic metadata."""
     assert issubclass(m.Custom, np.generic)
@@ -90,8 +91,9 @@ def test_array_creation_extended():
     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
     x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
     assert check_array(x, [[m.Custom(10), m.Custom(10)]])
-    # `np.eye(..., dtype=m.Custom)` requires a converter from `int` to `m.Custom` (or something that
-    # tells it to use `double`). Prefer to avoid, as it complicates other implicit conversions,
+    # `np.eye(..., dtype=m.Custom)` requires a converter from `int` to
+    # `m.Custom` (or something that tells it to use `double`).
+    # Prefer to avoid, as it complicates other implicit conversions,
     # which in general shouldn't be there, but nonetheless should be tested.
     x = np.eye(2).astype(m.Custom)
     assert check_array(x, [[m.Custom(1), m.Custom(0)], [m.Custom(0), m.Custom(1)]])
@@ -145,6 +147,7 @@ def test_array_cast_implicit():
         a[0] = 1.
     with pytest.raises(TypeError):
         b = np.array([1., 2.], dtype=m.Custom)
+        print(b)  # Supress "unused" warnings
     with pytest.raises(TypeError):
         a *= 2
 
@@ -204,5 +207,3 @@ def test_array_op_order():
     assert check_array(sv + sv, [0.])
     assert check_array(sv + fv, [1.])
     assert check_array(fv + sv, [-1.])
-
-sys.stdout = sys.stderr

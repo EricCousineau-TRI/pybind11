@@ -129,7 +129,7 @@ public:
 
     ~ufunc() {
         if (entries)
-            finalize(); 
+            finalize();
     }
 
     // Gets a NumPy UFunc by name.
@@ -196,7 +196,7 @@ private:
     }
 
     // These are only used if we have something new.
-    handle scope_{}; 
+    handle scope_{};
 
     struct entries_t {
         // Initialize from existing object.
@@ -223,7 +223,7 @@ private:
 
         void queue_core(detail::PyUFuncGenericFunction func, void* data, const std::vector<int>& dtype_args) {
             assert(nin_ != -1 && nout_ != -1);
-            assert(dtype_args.size() == nin_ + nout_);
+            assert((int)dtype_args.size() == nin_ + nout_);
             // Store core functionn.
             core_funcs_.push_back(func);
             core_data_.push_back(data);
@@ -238,7 +238,7 @@ private:
 
         void queue_user(detail::PyUFuncGenericFunction func, void* data, int dtype, const std::vector<int>& dtype_args) {
             assert(nin_ != -1 && nout_ != -1);
-            assert(dtype_args.size() == nin_ + nout_);
+            assert((int)dtype_args.size() == nin_ + nout_);
             user_funcs_.push_back(func);
             user_data_.push_back(data);
             user_types_.push_back(dtype);
