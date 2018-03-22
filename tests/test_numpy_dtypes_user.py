@@ -185,6 +185,7 @@ def test_array_ufunc():
     assert check_array(np.dot(x, y), m.Custom(8))
     assert check_array(np.dot([x], [y]), [[m.Custom(8)]])
     assert check_array(np.cos(x), [m.Custom(np.cos(x[0].value()))])
+    assert check_array(np.logical_and(x, y), [10.])
 
 
 def test_array_op_order():

@@ -292,9 +292,9 @@ class dtype_user : public class_<Class_> {
     // Register default ufunc cast to `object`.
     // N.B. Given how general this is, it should *NEVER* be implicit, as it
     // would interfere with more meaningful casts.
-    this->def_ufunc_cast([](const Class& self) { return cast(self); });
+    this->def_loop_cast([](const Class& self) { return cast(self); });
     object cls = self();
-    this->def_ufunc_cast([cls](object obj) -> Class {
+    this->def_loop_cast([cls](object obj) -> Class {
       // N.B. We use the *constructor* rather than implicit conversions because
       // implicit conversions may not be sufficient when dealing with `object`
       // dtypes. As an example, a class can only explicitly cast to float, but
@@ -330,9 +330,10 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
+  /// Define operator UFunc loop.
   template <detail::op_id id, detail::op_type ot,
       typename L, typename R, typename... Extra>
-  dtype_user& def_ufunc(
+  dtype_user& def_loop(
       const detail::op_<id, ot, L, R>&, const Extra&... extra) {
     using op_ = detail::op_<id, ot, L, R>;
     using op_impl = typename op_::template info<dtype_user>::op;
@@ -350,15 +351,16 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
+  /// Define nominal UFunc loop, mapping to a buitlin name.
   template <typename Func>
-  dtype_user& def_ufunc(const char* name, const Func& func) {
+  dtype_user& def_loop(const char* name, const Func& func) {
     base().def(name, func);
     const char* ufunc_name = detail::get_ufunc_name(name);
     ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
     return *this;
   }
 
-  // Nominal operator.
+  /// Nominal operator.
   template <detail::op_id id, detail::op_type ot,
       typename L, typename R, typename... Extra>
   dtype_user& def(
@@ -367,22 +369,21 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
+  /// Define loop cast, and optionally permit implicit conversions.
   template <typename Func_>
-  dtype_user& def_ufunc_cast(Func_&& func, bool allow_coercion = false) {
+  dtype_user& def_loop_cast(Func_&& func, bool allow_implicit_coercion = false) {
     auto func_infer = detail::function_inference::run(func);
     using Func = decltype(func_infer);
     using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
     using To = detail::intrinsic_t<typename Func::Return>;
-    detail::ufunc_register_cast<From, To>(func, allow_coercion);
+    detail::ufunc_register_cast<From, To>(func, allow_implicit_coercion);
     // Define implicit conversion on the class.
-    if (allow_coercion && std::is_same<To, Class>::value) {
+    if (allow_implicit_coercion && std::is_same<To, Class>::value) {
       auto& entry = detail::dtype_info::get_mutable_entry<Class>();
       constexpr bool transitive_convert = false;
       entry.implicit_conversions.push_back(
           detail::create_implicit_caster<From, Class, transitive_convert>());
     }
-    // TODO(eric.cousineau): When `allow_coercion` is true and `From` is
-    // `Class`, register the implicit conversion.
     return *this;
   }
 

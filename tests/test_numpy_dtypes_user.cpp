@@ -183,7 +183,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init<const char*>())
         .def("__str__", &CustomStr::str)
         .def("__repr__", &CustomStr::str)
-        .def_ufunc_cast([](const CustomStr&) -> double {
+        .def_loop_cast([](const CustomStr&) -> double {
             py::pybind11_fail("Cannot cast");
         })
         .def(py::self == py::self);
@@ -197,9 +197,9 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def("__str__", ss_str)
         .def("__repr__", ss_str)
         // Test operator ordering.
-        .def_ufunc(py::self + py::self)
-        .def_ufunc(double{} + py::self)
-        .def_ufunc(py::self + double{});
+        .def_loop(py::self + py::self)
+        .def_loop(double{} + py::self)
+        .def_loop(py::self + double{});
 
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
@@ -220,41 +220,39 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
             // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
             // - Explicit casting (e.g., we have additional arguments).
-        .def_ufunc_cast([](const Custom& in) { return in.value(); })
-        .def_ufunc_cast([](const double& in) -> Custom { return in; })
+        .def_loop_cast([](const Custom& in) { return in.value(); })
+        .def_loop_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion
-        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
+        .def_loop_cast(&Custom::operator SimpleStruct, true)
            // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
-        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
+        .def_loop_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
             // TODO(eric.cousineau): Figure out type for implicit coercion.
             // Operators + ufuncs, with some just-operators (e.g. in-place)
-        .def_ufunc(py::self + py::self)
+        .def_loop(py::self + py::self)
         .def(py::self += py::self)
-        .def_ufunc(py::self + double{})
-        .def_ufunc(double{} + py::self)
+        .def_loop(py::self + double{})
+        .def_loop(double{} + py::self)
         .def(py::self += double{})
-        .def_ufunc(py::self * py::self)
-        .def_ufunc(py::self - py::self)
-        .def_ufunc(-py::self)
-        .def_ufunc(py::self == py::self)
-        .def_ufunc(py::self < py::self)
+        .def_loop(py::self * py::self)
+        .def_loop(py::self - py::self)
+        .def_loop(-py::self)
+        .def_loop(py::self == py::self)
+        .def_loop(py::self < py::self)
         .def_dot()
-        .def_ufunc("__pow__", [](const Custom& a, const Custom& b) {
+        .def_loop("__pow__", [](const Custom& a, const Custom& b) {
             return CustomStr("%g ^ %g", a.value(), b.value());
         })
         // TOOD(eric.cousineau): Handle pointers too.
-        .def_ufunc("cos", [](const Custom& self) {
+        .def_loop("cos", [](const Custom& self) {
             return Custom(cos(self.value()));
+        })
+        .def_loop("logical_and", [](const Custom& self, const Custom& other) -> double {
+            return 10;
         });
     // Somewhat more expressive.
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
-
-    py::ufunc::get_builtin("add").def_loop<Custom>([](double a, const Custom& b) {
-        py::print("Call loop");
-        return Custom(a) + b;
-    });
 
     // // Define other stuff.
     // py::ufunc::get_builtin("power").def_loop<Custom>(
