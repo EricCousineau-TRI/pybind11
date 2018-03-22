@@ -471,10 +471,13 @@ class dtype_user : public class_<Class_> {
     // `tp_as_number` and casting, when it's not defined
     static auto tp_as_number = *ClassObject_Type.tp_as_number;
     ClassObject_Type.tp_as_number = &tp_as_number;
+    // TODO(eric.cousineau): Figure out how to use more generic dispatch on
+    // this object. If we use the `np.generic` stuff, we end up getting
+    // recursive loops.
     tp_as_number.nb_float = +[](PyObject* in) -> PyObject* {
       PyErr_SetString(
         PyExc_TypeError,
-        "dtype_user: No float");
+        "dtype_user: Direct casting to float not supported");
       return nullptr;
     };
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
