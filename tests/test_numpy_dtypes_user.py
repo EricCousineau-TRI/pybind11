@@ -160,6 +160,8 @@ def test_array_cast_implicit():
     # This, I guess, tries explicit coercion, which is not available.
     with pytest.raises(TypeError):
         af += a
+    # Try this?
+    af[0] = a[0]  # Causes loop
     # Try an implicit conversion.
     a = np.array([1.]).astype(m.Custom)
     # - Nominal pybind implicit conversion
