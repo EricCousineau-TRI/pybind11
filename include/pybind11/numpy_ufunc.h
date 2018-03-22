@@ -112,15 +112,28 @@ NAMESPACE_END(detail)
 
 class ufunc : public object {
 public:
-    ufunc(object ptr) : object(ptr) {
+    ufunc(object ptr_in) : object(ptr_in) {
         // TODO(eric.cousineau): Check type.
+        if (!self() || self().is_none())
+            pybind11_fail("ufunc: Cannot create from empty or None object");
+        entries.reset(new entries_t(ptr()));
     }
 
-    ufunc(detail::PyUFuncObject* ptr)
-        : object(reinterpret_borrow<object>((PyObject*)ptr))
+    ufunc(detail::PyUFuncObject* ptr_in)
+        : ufunc(reinterpret_borrow<object>((PyObject*)ptr_in))
     {}
 
-    ufunc(handle scope, const char* name) : scope_{scope}, name_{name} {}
+    ufunc(handle scope, const char* name) : scope_{scope} {
+        entries.reset(new entries_t(name));
+    }
+
+    ufunc(const ufunc& other) {
+    }
+
+    ~ufunc() {
+        if (entries)
+            finalize(); 
+    }
 
     // Gets a NumPy UFunc by name.
     static ufunc get_builtin(const char* name) {
@@ -138,6 +151,23 @@ public:
         return (detail::PyUFuncObject*)self().ptr();
     }
 
+    // Create UFunc object with core type functions if needed, and register user functions.
+    void finalize() {
+        if (!entries)
+            pybind11_fail("Object already finalized");
+        if (!self()) {
+            // Create object and register core functions.
+            auto* h = entries->create_core();
+            self() = reinterpret_borrow<object>((PyObject*)h);
+            scope_.attr(entries->name()) = self();
+        }
+        // Register user type functions.
+        entries->create_user(ptr());
+        // Leak memory for now so that data lives longer than UFunc.
+        // TODO(eric.cousineau): Embed this in a capsule and use `keep_alive`.
+        (void)new std::shared_ptr<entries_t>(entries);
+    }
+
 private:
     object& self() { return *this; }
     const object& self() const { return *this; }
@@ -148,72 +178,111 @@ private:
         constexpr int N = sizeof...(Args);
         constexpr int nin = N - 1;
         constexpr int nout = 1;
+        entries->init_or_check_args(nin, nout);
+
         int dtype = dtype::of<Type>().num();
-        int dtype_args[] = {dtype::of<Args>().num()...};
+        std::vector<int> dtype_args = {dtype::of<Args>().num()...};
         // Determine if we need to make a new ufunc.
-        using constants = detail::npy_api::constants;
-        auto& api = detail::npy_api::get();
-        if (!self()) {
-            if (!name_)
-                pybind11_fail("dtype: unspecified name");
-            // TODO(eric.cousineau): Fix unfreed memory with `name`.
-            auto leak = new std::string(name_);
-            char* name = (char*)&(*leak)[0];
-            // The following dummy stuff is to allow monkey-patching existing ufuncs.
-            // This is a bit sketchy, as calling the wrong thing may cause a segfault.
-            // TODO(eric.cousineau): Figure out how to more elegantly specify preallocation...
-            // Preallocate to allow replacement?
-            constexpr int ntypes = 4;
-            static char tinker_types[ntypes] = {
-                constants::NPY_BOOL_,
-                constants::NPY_INT_,
-                constants::NPY_FLOAT_,
-                constants::NPY_DOUBLE_,
-            };
-            auto dummy_funcs = new detail::PyUFuncGenericFunction[ntypes];
-            auto dummy_data = new void*[ntypes];
-            constexpr int ntotal = (nin + nout) * ntypes;
-            auto dummy_types = new char[ntotal];
-            for (int it = 0; it < ntypes; ++it) {
-                for (int iarg = 0; iarg < nin + nout; ++iarg) {
-                    int i = it * (nin + nout) + iarg;
-                    dummy_types[i] = tinker_types[it];
-                }
-            }
-            auto h = api.PyUFunc_FromFuncAndData_(
-                dummy_funcs, dummy_data, dummy_types, ntypes,
-                nin, nout, constants::PyUFunc_None_, name, nullptr, 0);
-            self() = reinterpret_borrow<object>((PyObject*)h);
-            scope_.attr(name_) = self();
+        bool is_core = true;
+        for (int i = 0; i < N; ++i) {
+            if (dtype_args[i] >= detail::npy_api::constants::NPY_USERDEF_)
+                is_core = false;
         }
-        if (N != ptr()->nargs)
-            pybind11_fail("ufunc: Argument count mismatch");
-        if (dtype >= constants::NPY_USERDEF_) {
-            if (api.PyUFunc_RegisterLoopForType_(
-                    ptr(), dtype, user.func, dtype_args, user.data) < 0)
-                pybind11_fail("ufunc: Failed to register custom ufunc");
+        if (is_core) {
+            // TODO: Consider supporting `PyUFunc_ReplaceLoopBySignature_`?
+            if (self())
+                pybind11_fail("ufunc: Can't add/replace signatures for core types for an existing ufunc");
+            entries->queue_core(user.func, user.data, dtype_args);
         } else {
-            // Hack because NumPy API doesn't allow us convenience for builtin types :(
-            if (api.PyUFunc_ReplaceLoopBySignature_(
-                    ptr(), user.func, dtype_args, nullptr) < 0)
-                pybind11_fail("ufunc: Failed ot register builtin ufunc");
-            // Now that we've registered, ensure that we replace the data.
-            bool found{};
-            for (int i = 0; i < ptr()->ntypes; ++i) {
-                if (ptr()->functions[i] == user.func) {
-                    found = true;
-                    ptr()->data[i] = user.data;
-                    break;
-                }
-            }
-            if (!found)
-                pybind11_fail("Can't hack and slash");
+            entries->queue_user(user.func, user.data, dtype, dtype_args);
         }
     }
 
     // These are only used if we have something new.
     handle scope_{}; 
-    const char* name_{};
+
+    struct entries_t {
+        // Initialize from existing object.
+        entries_t(detail::PyUFuncObject* h) {
+            nin_ = h->nin;
+            nout_ = h->nout;
+        }
+
+        // Set up to create a new instance.
+        entries_t(const char* name) : name_(name) {}
+
+        void init_or_check_args(int nin, int nout) {
+            if (nin_ == -1 && nout_ == -1) {
+                if (nin_ != nin)
+                    pybind11_fail("ufunc: Input count mismatch");
+                if (nout_ != nout)
+                    pybind11_fail("ufunc: Output count mismatch");
+            }
+            nin_ = nin;
+            nout_ = nout;
+        }
+
+        const char* name() const { return name_.c_str(); }
+
+        void queue_core(detail::PyUFuncGenericFunction func, void* data, const std::vector<int>& dtype_args) {
+            assert(nin_ != -1 && nout_ != -1);
+            assert(dtype_args.size() == nin_ + nout_);
+            // Store core functionn.
+            core_funcs_.push_back(func);
+            core_data_.push_back(data);
+            int ncore = core_funcs_.size();
+            int t_index = core_type_args_.size();
+            int nargs = nin_ + nout_;
+            core_type_args_.resize((ncore + 1) * nargs);
+            for (int i = 0; i < dtype_args.size(); ++i) {
+                core_type_args_.at(t_index++) = dtype_args[i];
+            }
+        }
+
+        void queue_user(detail::PyUFuncGenericFunction func, void* data, int dtype, const std::vector<int>& dtype_args) {
+            assert(nin_ != -1 && nout_ != -1);
+            assert(dtype_args.size() == nin_ + nout_);
+            user_funcs_.push_back(func);
+            user_data_.push_back(data);
+            user_types_.push_back(dtype);
+            user_type_args_.push_back(dtype_args);
+        }
+
+        detail::PyUFuncObject* create_core() {
+            int ncore = core_funcs_.size();
+            char* name_raw = (char*)name();
+            return (detail::PyUFuncObject*)detail::npy_api::get().PyUFunc_FromFuncAndData_(
+                core_funcs_.data(), core_data_.data(), core_type_args_.data(), ncore,
+                nin_, nout_, detail::npy_api::constants::PyUFunc_None_, name_raw, nullptr, 0);
+        }
+
+        void create_user(detail::PyUFuncObject* h) {
+            int nuser = user_funcs_.size();
+            for (int i = 0; i < nuser; ++i) {
+                if (detail::npy_api::get().PyUFunc_RegisterLoopForType_(
+                        h, user_types_[i], user_funcs_[i], user_type_args_[i].data(), user_data_[i]) < 0)
+                    pybind11_fail("ufunc: Failed to register custom ufunc");
+            }
+        }
+
+    private:
+        int nin_{-1};
+        int nout_{-1};
+        std::string name_{};
+
+        // Core.
+        std::vector<detail::PyUFuncGenericFunction> core_funcs_;
+        std::vector<void*> core_data_;
+        std::vector<char> core_type_args_;
+
+        // User.
+        std::vector<detail::PyUFuncGenericFunction> user_funcs_;
+        std::vector<void*> user_data_;
+        std::vector<int> user_types_;
+        std::vector<std::vector<int>> user_type_args_;
+    };
+
+    std::shared_ptr<entries_t> entries;
 };
 
 NAMESPACE_END(PYBIND11_NAMESPACE)
