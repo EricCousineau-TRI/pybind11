@@ -216,17 +216,21 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(-py::self)
         .def_ufunc(py::self == py::self)
         .def_ufunc(py::self < py::self)
-        .def_dot();
+        .def_dot()
+        .def_ufunc("__pow__", [](const Custom& a, const Custom& b) {
+            return CustomStr("%g ^ %g", double{a}, double{b});
+        })
+        .def_ufunc("cos", [](const Custom* self) {
+            return 0.;
+        });
     // Somewhat more expressive.
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
 
-    // Define other stuff.
-    py::ufunc::get_builtin("power").def_loop<Custom>(
-        [](const Custom& a, const Custom& b) {
-            return CustomStr("%g ^ %g", double{a}, double{b});
-        });
+    // // Define other stuff.
+    // py::ufunc::get_builtin("power").def_loop<Custom>(
+    //     ;
 
     // `py::vectorize` does not seem to allow custom types due to sfinae constraints :(
     py::ufunc x(m, "same");

@@ -212,29 +212,37 @@ struct cast_is_known_safe<T,
         dtype_user_caster<intrinsic_t<T>>, make_caster<T>>::value>>
     : public std::true_type {};
 
-// Maps a pybind11 operator (using py::self) to a NumPy UFunc name.
-inline const char* get_ufunc_name(detail::op_id id) {
-  using namespace detail;
-  static std::map<op_id, const char*> m = {
+// Maps a common Python function name to a NumPy UFunc name, or just returns
+// the original name (for trigonometric functions).
+inline const char* get_ufunc_name(const char* name) {
+  static const std::map<std::string, const char*> m = {
+    // https://docs.python.org/2.7/reference/datamodel.html#emulating-numeric-types
+    // Use nominal ordering (e.g. `__add__`, not `__radd__`) as ordering will be handled
+    // by ufunc registration.
+    // Use Python 3 operator names (e.g. `__truediv__`)
     // https://docs.scipy.org/doc/numpy/reference/routines.math.html
-    {op_add, "add"},
-    {op_neg, "negative"},
-    {op_mul, "multiply"},
-    {op_div, "divide"},
-    {op_pow, "power"},
-    {op_sub, "subtract"},
+    {"__add__", "add"},
+    {"__neg__", "negative"},
+    {"__mul__", "multiply"},
+    {"__truediv__", "divide"},
+    {"__pow__", "power"},
+    {"__sub__", "subtract"},
     // https://docs.scipy.org/doc/numpy/reference/routines.logic.html
-    {op_gt, "greater"},
-    {op_ge, "greater_equal"},
-    {op_lt, "less"},
-    {op_le, "less_equal"},
-    {op_eq, "equal"},
-    {op_ne, "not_equal"},
-    {op_bool, "nonzero"},
-    {op_invert, "logical_not"}
+    {"__gt__", "greater"},
+    {"__ge__", "greater_equal"},
+    {"__lt__", "less"},
+    {"__le__", "less_equal"},
+    {"__eq__", "equal"},
+    {"__ne__", "not_equal"},
+    {"__nonzero__", "nonzero"},
+    {"__invert__", "logical_not"}
     // TODO(eric.cousineau): Add something for junction-style logic?
   };
-  return m.at(id);
+  auto iter = m.find(name);
+  if (iter != m.end())
+    return iter->second;
+  else
+    return name;
 }
 
 // Provides implementation of `npy_format_decsriptor` for a user-defined dtype.
@@ -332,7 +340,18 @@ class dtype_user : public class_<Class_> {
     // Define operators.
     this->def(op_impl::name(), func, is_operator(), extra...);
     // Register ufunction with builtin name.
-    const char* ufunc_name = get_ufunc_name(id);
+    constexpr auto ot_norm = (ot == detail::op_r) ? detail::op_l : ot;
+    using op_norm_ = detail::op_<id, ot_norm, L, R>;
+    using op_norm_impl = typename op_norm_::template info<dtype_user>::op;
+    const char* ufunc_name = detail::get_ufunc_name(op_norm_impl::name());
+    ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
+    return *this;
+  }
+
+  template <typename Func>
+  dtype_user& def_ufunc(const char* name, const Func& func) {
+    base().def(name, func);
+    const char* ufunc_name = detail::get_ufunc_name(name);
     ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
     return *this;
   }
