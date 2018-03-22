@@ -196,7 +196,6 @@ def test_array_op_order():
     assert s + f == 1
     sv = np.array([s])
     fv = np.array([f])
-    print(sv, fv)
     assert check_array(sv + sv, [0.])
     assert check_array(sv + fv, [1.])
     assert check_array(fv + sv, [-1.])

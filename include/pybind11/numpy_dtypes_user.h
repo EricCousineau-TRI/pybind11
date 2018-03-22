@@ -336,17 +336,17 @@ class dtype_user : public class_<Class_> {
       const detail::op_<id, ot, L, R>&, const Extra&... extra) {
     using op_ = detail::op_<id, ot, L, R>;
     using op_impl = typename op_::template info<dtype_user>::op;
-    auto func = &op_impl::execute;
     // Define operators.
-    this->def(op_impl::name(), func, is_operator(), extra...);
+    this->def(op_impl::name(), &op_impl::execute, is_operator(), extra...);
     // Register ufunction with builtin name.
     // Use `op_l`. Mapping `__radd__` to `add` would require remapping argument
-    // order, and screw that.
+    // order, and screw that. We can just use the fact that `op_impl` is
+    // generic.
     constexpr auto ot_norm = (ot == detail::op_r) ? detail::op_l : ot;
     using op_norm_ = detail::op_<id, ot_norm, L, R>;
     using op_norm_impl = typename op_norm_::template info<dtype_user>::op;
     const char* ufunc_name = detail::get_ufunc_name(op_norm_impl::name());
-    ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
+    ufunc::get_builtin(ufunc_name).def_loop<Class>(&op_norm_impl::execute);
     return *this;
   }
 
