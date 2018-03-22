@@ -127,9 +127,6 @@ public:
         entries.reset(new entries_t(name));
     }
 
-    ufunc(const ufunc& other) {
-    }
-
     ~ufunc() {
         if (entries)
             finalize(); 
@@ -230,12 +227,12 @@ private:
             // Store core functionn.
             core_funcs_.push_back(func);
             core_data_.push_back(data);
-            int ncore = core_funcs_.size();
-            int t_index = core_type_args_.size();
+            size_t ncore = core_funcs_.size();
+            size_t t_index = core_type_args_.size();
             int nargs = nin_ + nout_;
             core_type_args_.resize(ncore * nargs);
-            for (int i = 0; i < dtype_args.size(); ++i) {
-                core_type_args_.at(t_index++) = dtype_args[i];
+            for (size_t i = 0; i < dtype_args.size(); ++i) {
+                core_type_args_.at(t_index++) = (char)dtype_args[i];
             }
         }
 
@@ -249,16 +246,16 @@ private:
         }
 
         detail::PyUFuncObject* create_core() {
-            int ncore = core_funcs_.size();
-            char* name_raw = (char*)name();
+            int ncore = (int)core_funcs_.size();
+            char* name_raw = const_cast<char*>(name());
             return (detail::PyUFuncObject*)detail::npy_api::get().PyUFunc_FromFuncAndData_(
                 core_funcs_.data(), core_data_.data(), core_type_args_.data(), ncore,
                 nin_, nout_, detail::npy_api::constants::PyUFunc_None_, name_raw, nullptr, 0);
         }
 
         void create_user(detail::PyUFuncObject* h) {
-            int nuser = user_funcs_.size();
-            for (int i = 0; i < nuser; ++i) {
+            size_t nuser = user_funcs_.size();
+            for (size_t i = 0; i < nuser; ++i) {
                 if (detail::npy_api::get().PyUFunc_RegisterLoopForType_(
                         h, user_types_[i], user_funcs_[i], user_type_args_[i].data(), user_data_[i]) < 0)
                     pybind11_fail("ufunc: Failed to register custom ufunc");

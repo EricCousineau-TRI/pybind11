@@ -238,17 +238,13 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop("cos", [](const Custom& self) {
             return Custom(cos(self.value()));
         })
-        .def_loop("logical_and", [](const Custom& self, const Custom& other) -> double {
+        .def_loop("logical_and", [](const Custom&, const Custom&) -> double {
             return 10;
         });
     // Somewhat more expressive.
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
-
-    // // Define other stuff.
-    // py::ufunc::get_builtin("power").def_loop<Custom>(
-    //     ;
 
     // `py::vectorize` does not seem to allow custom types due to sfinae constraints :(
     py::ufunc x(m, "same");

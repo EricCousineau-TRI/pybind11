@@ -65,7 +65,7 @@ struct dtype_info {
     return get_mutable_internals().at(id);
   }
 
-  static const std::type_index* find_entry(py::object cls) {
+  static const std::type_index* find_entry(object cls) {
     auto& map = get_internals();
     for (auto& iter : map) {
       auto& entry = iter.second;
