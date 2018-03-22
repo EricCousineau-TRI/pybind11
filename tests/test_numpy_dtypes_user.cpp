@@ -75,7 +75,8 @@ public:
         print_created(this);
     }
     ~Custom() {
-        print_destroyed(this);
+        track_destroyed(this);
+//        print_destroyed(this);
     }
     Custom(double value) : value_{value} {
         print_created(this, value);

@@ -17,7 +17,9 @@ pytestmark = pytest.mark.skipif(
 def test_loop():
     af = np.array([0.])
     # Causes loop
-    x = float(m.Custom(10.))
+    with pytest.raises(TypeError):
+        x = float(m.Custom(10.))
+    print("Yar")
     # with pytest.raises(TypeError):
     #     af[0] = m.Custom(10.)
 

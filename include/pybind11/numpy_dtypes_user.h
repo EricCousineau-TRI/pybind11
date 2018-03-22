@@ -469,7 +469,14 @@ class dtype_user : public class_<Class_> {
         pybind11_fail("dtype_user: Unable to initialize class");
     // TODO(eric.cousineau): Figure out how to catch recursions with
     // `tp_as_number` and casting, when it's not defined
-    ClassObject_Type.tp_as_number = 0;
+    static auto tp_as_number = *ClassObject_Type.tp_as_number;
+    ClassObject_Type.tp_as_number = &tp_as_number;
+    tp_as_number.nb_float = +[](PyObject* in) -> PyObject* {
+      PyErr_SetString(
+        PyExc_TypeError,
+        "dtype_user: No float");
+      return nullptr;
+    };
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
   }
 
