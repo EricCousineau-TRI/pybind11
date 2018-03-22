@@ -89,7 +89,9 @@ public:
         clone(other.str_, str_);
         return *this;
     }
-    operator double() const { return value_; }
+
+    double value() const { return value_; }
+
     operator SimpleStruct() const { return {value_}; }
 
     Custom operator+(const Custom& rhs) const {
@@ -188,10 +190,10 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init<const SimpleStruct&>())
         .def(py::init<Custom>())
         .def("__repr__", [](const Custom* self) {
-            return py::str("Custom({}, '{}')").format(double{*self}, self->str());
+            return py::str("Custom({}, '{}')").format(self->value(), self->str());
         })
         .def("__str__", [](const Custom* self) {
-            return py::str("C<{}, '{}'>").format(double{*self}, self->str());
+            return py::str("C<{}, '{}'>").format(self->value(), self->str());
         })
             // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
@@ -199,7 +201,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
             // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
             // - Explicit casting (e.g., we have additional arguments).
-        .def_ufunc_cast(&Custom::operator double)
+        .def_ufunc_cast([](const Custom& in) { return in.value(); })
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion
 //        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
@@ -219,7 +221,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(py::self < py::self)
         .def_dot()
         .def_ufunc("__pow__", [](const Custom& a, const Custom& b) {
-            return CustomStr("%g ^ %g", double{a}, double{b});
+            return CustomStr("%g ^ %g", a.value(), b.value());
         })
         // TOOD(eric.cousineau): Handle pointers too.
         .def_ufunc("cos", [](const Custom& self) {
