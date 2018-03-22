@@ -465,11 +465,11 @@ class dtype_user : public class_<Class_> {
     ClassObject_Type.tp_basicsize = sizeof(DTypePyObject);
     ClassObject_Type.tp_getset = 0;
     ClassObject_Type.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
-    // TODO(eric.cousineau): Figure out how to catch recursions with
-    // `tp_as_number` and casting, when it's not defined
-    // ClassObject_Type.tp_as_number = 0;
     if (PyType_Ready(&ClassObject_Type) != 0)
         pybind11_fail("dtype_user: Unable to initialize class");
+    // TODO(eric.cousineau): Figure out how to catch recursions with
+    // `tp_as_number` and casting, when it's not defined
+    ClassObject_Type.tp_as_number = 0;
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
   }
 
