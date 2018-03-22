@@ -202,15 +202,15 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc_cast(&Custom::operator double)
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion
-        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
-            // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
-        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
+//        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
+//            // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
+//        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
             // TODO(eric.cousineau): Figure out type for implicit coercion.
             // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
         .def_ufunc(py::self + double{})
-        .def_ufunc(double{} + py::self)
+//        .def_ufunc(double{} + py::self)
         .def(py::self += double{})
         .def_ufunc(py::self * py::self)
         .def_ufunc(py::self - py::self)
@@ -229,6 +229,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
+
+    py::ufunc::get_builtin("add").def_loop<Custom>([](double a, const Custom& b) {
+        py::print("Call loop");
+        return Custom(a) + b;
+    });
 
     // // Define other stuff.
     // py::ufunc::get_builtin("power").def_loop<Custom>(
