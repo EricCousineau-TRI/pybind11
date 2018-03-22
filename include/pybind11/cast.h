@@ -1989,9 +1989,6 @@ template <> inline void cast_safe<void>(object &&) {}
 
 NAMESPACE_END(detail)
 
-template <return_value_policy policy = return_value_policy::automatic_reference>
-tuple make_tuple() { return tuple(0); }
-
 template <return_value_policy policy = return_value_policy::automatic_reference,
           typename... Args> tuple make_tuple(Args&&... args_) {
     constexpr size_t size = sizeof...(Args);
@@ -2358,13 +2355,9 @@ object object_api<Derived>::call(Args &&...args) const {
 
 NAMESPACE_END(detail)
 
-#define PYBIND11_MAKE_OPAQUE(...) \
+#define PYBIND11_MAKE_OPAQUE(Type) \
     namespace pybind11 { namespace detail { \
-        template<> class type_caster<__VA_ARGS__> : public type_caster_base<__VA_ARGS__> { }; \
+        template<> class type_caster<Type> : public type_caster_base<Type> { }; \
     }}
-
-/// Lets you pass a type containing a `,` through a macro parameter without needing a separate
-/// typedef, e.g.: `PYBIND11_OVERLOAD(PYBIND11_TYPE(ReturnType<A, B>), PYBIND11_TYPE(Parent<C, D>), f, arg)`
-#define PYBIND11_TYPE(...) __VA_ARGS__
 
 NAMESPACE_END(PYBIND11_NAMESPACE)

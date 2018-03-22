@@ -211,31 +211,6 @@ extern "C" {
 #define PYBIND11_TOSTRING(x) PYBIND11_STRINGIFY(x)
 #define PYBIND11_CONCAT(first, second) first##second
 
-#define PYBIND11_CHECK_PYTHON_VERSION \
-    {                                                                          \
-        const char *compiled_ver = PYBIND11_TOSTRING(PY_MAJOR_VERSION)         \
-            "." PYBIND11_TOSTRING(PY_MINOR_VERSION);                           \
-        const char *runtime_ver = Py_GetVersion();                             \
-        size_t len = std::strlen(compiled_ver);                                \
-        if (std::strncmp(runtime_ver, compiled_ver, len) != 0                  \
-                || (runtime_ver[len] >= '0' && runtime_ver[len] <= '9')) {     \
-            PyErr_Format(PyExc_ImportError,                                    \
-                "Python version mismatch: module was compiled for Python %s, " \
-                "but the interpreter version is incompatible: %s.",            \
-                compiled_ver, runtime_ver);                                    \
-            return nullptr;                                                    \
-        }                                                                      \
-    }
-
-#define PYBIND11_CATCH_INIT_EXCEPTIONS \
-        catch (pybind11::error_already_set &e) {                               \
-            PyErr_SetString(PyExc_ImportError, e.what());                      \
-            return nullptr;                                                    \
-        } catch (const std::exception &e) {                                    \
-            PyErr_SetString(PyExc_ImportError, e.what());                      \
-            return nullptr;                                                    \
-        }                                                                      \
-
 /** \rst
     ***Deprecated in favor of PYBIND11_MODULE***
 
@@ -255,10 +230,27 @@ extern "C" {
     PYBIND11_DEPRECATED("PYBIND11_PLUGIN is deprecated, use PYBIND11_MODULE")  \
     static PyObject *pybind11_init();                                          \
     PYBIND11_PLUGIN_IMPL(name) {                                               \
-        PYBIND11_CHECK_PYTHON_VERSION                                          \
+        int major, minor;                                                      \
+        if (sscanf(Py_GetVersion(), "%i.%i", &major, &minor) != 2) {           \
+            PyErr_SetString(PyExc_ImportError, "Can't parse Python version."); \
+            return nullptr;                                                    \
+        } else if (major != PY_MAJOR_VERSION || minor != PY_MINOR_VERSION) {   \
+            PyErr_Format(PyExc_ImportError,                                    \
+                         "Python version mismatch: module was compiled for "   \
+                         "version %i.%i, while the interpreter is running "    \
+                         "version %i.%i.", PY_MAJOR_VERSION, PY_MINOR_VERSION, \
+                         major, minor);                                        \
+            return nullptr;                                                    \
+        }                                                                      \
         try {                                                                  \
             return pybind11_init();                                            \
-        } PYBIND11_CATCH_INIT_EXCEPTIONS                                       \
+        } catch (pybind11::error_already_set &e) {                             \
+            PyErr_SetString(PyExc_ImportError, e.what());                      \
+            return nullptr;                                                    \
+        } catch (const std::exception &e) {                                    \
+            PyErr_SetString(PyExc_ImportError, e.what());                      \
+            return nullptr;                                                    \
+        }                                                                      \
     }                                                                          \
     PyObject *pybind11_init()
 
@@ -282,12 +274,29 @@ extern "C" {
 #define PYBIND11_MODULE(name, variable)                                        \
     static void PYBIND11_CONCAT(pybind11_init_, name)(pybind11::module &);     \
     PYBIND11_PLUGIN_IMPL(name) {                                               \
-        PYBIND11_CHECK_PYTHON_VERSION                                          \
+        int major, minor;                                                      \
+        if (sscanf(Py_GetVersion(), "%i.%i", &major, &minor) != 2) {           \
+            PyErr_SetString(PyExc_ImportError, "Can't parse Python version."); \
+            return nullptr;                                                    \
+        } else if (major != PY_MAJOR_VERSION || minor != PY_MINOR_VERSION) {   \
+            PyErr_Format(PyExc_ImportError,                                    \
+                         "Python version mismatch: module was compiled for "   \
+                         "version %i.%i, while the interpreter is running "    \
+                         "version %i.%i.", PY_MAJOR_VERSION, PY_MINOR_VERSION, \
+                         major, minor);                                        \
+            return nullptr;                                                    \
+        }                                                                      \
         auto m = pybind11::module(PYBIND11_TOSTRING(name));                    \
         try {                                                                  \
             PYBIND11_CONCAT(pybind11_init_, name)(m);                          \
             return m.ptr();                                                    \
-        } PYBIND11_CATCH_INIT_EXCEPTIONS                                       \
+        } catch (pybind11::error_already_set &e) {                             \
+            PyErr_SetString(PyExc_ImportError, e.what());                      \
+            return nullptr;                                                    \
+        } catch (const std::exception &e) {                                    \
+            PyErr_SetString(PyExc_ImportError, e.what());                      \
+            return nullptr;                                                    \
+        }                                                                      \
     }                                                                          \
     void PYBIND11_CONCAT(pybind11_init_, name)(pybind11::module &variable)
 
