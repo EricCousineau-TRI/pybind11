@@ -142,7 +142,7 @@ def test_array_cast_implicit():
     a = np.array([1., 2.]).astype(m.Custom)
     a += 2.
     assert check_array(a, [m.Custom(3.), m.Custom(4.)])
-    # We do not allow implicit coercion for `double`:
+    # We do not allow implicit coercion from `double` to Custom:
     with pytest.raises(TypeError):
         a[0] = 1.
     with pytest.raises(TypeError):
@@ -150,6 +150,16 @@ def test_array_cast_implicit():
         print(b)  # Supress "unused" warnings
     with pytest.raises(TypeError):
         a *= 2
+    # Try coercion from `Custom` to `double`
+    af = np.array([0., 0.], dtype=float)
+    # The following is viewed as "explicit" since we're using a slice, I guess?
+    af[:] = a
+    assert check_array(af, [3., 4.])
+    af[:] = af + a
+    assert check_array(af, [6., 8.])
+    # This, I guess, tries explicit coercion, which is not available.
+    with pytest.raises(TypeError):
+        af += a
     # Try an implicit conversion.
     a = np.array([1.]).astype(m.Custom)
     # - Nominal pybind implicit conversion
