@@ -268,8 +268,9 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop<CustomStr>([](const CustomStr& a, const CustomStr& b) {
             return a == b;
         })
-        // Define this for checking logicals.
-        .def_loop<bool>([](bool a, bool b) { return a == b; });
+        // Define this for checking other stuff.
+        .def_loop<bool>([](bool a, bool b) { return a == b; })
+        .def_loop<double>([](double a, double b) { return a == b; });
 }
 
 #else  // defined(PYBIND11_CPP14)

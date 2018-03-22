@@ -233,7 +233,7 @@ private:
             int ncore = core_funcs_.size();
             int t_index = core_type_args_.size();
             int nargs = nin_ + nout_;
-            core_type_args_.resize((ncore + 1) * nargs);
+            core_type_args_.resize(ncore * nargs);
             for (int i = 0; i < dtype_args.size(); ++i) {
                 core_type_args_.at(t_index++) = dtype_args[i];
             }

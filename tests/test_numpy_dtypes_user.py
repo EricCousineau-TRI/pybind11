@@ -101,11 +101,12 @@ def test_array_creation_extended():
 def check_array(actual, expected):
     """Checks if two arrays are exactly similar (shape, type, and data)."""
     expected = np.array(expected)
+    print(actual.dtype)
     if actual.shape != expected.shape:
         return False
-    if not m.same(actual, expected).all():
-        return False
     if actual.dtype != expected.dtype:
+        return False
+    if not m.same(actual, expected).all():
         return False
     return True
 
@@ -196,8 +197,8 @@ def test_array_op_order():
     sv = np.array([s])
     fv = np.array([f])
     print(sv, fv)
-    assert check_array(sv + sv, [0])
-    assert check_array(sv + fv, [1])
-    assert check_array(fv + sv, [-1])
+    assert check_array(sv + sv, [0.])
+    assert check_array(sv + fv, [1.])
+    assert check_array(fv + sv, [-1.])
 
 sys.stdout = sys.stderr
