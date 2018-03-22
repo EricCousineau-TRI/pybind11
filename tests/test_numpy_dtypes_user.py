@@ -187,4 +187,17 @@ def test_array_ufunc():
     print(np.cos(x))
 
 
+def test_array_op_order():
+    s = m.SimpleStruct(1)
+    f = 0.
+    assert f + s == -1
+    assert s + s == 0
+    assert s + f == 1
+    sv = np.array([s])
+    fv = np.array([f])
+    print(sv, fv)
+    assert check_array(fv + sv, [-1])
+    assert check_array(sv + sv, [0])
+    assert check_array(sv + fv, [1])
+
 sys.stdout = sys.stderr

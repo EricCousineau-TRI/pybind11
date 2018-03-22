@@ -51,6 +51,16 @@ struct SimpleStruct {
     SimpleStruct(double value_in) : value(value_in) {}
 };
 
+double operator+(double, SimpleStruct) {
+    return -1;
+}
+double operator+(SimpleStruct, SimpleStruct) {
+    return 0;
+}
+double operator+(SimpleStruct, double) {
+    return 1;
+}
+
 template <typename T>
 void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
     if (!src)
@@ -185,7 +195,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     py::dtype_user<SimpleStruct>(m, "SimpleStruct")
         .def(py::init<double>())
         .def("__str__", ss_str)
-        .def("__repr__", ss_str);
+        .def("__repr__", ss_str)
+        // Test operator ordering.
+        .def_ufunc(py::self + py::self)
+        .def_ufunc(double{} + py::self)
+        .def_ufunc(py::self + double{});
 
     py::dtype_user<Custom>(m, "Custom")
         .def(py::init())
