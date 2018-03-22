@@ -17,8 +17,9 @@ pytestmark = pytest.mark.skipif(
 def test_loop():
     af = np.array([0.])
     # Causes loop
-    with pytest.raises(TypeError):
-        af[0] = m.Custom(10.)
+    x = float(m.Custom(10.))
+    # with pytest.raises(TypeError):
+    #     af[0] = m.Custom(10.)
 
 
 # def test_scalar_meta():
