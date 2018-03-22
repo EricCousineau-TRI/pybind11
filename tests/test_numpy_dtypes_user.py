@@ -49,7 +49,6 @@ def test_scalar_op():
     assert m.same(a, m.Custom(3))
     # - self + double (and int, implicitly)
     assert m.same(a + 2, m.Custom(5))
-    print(2 + a)
     assert m.same(2 + a, m.Custom(5))
     a += 2.
     a += 1
@@ -101,7 +100,6 @@ def test_array_creation_extended():
 def check_array(actual, expected):
     """Checks if two arrays are exactly similar (shape, type, and data)."""
     expected = np.array(expected)
-    print(actual.dtype)
     if actual.shape != expected.shape:
         return False
     if actual.dtype != expected.dtype:

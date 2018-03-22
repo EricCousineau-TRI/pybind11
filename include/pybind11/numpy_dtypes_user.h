@@ -515,7 +515,6 @@ class dtype_user : public class_<Class_> {
           return -1;
         }
         *(Class*)out = caster;
-        print("setitem: in = ", handle(in));
         return 0;
     };
     arrfuncs.copyswap = (void*)+[](void* dst, void* src, int swap, void* /*arr*/) {
@@ -523,7 +522,6 @@ class dtype_user : public class_<Class_> {
         if (!src) return;
         Class* r_dst = (Class*)dst;
         Class* r_src = (Class*)src;
-        print("copyswap: src = ", *r_src);
         if (swap) {
             PyErr_SetString(
                 PyExc_NotImplementedError,

@@ -105,27 +105,19 @@ public:
     operator SimpleStruct() const { return {value_}; }
 
     Custom operator+(const Custom& rhs) const {
-        py::print("add: ", value_, rhs.value_);
         auto tmp = Custom(value_ + rhs.value_);
-        py::print(" = ", tmp.value_);
         return tmp;
     }
     Custom& operator+=(const Custom& rhs) {
-        py::print("iadd: ", value_, rhs.value_);
         value_ += rhs.value_;
-        py::print(" = ", value_);
         return *this;
     }
     Custom operator+(double rhs) const {
-        py::print("add: ", value_, rhs);
         auto tmp = Custom(value_ + rhs);
-        py::print(" = ", tmp.value_);
         return tmp;
     }
     Custom& operator+=(double rhs) {
-        py::print("iadd: ", value_, rhs);
         value_ += rhs;
-        py::print(" = ", value_);
         return *this;
     }
     Custom operator*(const Custom& rhs) const { return value_ * rhs.value_; }
