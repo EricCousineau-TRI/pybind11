@@ -145,14 +145,14 @@ struct npy_api {
         NPY_UINT8_ = NPY_UBYTE_,
         NPY_INT16_ = NPY_SHORT_,
         NPY_UINT16_ = NPY_USHORT_,
-        NPY_INT32_ = platform_lookup<std::int32_t, short, int, long>({
-            NPY_SHORT_, NPY_INT_, NPY_LONG_}),
-        NPY_UINT32_ = platform_lookup<std::uint32_t, unsigned short, unsigned int, unsigned long>({
-            NPY_USHORT_, NPY_UINT_, NPY_ULONG_}),
-        NPY_INT64_ = platform_lookup<std::int64_t, int, long, long long>({
-            NPY_INT_, NPY_LONG_, NPY_LONGLONG_}),
-        NPY_UINT64_ = platform_lookup<std::uint64_t, unsigned int, unsigned long, unsigned long long>({
-            NPY_UINT_, NPY_ULONG_, NPY_ULONGLONG_}),
+        NPY_INT32_ = platform_lookup<std::int32_t, short, int, long>({{
+            NPY_SHORT_, NPY_INT_, NPY_LONG_}}),
+        NPY_UINT32_ = platform_lookup<std::uint32_t, unsigned short, unsigned int, unsigned long>({{
+            NPY_USHORT_, NPY_UINT_, NPY_ULONG_}}),
+        NPY_INT64_ = platform_lookup<std::int64_t, int, long, long long>({{
+            NPY_INT_, NPY_LONG_, NPY_LONGLONG_}}),
+        NPY_UINT64_ = platform_lookup<std::uint64_t, unsigned int, unsigned long, unsigned long long>({{
+            NPY_UINT_, NPY_ULONG_, NPY_ULONGLONG_}}),
     };
 
     typedef struct {
