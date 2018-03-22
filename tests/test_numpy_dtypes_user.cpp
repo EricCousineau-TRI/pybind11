@@ -220,7 +220,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc("__pow__", [](const Custom& a, const Custom& b) {
             return CustomStr("%g ^ %g", double{a}, double{b});
         })
-        .def_ufunc("cos", [](const Custom* self) {
+        // TOOD(eric.cousineau): Handle pointers too.
+        .def_ufunc("cos", [](const Custom& self) {
             return 0.;
         });
     // Somewhat more expressive.
