@@ -340,6 +340,8 @@ class dtype_user : public class_<Class_> {
     // Define operators.
     this->def(op_impl::name(), func, is_operator(), extra...);
     // Register ufunction with builtin name.
+    // Use `op_l`. Mapping `__radd__` to `add` would require remapping argument
+    // order, and screw that.
     constexpr auto ot_norm = (ot == detail::op_r) ? detail::op_l : ot;
     using op_norm_ = detail::op_<id, ot_norm, L, R>;
     using op_norm_impl = typename op_norm_::template info<dtype_user>::op;

@@ -148,6 +148,10 @@ private:
     std::unique_ptr<string> str_;
 };
 
+Custom operator+(double a, const Custom& b) {
+    return Custom(a) += b;
+}
+
 }  // namespace
 
 #if defined(PYBIND11_CPP14)
@@ -204,15 +208,15 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc_cast([](const Custom& in) { return in.value(); })
         .def_ufunc_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion
-//        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
-//            // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
-//        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
+        .def_ufunc_cast(&Custom::operator SimpleStruct, true)
+           // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
+        .def_ufunc_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
             // TODO(eric.cousineau): Figure out type for implicit coercion.
             // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
         .def_ufunc(py::self + double{})
-//        .def_ufunc(double{} + py::self)
+        .def_ufunc(double{} + py::self)
         .def(py::self += double{})
         .def_ufunc(py::self * py::self)
         .def_ufunc(py::self - py::self)
