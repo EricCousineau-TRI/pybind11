@@ -212,7 +212,7 @@ private:
         entries_t(const char* name) : name_(name) {}
 
         void init_or_check_args(int nin, int nout) {
-            if (nin_ == -1 && nout_ == -1) {
+            if (nin_ != -1 && nout_ != -1) {
                 if (nin_ != nin)
                     pybind11_fail("ufunc: Input count mismatch");
                 if (nout_ != nout)
