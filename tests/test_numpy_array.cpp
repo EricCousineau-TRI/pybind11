@@ -57,7 +57,7 @@ DtypeSizeCheck get_dtype_size_check() {
     check.name = py::type_id<T>();
     check.size_cpp = sizeof(T);
     check.dtype = py::dtype::of<T>();
-    check.size_numpy = check.dtype.attr("alignment").template cast<int>();
+    check.size_numpy = check.dtype.attr("itemsize").template cast<int>();
     return check;
 }
 
