@@ -210,6 +210,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_ufunc(py::self + py::self)
         .def(py::self += py::self)
         .def_ufunc(py::self + double{})
+        .def_ufunc(double{} + py::self)
         .def(py::self += double{})
         .def_ufunc(py::self * py::self)
         .def_ufunc(py::self - py::self)

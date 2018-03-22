@@ -49,6 +49,8 @@ def test_scalar_op():
     assert m.same(a, m.Custom(3))
     # - self + double (and int, implicitly)
     assert m.same(a + 2, m.Custom(5))
+    print(2 + a)
+    assert m.same(2 + a, m.Custom(5))
     a += 2.
     a += 1
     assert m.same(a, m.Custom(6))
@@ -171,6 +173,7 @@ def test_array_ufunc():
     x = np.array([m.Custom(4)])
     y = np.array([m.Custom(2, "World")])
     assert check_array(x + y, [m.Custom(6)])
+    # assert check_array(x + 1, [m.Custom(5)])
     assert check_array(x * y, [m.Custom(8)])
     assert check_array(x - y, [m.Custom(2)])
     assert check_array(-x, [m.Custom(-4)])
@@ -181,3 +184,6 @@ def test_array_ufunc():
     assert check_array(np.dot([x], [y]), [[m.Custom(8)]])
     print(x[0].cos())
     print(np.cos(x))
+
+
+sys.stdout = sys.stderr
