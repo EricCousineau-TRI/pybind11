@@ -17,9 +17,8 @@ def test_dtypes():
     for check in m.get_concrete_dtype_checks():
         print(check)
         assert check.numpy == check.pybind11, check
-        if check.numpy.num != check.pybind11.num:
-            print("NOTE: typenum mismatch for {}: {} != {}".format(
-                check, check.numpy.num, check.pybind11.num))
+        # NumPy normalizes some checks. Explicitly check here.
+        assert check.numpy.num == check.pybind11.num, check
 
 
 @pytest.fixture(scope='function')
