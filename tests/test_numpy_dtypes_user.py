@@ -184,8 +184,7 @@ def test_array_ufunc():
     assert check_array(np.power(x, y), [m.CustomStr("4 ^ 2")])
     assert check_array(np.dot(x, y), m.Custom(8))
     assert check_array(np.dot([x], [y]), [[m.Custom(8)]])
-    print(x[0].cos())
-    print(np.cos(x))
+    assert check_array(np.cos(x), [m.Custom(np.cos(x[0].value()))])
 
 
 def test_array_op_order():

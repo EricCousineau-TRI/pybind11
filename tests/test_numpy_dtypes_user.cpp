@@ -213,7 +213,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def("__str__", [](const Custom* self) {
             return py::str("C<{}, '{}'>").format(self->value(), self->str());
         })
-            // Test referencing.
+        .def("value", &Custom::value)
+        // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
             // Casting.
             // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
@@ -243,7 +244,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         })
         // TOOD(eric.cousineau): Handle pointers too.
         .def_ufunc("cos", [](const Custom& self) {
-            return 0.;
+            return Custom(cos(self.value()));
         });
     // Somewhat more expressive.
 
