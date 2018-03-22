@@ -227,6 +227,7 @@ inline const char* get_ufunc_name(const char* name) {
     {"__truediv__", "divide"},
     {"__pow__", "power"},
     {"__sub__", "subtract"},
+    {"__abs__", "absolute"},
     // https://docs.scipy.org/doc/numpy/reference/routines.logic.html
     {"__gt__", "greater"},
     {"__ge__", "greater_equal"},
@@ -235,7 +236,10 @@ inline const char* get_ufunc_name(const char* name) {
     {"__eq__", "equal"},
     {"__ne__", "not_equal"},
     {"__nonzero__", "nonzero"},
-    {"__invert__", "logical_not"}
+    {"__invert__", "logical_not"},
+    // Are these necessary?
+    {"min", "fmin"},
+    {"max", "fmax"},
     // TODO(eric.cousineau): Add something for junction-style logic?
   };
   auto iter = m.find(name);

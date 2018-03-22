@@ -150,13 +150,6 @@ def test_array_cast_implicit():
         print(b)  # Supress "unused" warnings
     with pytest.raises(TypeError):
         a *= 2
-
-    # TODO(eric.cousineau): Fix these.
-    with pytest.raises(TypeError):
-        af = np.array([1., 2.])
-        # af[0] = a[0]  # Causes infinite loop.
-        af[:] = a  # Does not actually cause an issue.
-
     # Try an implicit conversion.
     a = np.array([1.]).astype(m.Custom)
     # - Nominal pybind implicit conversion
