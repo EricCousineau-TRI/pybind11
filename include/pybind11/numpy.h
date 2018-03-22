@@ -257,6 +257,7 @@ struct npy_api {
             NPY_LONG_, NPY_LONGLONG_, NPY_INT_}}),
         NPY_UINT64_ = platform_lookup<std::uint64_t, unsigned long, unsigned long long, unsigned int>({{
             NPY_ULONG_, NPY_ULONGLONG_, NPY_UINT_}}),
+        // User-defined
         NPY_USERDEF_ = 256,
         // Descriptor flags
         NPY_NEEDS_INIT_ = 0x08,
@@ -1208,8 +1209,8 @@ private:
     // NB: the order here must match the one in common.h
     constexpr static const int values[15] = {
         npy_api::NPY_BOOL_,
-        npy_api::NPY_BYTE_,   npy_api::NPY_UBYTE_,   npy_api::NPY_SHORT_,    npy_api::NPY_USHORT_,
-        npy_api::NPY_INT_,    npy_api::NPY_UINT_,    npy_api::NPY_LONGLONG_, npy_api::NPY_ULONGLONG_,
+        npy_api::NPY_BYTE_,   npy_api::NPY_UBYTE_,   npy_api::NPY_INT16_,    npy_api::NPY_UINT16_,
+        npy_api::NPY_INT32_,  npy_api::NPY_UINT32_,  npy_api::NPY_INT64_,    npy_api::NPY_UINT64_,
         npy_api::NPY_FLOAT_,  npy_api::NPY_DOUBLE_,  npy_api::NPY_LONGDOUBLE_,
         npy_api::NPY_CFLOAT_, npy_api::NPY_CDOUBLE_, npy_api::NPY_CLONGDOUBLE_
     };
