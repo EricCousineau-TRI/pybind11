@@ -87,9 +87,12 @@ void assert_ufunc_dtype_valid() {
   auto T_dtype = dtype::of<T>();
   int num = T_dtype.num();
   bool is_object = std::is_same<T, object>::value;
-  if (num == npy_api::NPY_OBJECT_ && !is_object)
-    pybind11_fail(
-        "ufunc: Cannot handle `dtype=object` when T != `py::object`. Please register function using `py::object`");
+  if (num == npy_api::NPY_OBJECT_ && !is_object) {
+    std::string message = "ufunc: Cannot handle `dtype=object` when T != `py::object` ";
+    message += "(where T = " + type_id<T>() + "). ";
+    message += "Please register function using `py::object`";
+    pybind11_fail(message.c_str());
+  }
 }
 
 template <typename From, typename To, typename Func>
