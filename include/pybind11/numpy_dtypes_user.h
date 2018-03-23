@@ -317,12 +317,7 @@ class dtype_user : public class_<Class_> {
   }
 
   ~dtype_user() {
-    // // TODO(eric.cousineau): Figure out how not to trigger this.
-    // if (!std::current_exception() && !PyErr_Occurred()) {
-    //   check();
-    // } else {
-    //   print("Skipping `dtype::check()` since there is an exception");
-    // }
+    check();
   }
 
   template <typename ... Args>
@@ -435,14 +430,18 @@ class dtype_user : public class_<Class_> {
   const object& self() const { return *this; }
 
   void check() const {
+    auto warn = [](const std::string& msg) {
+      // TODO(eric.cousineau): Figure out better waring type.
+      PyErr_WarnEx(PyExc_UserWarning, msg.c_str(), 0);
+    };
     // This `dict` should indicate whether we've directly overridden methods.
     dict d = self().attr("__dict__");
     // Without these, numpy goes into infinite recursion. Haven't bothered to
     // figure out exactly why.
     if (!d.contains("__repr__"))
-      pybind11_fail("Class is missing explicit __repr__");
+      warn("dtype: Class is missing explicit __repr__!");
     if (!d.contains("__str__"))
-      pybind11_fail("Class is missing explicit __str__");
+      warn("dtype: Class is missing explicit __str__!");
   }
 
   template <typename Func>
