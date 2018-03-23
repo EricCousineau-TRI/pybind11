@@ -384,9 +384,11 @@ class dtype_user : public class_<Class_> {
     // Define implicit conversion on the class.
     if (allow_implicit_coercion && std::is_same<To, Class>::value) {
       auto& entry = detail::dtype_info::get_mutable_entry<Class>();
+      // VERY risky flag (e.g. implicit from `int` -> `double` -> `Class`.
       constexpr bool transitive_convert = false;
       entry.implicit_conversions.push_back(
           detail::create_implicit_caster<From, Class, transitive_convert>());
+      // TODO(eric.cousineau): Figure out how to register `nb_{type}`, if applicable.
     }
     return *this;
   }
