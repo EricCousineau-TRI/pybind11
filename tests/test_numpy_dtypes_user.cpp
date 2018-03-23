@@ -29,20 +29,29 @@ class CustomStr {
 public:
     static constexpr int len = 100;
     CustomStr(const char* s) {
-        snprintf(buffer, len, "%s", s);
+        snprintf(buffer.data(), len, "%s", s);
+        py::print("CONSTRUCT");
+        dummy.reset(new int(1000));
     }
     template <typename Arg, typename... Args>
     CustomStr(const char* fmt, Arg arg, Args... args) {
-        snprintf(buffer, len, fmt, arg, args...);
+        snprintf(buffer.data(), len, fmt, arg, args...);
+        py::print("CONSTRUCT 2");
+        dummy.reset(new int(1000));
     }
+    CustomStr(const CustomStr&) = default;
+    CustomStr& operator=(const CustomStr&) = default;
+    CustomStr(CustomStr&&) = default;
+    CustomStr& operator=(CustomStr&&) = default;
     std::string str() const {
-        return buffer;
+        return buffer.data();
     }
     bool operator==(const CustomStr& other) const {
         return str() == other.str();
     }
 private:
-    char buffer[len];
+    std::array<char, len> buffer;
+    std::shared_ptr<int> dummy;
 };
 
 // Basic structure, meant to be an implicitly convertible value for `Custom`.
