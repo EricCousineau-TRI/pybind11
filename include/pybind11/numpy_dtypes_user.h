@@ -300,6 +300,9 @@ class dtype_user : public class_<Class_> {
     // Register default ufunc cast to `object`.
     // N.B. Given how general this is, it should *NEVER* be implicit, as it
     // would interfere with more meaningful casts.
+    // N.B. This works because `object` is defined to have the same space as
+    // `PyObject*`, thus can be registered in lieu of `PyObject*` - this also
+    // effectively increases the refcount and releases the object.
     this->def_loop_cast([](const Class& self) { return cast(self); });
     object cls = self();
     this->def_loop_cast([cls](object obj) -> Class {

@@ -98,6 +98,12 @@ void ufunc_register_cast(
   auto from = npy_format_descriptor<From>::dtype();
   int to_num = npy_format_descriptor<To>::dtype().num();
   auto from_raw = (PyArray_Descr*)from.ptr();
+  if (to_num == npy_api::NPY_OBJECT_ && !std::is_same<To, object>::value)
+      pybind11_fail(
+          "ufunc: Registering conversion to `dtype=object` with To != `py::object` is not supported");
+  if (from.num() == npy_api::NPY_OBJECT_ && !std::is_same<From, object>::value)
+      pybind11_fail(
+          "ufunc: Registering conversion from `dtype=object` with From != `py::object` is not supported");
   if (api.PyArray_RegisterCastFunc_(from_raw, to_num, cast_func) < 0)
       pybind11_fail("ufunc: Cannot register cast");
   if (allow_coercion) {
