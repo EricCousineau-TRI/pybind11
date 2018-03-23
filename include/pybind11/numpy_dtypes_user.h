@@ -228,7 +228,7 @@ inline const char* get_ufunc_name(const char* name) {
     {"__neg__", "negative"},
     {"__pos__", "numpy_does_not_have_positive__pos__"},  // Cause errror.
     {"__mul__", "multiply"},
-    {"__truediv__", "divide"},
+    {"__truediv__", "true_divide"},
     {"__pow__", "power"},
     {"__sub__", "subtract"},
     {"__abs__", "absolute"},
@@ -340,13 +340,15 @@ class dtype_user : public class_<Class_> {
 
   /// Define operator UFunc loop.
   template <detail::op_id id, detail::op_type ot,
-      typename L, typename R, typename... Extra>
+      typename L, typename R>
   dtype_user& def_loop(
-      const detail::op_<id, ot, L, R>&, const Extra&... extra) {
-    using op_ = detail::op_<id, ot, L, R>;
-    using op_impl = typename op_::template info<dtype_user>::op;
-    // Define operators.
-    this->def(op_impl::name(), &op_impl::execute, is_operator(), extra...);
+      const detail::op_<id, ot, L, R>&, bool add_op = true) {
+    if (add_op) {
+      using op_ = detail::op_<id, ot, L, R>;
+      using op_impl = typename op_::template info<dtype_user>::op;
+      // Define operators.
+      this->def(op_impl::name(), &op_impl::execute, is_operator());
+    }
     // Register ufunction with builtin name.
     // Use `op_l`. Mapping `__radd__` to `add` would require remapping argument
     // order, and screw that. We can just use the fact that `op_impl` is
