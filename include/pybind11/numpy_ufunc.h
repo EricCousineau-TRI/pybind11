@@ -82,9 +82,19 @@ auto ufunc_to_ptr(Func func) {
     return ufunc_to_ptr(func, type_args);
 }
 
+template <typename T>
+bool assert_ufunc_dtype_valid() {
+  auto T_dtype = dtype::of<T>();
+  if (T_dtype.num() == npy_api::NPY_OBJECT_ && !std::is_same<T, object>::value)
+    pybind11_fail(
+        "ufunc: Cannot handle `dtype=object` when T != `py::object`. Please register function using `py::object`");
+}
+
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(
     Func&& func, bool allow_coercion, type_pack<From, To> = {}) {
+  assert_ufunc_dtype_valid<From>();
+  assert_ufunc_dtype_valid<To>();
   static auto cast_lambda = detail::function_inference::run(func).func;
   auto cast_func = +[](
         void* from_, void* to_, npy_intp n,
@@ -98,9 +108,6 @@ void ufunc_register_cast(
   auto from = npy_format_descriptor<From>::dtype();
   int to_num = npy_format_descriptor<To>::dtype().num();
   auto from_raw = (PyArray_Descr*)from.ptr();
-  if (to_num == npy_api::NPY_OBJECT_ && !std::is_same<To, object>::value)
-      pybind11_fail(
-          "ufunc: Registering conversion to `dtype=object` with To != `py::object` is not supported");
   if (from.num() == npy_api::NPY_OBJECT_ && !std::is_same<From, object>::value)
       pybind11_fail(
           "ufunc: Registering conversion from `dtype=object` with From != `py::object` is not supported");
@@ -184,6 +191,8 @@ private:
         entries->init_or_check_args(nin, nout);
 
         int dtype = dtype::of<Type>().num();
+        int dummy[] = {(detail::assert_ufunc_dtype_valid<Args>(), 0)...};
+        (void)dummy;
         std::vector<int> dtype_args = {dtype::of<Args>().num()...};
         // Determine if we need to make a new ufunc.
         bool is_core = true;
