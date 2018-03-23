@@ -33,6 +33,8 @@ NAMESPACE_BEGIN(detail)
 
 // TODO(eric.cousineau): Get rid of this structure if #1170 can be resolved.
 
+typedef PyObject* (*nb_conversion_t)(PyObject*);
+
 // Watered down version of `detail::type_info`, specifically for
 // NumPy user dtypes.
 struct dtype_info {
@@ -40,6 +42,7 @@ struct dtype_info {
   int dtype_num{-1};
   std::map<void*, PyObject*> instance_to_py;
   std::vector<type_info::implicit_conversion_func> implicit_conversions;
+  std::map<std::type_index, nb_conversion_t> nb_implicit_conversions;
 
   // Provides mutable entry for a registered type, with option to create.
   template <typename T>
@@ -375,20 +378,24 @@ class dtype_user : public class_<Class_> {
 
   /// Define loop cast, and optionally permit implicit conversions.
   template <typename Func_>
-  dtype_user& def_loop_cast(Func_&& func, bool allow_implicit_coercion = false) {
+  dtype_user& def_loop_cast(const Func_& func, bool allow_implicit_coercion = false) {
     auto func_infer = detail::function_inference::run(func);
     using Func = decltype(func_infer);
     using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
     using To = detail::intrinsic_t<typename Func::Return>;
     detail::ufunc_register_cast<From, To>(func, allow_implicit_coercion);
     // Define implicit conversion on the class.
-    if (allow_implicit_coercion && std::is_same<To, Class>::value) {
-      auto& entry = detail::dtype_info::get_mutable_entry<Class>();
-      // VERY risky flag (e.g. implicit from `int` -> `double` -> `Class`.
-      constexpr bool transitive_convert = false;
-      entry.implicit_conversions.push_back(
-          detail::create_implicit_caster<From, Class, transitive_convert>());
-      // TODO(eric.cousineau): Figure out how to register `nb_{type}`, if applicable.
+    if (allow_implicit_coercion) {
+      if (std::is_same<To, Class>::value) {
+        auto& entry = detail::dtype_info::get_mutable_entry<Class>();
+        // VERY risky flag (e.g. implicit from `int` -> `double` -> `Class`.
+        constexpr bool transitive_convert = false;
+        entry.implicit_conversions.push_back(
+            detail::create_implicit_caster<From, Class, transitive_convert>());
+      } else {
+        auto enabled = std::is_same<From, Class>{};
+        register_nb_conversion<To>(enabled, func_infer.func);
+      }
     }
     return *this;
   }
@@ -450,18 +457,46 @@ class dtype_user : public class_<Class_> {
     }
   }
 
-  static PyObject* disable_py_cast(PyObject*) {
+  template <typename T>
+  static PyObject* handle_nb_conversion(PyObject* from) {
+    auto& entry = detail::dtype_info::get_entry<Class>();
+    auto& map = entry.nb_implicit_conversions;
+    // Check for available conversions.
+    std::type_index id(typeid(T));
+    auto iter = map.find(id);
+    if (iter != map.end()) {
+      return iter->second(from);
+    } else {
       PyErr_SetString(
         PyExc_TypeError,
         "dtype_user: Direct casting via Python not supported");
       return nullptr;
+    }
   }
 
-  static int disable_py_coerce(PyObject**, PyObject**) {
-      PyErr_SetString(
-        PyExc_TypeError,
-        "dtype_user: Direct coercion via Python not supported");
-      return 1;
+  template <typename To, typename Func>
+  void register_nb_conversion(std::true_type, const Func& func) {
+    auto& entry = detail::dtype_info::get_mutable_entry<Class>();
+    std::type_index id(typeid(To));
+    auto& map = entry.nb_implicit_conversions;
+    assert(map.find(id) == map.end());
+    static Func func_static = func;
+    detail::nb_conversion_t nb_conversion = +[](PyObject* from_py) -> PyObject* {
+      Class* from = cast<Class*>(from_py);
+      To to = func_static(*from);
+      return cast<To>(to).release().ptr();
+    };
+    map[id] = nb_conversion;
+  }
+
+  template <typename To, typename Func>
+  void register_nb_conversion(std::false_type, const Func&) {}
+
+  static int disable_nb_coerce(PyObject**, PyObject**) {
+    PyErr_SetString(
+      PyExc_TypeError,
+      "dtype_user: Direct coercion via Python not supported");
+    return 1;
   }
 
   void register_type(const char* name) {
@@ -490,10 +525,10 @@ class dtype_user : public class_<Class_> {
     // TODO(eric.cousineau): Figure out how to use more generic dispatch on
     // this object. If we use the `np.generic` stuff, we end up getting
     // recursive loops.
-    tp_as_number.nb_float = &disable_py_cast;
-    tp_as_number.nb_int = &disable_py_cast;
-    tp_as_number.nb_long = &disable_py_cast;
-    tp_as_number.nb_coerce = &disable_py_coerce;
+    tp_as_number.nb_float = &handle_nb_conversion<double>;
+    tp_as_number.nb_int = &handle_nb_conversion<int>;
+    tp_as_number.nb_long = &handle_nb_conversion<int>;
+    tp_as_number.nb_coerce = &disable_nb_coerce;
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
   }
 
