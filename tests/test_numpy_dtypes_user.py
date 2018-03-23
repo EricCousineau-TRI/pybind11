@@ -163,7 +163,15 @@ def test_array_cast_implicit():
     # Also causes an error, as it attempts implicit coercion, which we've
     # disabled.
     with pytest.raises(TypeError):
-        af[0] = a[0]  # Causes loop
+        af[0] = a[0]
+    # - Try an unregistered type, e.g. `int`.
+    ai = np.array([0, 0], dtype=int)
+    with pytest.raises(ValueError):
+        ai[:] = a
+    with pytest.raises(TypeError):
+        ai += a
+    with pytest.raises(TypeError):
+        ai[0] = a[0]
     # Try an implicit conversion.
     a = np.array([1.]).astype(m.Custom)
     # - Nominal pybind implicit conversion

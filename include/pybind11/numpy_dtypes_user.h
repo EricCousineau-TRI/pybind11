@@ -448,6 +448,20 @@ class dtype_user : public class_<Class_> {
     }
   }
 
+  static PyObject* disable_py_cast(PyObject*) {
+      PyErr_SetString(
+        PyExc_TypeError,
+        "dtype_user: Direct casting via Python not supported");
+      return nullptr;
+  }
+
+  static int disable_py_coerce(PyObject**, PyObject**) {
+      PyErr_SetString(
+        PyExc_TypeError,
+        "dtype_user: Direct coercion via Python not supported");
+      return 1;
+  }
+
   void register_type(const char* name) {
     // Ensure we initialize NumPy before accessing `PyGenericArrType_Type`.
     auto& api = detail::npy_api::get();
@@ -474,12 +488,10 @@ class dtype_user : public class_<Class_> {
     // TODO(eric.cousineau): Figure out how to use more generic dispatch on
     // this object. If we use the `np.generic` stuff, we end up getting
     // recursive loops.
-    tp_as_number.nb_float = +[](PyObject* in) -> PyObject* {
-      PyErr_SetString(
-        PyExc_TypeError,
-        "dtype_user: Direct casting to float not supported");
-      return nullptr;
-    };
+    tp_as_number.nb_float = &disable_py_cast;
+    tp_as_number.nb_int = &disable_py_cast;
+    tp_as_number.nb_long = &disable_py_cast;
+    tp_as_number.nb_coerce = &disable_py_coerce;
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
   }
 
