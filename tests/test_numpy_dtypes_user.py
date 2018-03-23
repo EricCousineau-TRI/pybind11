@@ -222,3 +222,18 @@ def test_array_op_order():
     assert check_array(sv + sv, [0.])
     assert check_array(sv + fv, [1.])
     assert check_array(fv + sv, [-1.])
+
+
+def test_object_mixing():
+    c = m.Custom(0)
+    a = m.ObjectA()
+    b = m.ObjectB()
+    print(c + a)
+    print(c + b)
+
+    cv = np.array([c])
+    av = np.array([a])
+    bv = np.array([b])
+    # These operations are now downcast to `object`.
+    assert check_array(cv + av, np.array([m.Custom(1000.)], dtype=object))
+    assert check_array(cv + bv, np.array([m.Custom(9999.)], dtype=object))

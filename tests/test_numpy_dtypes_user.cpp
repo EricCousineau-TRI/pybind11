@@ -7,6 +7,8 @@
   BSD-style license that can be found in the LICENSE file.
 */
 
+// TODO(eric.cousineau): See what mixing non-dtypes look like for pybind...
+
 #include <cstring>
 
 #include "pybind11_tests.h"
@@ -155,6 +157,16 @@ Custom operator+(double a, const Custom& b) {
     return Custom(a) += b;
 }
 
+struct ObjectA {};
+struct ObjectB {};
+
+Custom operator+(const Custom& a, const ObjectA& b) {
+    return Custom(1000);
+}
+Custom operator+(const Custom& a, const ObjectB& b) {
+    return Custom(9999);
+}
+
 }  // namespace
 
 #if defined(PYBIND11_CPP14)
@@ -163,6 +175,9 @@ PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
 PYBIND11_NUMPY_DTYPE_USER(Custom);
 
+PYBIND11_NUMPY_OBJECT_DTYPE(ObjectA);
+PYBIND11_NUMPY_OBJECT_DTYPE(ObjectB);
+
 TEST_SUBMODULE(numpy_dtype_user, m) {
     ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
         return const_cast<std::type_index*>(py::detail::dtype_info::find_entry(cls));
@@ -170,6 +185,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     try { py::module::import("numpy"); }
     catch (...) { return; }
+
+    py::class_<ObjectA>(m, "ObjectA")
+        .def(py::init());
+    py::class_<ObjectB>(m, "ObjectB")
+        .def(py::init());
 
     // Bare, minimal type.
     py::dtype_user<CustomStr>(m, "CustomStr")
@@ -231,6 +251,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop(-py::self)
         .def_loop(py::self == py::self)
         .def_loop(py::self < py::self)
+        .def(py::self + ObjectA{})
+        .def(py::self + ObjectB{})
         .def_dot()
         .def_loop("__pow__", [](const Custom& a, const Custom& b) {
             return CustomStr("%g ^ %g", a.value(), b.value());
@@ -258,7 +280,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         })
         // Define this for checking other stuff.
         .def_loop<bool>([](bool a, bool b) { return a == b; })
-        .def_loop<double>([](double a, double b) { return a == b; });
+        .def_loop<double>([](double a, double b) { return a == b; })
+        .def_loop<py::object>([m](py::object a, py::object b) {
+            // Will recurse if we don't have an overload for the given type.
+            return m.attr("same")(a, b).cast<bool>();
+        });
 }
 
 #else  // defined(PYBIND11_CPP14)
