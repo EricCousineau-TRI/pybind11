@@ -226,6 +226,7 @@ inline const char* get_ufunc_name(const char* name) {
     // https://docs.scipy.org/doc/numpy/reference/routines.math.html
     {"__add__", "add"},
     {"__neg__", "negative"},
+    {"__pos__", "numpy_does_not_have_positive__pos__"},  // Cause errror.
     {"__mul__", "multiply"},
     {"__truediv__", "divide"},
     {"__pow__", "power"},
@@ -316,7 +317,12 @@ class dtype_user : public class_<Class_> {
   }
 
   ~dtype_user() {
-    check();
+    // // TODO(eric.cousineau): Figure out how not to trigger this.
+    // if (!std::current_exception() && !PyErr_Occurred()) {
+    //   check();
+    // } else {
+    //   print("Skipping `dtype::check()` since there is an exception");
+    // }
   }
 
   template <typename ... Args>
