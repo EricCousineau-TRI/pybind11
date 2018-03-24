@@ -581,6 +581,7 @@ class dtype_user : public class_<Class_> {
         return cast(*item).release().ptr();
     };
     arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* /*arr*/) {
+        detail::loader_life_support guard{};
         detail::dtype_user_caster<Class> caster;
         if (!caster.load(in, true)) {
           PyErr_SetString(
