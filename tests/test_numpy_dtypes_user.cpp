@@ -214,16 +214,19 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     auto ss_str = [](const SimpleStruct& self) {
         return py::str("SimpleStruct({})").format(self.value);
     };
-    py::dtype_user<SimpleStruct>(m, "SimpleStruct")
+    py::dtype_user<SimpleStruct> simple_struct(m, "SimpleStruct");
+    py::dtype_user<Custom> custom(m, "Custom");
+    simple_struct
         .def(py::init<double>())
         .def("__str__", ss_str)
         .def("__repr__", ss_str)
         // Test operator ordering.
         .def_loop(py::self + py::self)
         .def_loop(double{} + py::self)
-        .def_loop(py::self + double{});
+        .def_loop(py::self + double{})
+        .def_loop_cast([](const SimpleStruct& in) -> Custom { return in; }, true);
 
-    py::dtype_user<Custom>(m, "Custom")
+    custom
         .def(py::init())
         .def(py::init<double>())
         .def(py::init<double, string>())

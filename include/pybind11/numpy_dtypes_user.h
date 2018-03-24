@@ -184,6 +184,7 @@ struct dtype_user_caster {
           auto temp = converter(src.ptr(), (PyTypeObject*)cls.ptr());
           if (temp) {
             obj = reinterpret_steal<object>(temp);
+            loader_life_support::add_patient(obj);
             break;
           }
         }
