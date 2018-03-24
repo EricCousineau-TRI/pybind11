@@ -18,6 +18,9 @@ def test_implicit_arguments():
     s1 = m.SimpleStruct(1)
     s2 = m.SimpleStruct(1000)
     print(m.binary_op(s1, s2))
+    s1a = np.array(s1)
+    s2a = np.array(s2)
+    print(m.binary_op_loop(s1a, s2a))
 
 
 # def test_scalar_meta():

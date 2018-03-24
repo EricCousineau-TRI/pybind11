@@ -275,9 +275,12 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         });
     // Somewhat more expressive.
 
-    m.def("binary_op", [](const Custom& a, const Custom& b) {
+    auto binary_op = [](const Custom& a, const Custom& b) {
         return CustomStr("%g == %g", a.value(), b.value());
-    });
+    };
+    m.def("binary_op", binary_op);
+    py::ufunc(m, "binary_op_loop")
+        .def_loop<Custom>(binary_op);
 
     // N.B. We should not define a boolean operator for `equal`, as NumPy will
     // use this, even if we define it "afterwards", due to how it is stored.
