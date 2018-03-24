@@ -178,7 +178,15 @@ struct dtype_user_caster {
     auto cls = entry.cls;
     object obj;
     if (!isinstance(src, cls)) {
-      if (convert) {
+      // Check if it's an `np.array` with matching dtype.
+      handle array = (PyObject*)npy_api::get().PyArray_Type_;
+      if (isinstance(src, array)) {
+        tuple shape = src.attr("shape");
+        if (shape.size() == 0) {
+          obj = src.attr("item")();
+        }
+      }
+      if (!obj && convert) {
         // Try implicit conversions.
         for (auto& converter : entry.implicit_conversions) {
           auto temp = converter(src.ptr(), (PyTypeObject*)cls.ptr());
