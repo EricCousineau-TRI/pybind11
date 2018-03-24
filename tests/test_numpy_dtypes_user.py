@@ -242,10 +242,17 @@ def test_object_mixing():
 def test_implicit_arguments():
     s1 = m.SimpleStruct(1)
     s2 = m.SimpleStruct(1000)
-    y = m.binary_op(s1, s2)
     s1a = np.array(s1)
     s2a = np.array(s2)
+    y = m.binary_op(s1, s2)
+    assert m.same(y, m.CustomStr("1 == 1000"))
+    y = m.binary_op(s1a, s2a)
+    assert m.same(y, m.CustomStr("1 == 1000"))
     with pytest.raises(TypeError):
         # This does not work, even when declaring implicit arguments.
         # Not sure why.
         y = m.binary_op_loop(s1a, s2a)
+    # The following works because NumPy is aware of the type...
+    c1 = m.Custom(s1)
+    y = m.binary_op_loop(c1, s2a)
+    assert m.same(y, m.CustomStr("1 == 1000"))
