@@ -290,20 +290,23 @@ define this yet.
  */
 // TODO(eric.cousineau): When defining operator overloads, it'd be nice if
 // things like `operator==` didn't have its own implicit behavior...
-// TODO(eric.cousineau): Use composition, not inheritance.
 template <typename Class_>
-class dtype_user : public class_<Class_> {
+class dtype_user : public object {
  public:
-  using Base = class_<Class_>;
+  static_assert(
+      !std::is_polymorphic<Class_>::value,
+      "Cannot define NumPy dtypes for polymorphics classes.");
+
+  using PyClass = class_<Class_>;
   using Class = Class_;
   using DTypePyObject = detail::dtype_user_instance<Class>;
 
-  dtype_user(handle scope, const char* name) : Base(none()) {
+  dtype_user(handle scope, const char* name) : cls_(none()) {
     register_type(name);
     scope.attr(name) = self();
     auto& entry = detail::dtype_info::get_mutable_entry<Class>(true);
     entry.cls = self();
-    // Registry numpy type.
+    // Register numpy type.
     // (Note that not registering the type will result in infinte recursion).
     entry.dtype_num = register_numpy();
 
@@ -313,7 +316,7 @@ class dtype_user : public class_<Class_> {
     // N.B. This works because `object` is defined to have the same memory
     // layout as `PyObject*`, thus can be registered in lieu of `PyObject*` -
     // this also effectively increases the refcount and releases the object.
-    this->def_loop_cast([](const Class& self) { return cast(self); });
+    this->def_loop_cast([](const Class& self) { return pybind11::cast(self); });
     object cls = self();
     this->def_loop_cast([cls](object obj) -> Class {
       // N.B. We use the *constructor* rather than implicit conversions because
@@ -335,7 +338,7 @@ class dtype_user : public class_<Class_> {
 
   template <typename ... Args>
   dtype_user& def(const char* name, Args&&... args) {
-    base().def(name, std::forward<Args>(args)...);
+    cls().def(name, std::forward<Args>(args)...);
     return *this;
   }
 
@@ -358,7 +361,7 @@ class dtype_user : public class_<Class_> {
       const detail::op_<id, ot, L, R>&, bool add_op = true) {
     if (add_op) {
       using op_ = detail::op_<id, ot, L, R>;
-      using op_impl = typename op_::template info<dtype_user>::op;
+      using op_impl = typename op_::template info<PyClass>::op;
       // Define operators.
       this->def(op_impl::name(), &op_impl::execute, is_operator());
     }
@@ -368,7 +371,7 @@ class dtype_user : public class_<Class_> {
     // generic.
     constexpr auto ot_norm = (ot == detail::op_r) ? detail::op_l : ot;
     using op_norm_ = detail::op_<id, ot_norm, L, R>;
-    using op_norm_impl = typename op_norm_::template info<dtype_user>::op;
+    using op_norm_impl = typename op_norm_::template info<PyClass>::op;
     const char* ufunc_name = detail::get_ufunc_name(op_norm_impl::name());
     ufunc::get_builtin(ufunc_name).def_loop<Class>(&op_norm_impl::execute);
     return *this;
@@ -378,7 +381,7 @@ class dtype_user : public class_<Class_> {
   /// needed.
   template <typename Func>
   dtype_user& def_loop(const char* name, const Func& func) {
-    base().def(name, func);
+    cls().def(name, func);
     const char* ufunc_name = detail::get_ufunc_name(name);
     ufunc::get_builtin(ufunc_name).def_loop<Class>(func);
     return *this;
@@ -389,7 +392,7 @@ class dtype_user : public class_<Class_> {
       typename L, typename R, typename... Extra>
   dtype_user& def(
       const detail::op_<id, ot, L, R>& op, const Extra&... extra) {
-    base().def(op, extra...);
+    cls().def(op, extra...);
     return *this;
   }
 
@@ -440,8 +443,11 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
+  /// Access a class_ view of the type. Please be careful when adding methods
+  /// or attributes, as they may conflict with how NumPy works.
+  PyClass& cls() { return cls_; }
+
  private:
-  Base& base() { return *this; }
   object& self() { return *this; }
   const object& self() const { return *this; }
 
@@ -503,9 +509,9 @@ class dtype_user : public class_<Class_> {
     assert(map.find(id) == map.end());
     static Func func_static = func;
     detail::nb_conversion_t nb_conversion = +[](PyObject* from_py) -> PyObject* {
-      Class* from = cast<Class*>(from_py);
+      Class* from = pybind11::cast<Class*>(from_py);
       To to = func_static(*from);
-      return cast<To>(to).release().ptr();
+      return pybind11::cast<To>(to).release().ptr();
     };
     map[id] = nb_conversion;
   }
@@ -527,7 +533,7 @@ class dtype_user : public class_<Class_> {
     auto heap_type = (PyHeapTypeObject*)PyType_Type.tp_alloc(&PyType_Type, 0);
     if (!heap_type)
         pybind11_fail("dtype_user: Could not register heap type");
-    heap_type->ht_name = str(name).release().ptr();
+    heap_type->ht_name = pybind11::str(name).release().ptr();
     // It's painful to inherit from `np.generic`, because it has no `tp_new`.
     auto& ClassObject_Type = heap_type->ht_type;
     ClassObject_Type.tp_base = api.PyGenericArrType_Type_;
@@ -550,7 +556,9 @@ class dtype_user : public class_<Class_> {
     tp_as_number.nb_int = &handle_nb_conversion<int>;
     tp_as_number.nb_long = &handle_nb_conversion<int>;
     tp_as_number.nb_coerce = &disable_nb_coerce;
+    // Create views into created type.
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
+    cls_ = self();
   }
 
   int register_numpy() {
@@ -588,7 +596,7 @@ class dtype_user : public class_<Class_> {
     // https://docs.scipy.org/doc/numpy/reference/c-api.types-and-structures.html
     arrfuncs.getitem = (void*)+[](void* in, void* /*arr*/) -> PyObject* {
         auto item = (const Class*)in;
-        return cast(*item).release().ptr();
+        return pybind11::cast(*item).release().ptr();
     };
     arrfuncs.setitem = (void*)+[](PyObject* in, void* out, void* /*arr*/) {
         detail::loader_life_support guard{};
@@ -637,6 +645,7 @@ class dtype_user : public class_<Class_> {
     return dtype_num;
   }
 
+  PyClass cls_;
   detail::PyArray_ArrFuncs* arrfuncs_{};
 };
 
