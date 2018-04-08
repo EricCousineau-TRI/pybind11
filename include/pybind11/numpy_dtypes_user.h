@@ -277,6 +277,11 @@ struct dtype_user_npy_format_descriptor {
 
 NAMESPACE_END(detail)
 
+/// Dtype methods which cannot be defined via a UFunc.
+struct dtype_method {
+  struct dot {};
+};
+
 /**
 Defines a user-defined dtype.
 
@@ -420,9 +425,9 @@ class dtype_user : public object {
     return *this;
   }
 
-  // Need to figure out how to generalize these...
+  /// Defines dot product.
   template <typename Defer = void>
-  dtype_user& def_dot() {
+  dtype_user& def_loop(dtype_method::dot) {
     if (arrfuncs_->dotfunc)
       pybind11_fail("dtype: Cannot redefine `dot`");
     using detail::npy_intp;

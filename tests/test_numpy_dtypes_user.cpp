@@ -268,7 +268,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop(py::self < py::self)
         .def(py::self + ObjectA{})
         .def(py::self + ObjectB{})
-        .def_dot()
+        .def_loop(py::dtype_method::dot())
         .def_loop("__pow__", [](const Custom& a, const Custom& b) {
             return CustomStr("%g ^ %g", a.value(), b.value());
         })
