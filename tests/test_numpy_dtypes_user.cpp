@@ -30,13 +30,11 @@ public:
     static constexpr int len = 100;
     CustomStr(const char* s) {
         snprintf(buffer.data(), len, "%s", s);
-        py::print("CONSTRUCT");
         dummy.reset(new int(1000));
     }
     template <typename Arg, typename... Args>
     CustomStr(const char* fmt, Arg arg, Args... args) {
         snprintf(buffer.data(), len, fmt, arg, args...);
-        py::print("CONSTRUCT 2");
         dummy.reset(new int(1000));
     }
     CustomStr(const CustomStr&) = default;
@@ -51,6 +49,7 @@ public:
     }
 private:
     std::array<char, len> buffer;
+    // Data member to ensure that we do not get segfaults when carrying around `shared_ptr`s.
     std::shared_ptr<int> dummy;
 };
 
@@ -62,6 +61,7 @@ struct SimpleStruct {
     SimpleStruct(double value_in) : value(value_in) {}
 };
 
+// Define operations to return fixed values.
 double operator+(double, SimpleStruct) {
     return -1;
 }
@@ -72,6 +72,7 @@ double operator+(SimpleStruct, double) {
     return 1;
 }
 
+// Clones a unique_ptr using type's copy constructor.
 template <typename T>
 void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
     if (!src)
@@ -87,7 +88,8 @@ public:
     }
     ~Custom() {
         track_destroyed(this);
-//        print_destroyed(this);
+        // TODO(eric.cousineau): Track down why this causes a segfault.
+        //print_destroyed(this);
     }
     Custom(double value) : value_{value} {
         print_created(this, value);
@@ -166,6 +168,7 @@ Custom operator+(double a, const Custom& b) {
     return Custom(a) += b;
 }
 
+// Define `dtype=object` types, and ensure the operations correctly reflect these.
 struct ObjectA {};
 struct ObjectB {};
 
@@ -241,10 +244,10 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def("value", &Custom::value)
         // Test referencing.
         .def("self", [](Custom* self) { return self; }, py::return_value_policy::reference)
-            // Casting.
-            // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
-            // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
-            // - Explicit casting (e.g., we have additional arguments).
+        // Casting.
+        // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
+        // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
+        // - Explicit casting (e.g., we have additional arguments).
         .def_loop_cast([](const Custom& in) { return in.value(); })
         .def_loop_cast([](const double& in) -> Custom { return in; })
             // - Implicit coercion + conversion

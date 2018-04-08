@@ -248,7 +248,8 @@ inline const char* get_ufunc_name(const char* name) {
     {"__le__", "less_equal"},
     {"__eq__", "equal"},
     {"__ne__", "not_equal"},
-    {"__nonzero__", "nonzero"},
+    {"__bool__", "nonzero"}, // Python3
+    {"__nonzero__", "nonzero"},  // Python2.7
     {"__invert__", "logical_not"},
     // Are these necessary?
     {"min", "fmin"},
@@ -309,9 +310,9 @@ class dtype_user : public class_<Class_> {
     // Register default ufunc cast to `object`.
     // N.B. Given how general this is, it should *NEVER* be implicit, as it
     // would interfere with more meaningful casts.
-    // N.B. This works because `object` is defined to have the same space as
-    // `PyObject*`, thus can be registered in lieu of `PyObject*` - this also
-    // effectively increases the refcount and releases the object.
+    // N.B. This works because `object` is defined to have the same memory
+    // layout as `PyObject*`, thus can be registered in lieu of `PyObject*` -
+    // this also effectively increases the refcount and releases the object.
     this->def_loop_cast([](const Class& self) { return cast(self); });
     object cls = self();
     this->def_loop_cast([cls](object obj) -> Class {
@@ -373,7 +374,8 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
-  /// Define nominal UFunc loop, mapping to a buitlin name.
+  /// Defines a scalar function, and a UFunc loop, mapping to a buitlin name if
+  /// needed.
   template <typename Func>
   dtype_user& def_loop(const char* name, const Func& func) {
     base().def(name, func);
@@ -382,7 +384,7 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
-  /// Nominal operator.
+  /// Defines a nominal operator.
   template <detail::op_id id, detail::op_type ot,
       typename L, typename R, typename... Extra>
   dtype_user& def(
@@ -391,7 +393,7 @@ class dtype_user : public class_<Class_> {
     return *this;
   }
 
-  /// Define loop cast, and optionally permit implicit conversions.
+  /// Defines loop cast, and optionally permit implicit conversions.
   template <typename Func_>
   dtype_user& def_loop_cast(const Func_& func, bool allow_implicit_coercion = false) {
     auto func_infer = detail::function_inference::run(func);

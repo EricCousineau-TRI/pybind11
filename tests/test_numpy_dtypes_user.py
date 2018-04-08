@@ -34,15 +34,21 @@ def test_scalar_ctor():
     assert stats.alive() == 0
 
 
-def test_scalar_op():
-    """Tests scalar operators."""
+def test_scalar_functions():
+    # Test scalar functions.
     a = m.Custom(1)
     assert repr(a) == "Custom(1.0, '')"
     assert str(a) == "C<1.0, ''>"
     assert m.same(a, a)
     b = m.Custom(2)
     assert not m.same(a, b)
-    # Implicit casting is not easily testable here; see array tests.
+
+
+def test_scalar_algebra():
+    """Tests scalar algebra."""
+    a = m.Custom(1)
+    b = m.Custom(2)
+    # N.B. Implicit casting is not easily testable here; see array tests.
     # Operators.
     # - self + self
     assert m.same(a + b, m.Custom(3))
@@ -85,7 +91,7 @@ def test_array_creation():
 
 def test_array_creation_extended():
     with pytest.raises(ValueError):
-        # Fails due to shenanigans with `np.copyto`.
+        # Fails due to `np.copyto` relying on `np.long` conversion on uninitialized memory.
         x = np.ones((2, 2), dtype=m.Custom)
     x = np.ones((1, 2)).astype(m.Custom)
     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
@@ -225,12 +231,10 @@ def test_array_op_order():
 
 
 def test_object_mixing():
+    # Ensure that operations involving `dtype=object` downcasts properly.
     c = m.Custom(0)
     a = m.ObjectA()
     b = m.ObjectB()
-    print(c + a)
-    print(c + b)
-
     cv = np.array([c])
     av = np.array([a])
     bv = np.array([b])
@@ -249,8 +253,8 @@ def test_implicit_arguments():
     y = m.binary_op(s1a, s2a)
     assert m.same(y, m.CustomStr("1 == 1000"))
     with pytest.raises(TypeError):
-        # This does not work, even when declaring implicit arguments.
-        # Not sure why.
+        # This does not work, even when declaring implicit arguments. Most likely
+        # because NumPy needs to know an anchoring type?
         y = m.binary_op_loop(s1a, s2a)
     # The following works because NumPy is aware of the type...
     c1 = m.Custom(s1)
