@@ -114,7 +114,7 @@ template <typename PlainObjectType, int Options, typename StrideType>
 struct eigen_extract_stride<Eigen::Ref<PlainObjectType, Options, StrideType>> { using type = StrideType; };
 
 template <typename Scalar> bool is_pyobject_() {
-    return static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::value) == npy_api::NPY_OBJECT_;
+    return static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::dtype().num()) == npy_api::NPY_OBJECT_;
 }
 
 // Helper struct for extracting information from an Eigen type
@@ -223,7 +223,7 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
     constexpr ssize_t elem_size = sizeof(typename props::Scalar);
     array a;
     using Scalar = typename props::Type::Scalar;
-    bool is_pyoject = static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::value) == npy_api::NPY_OBJECT_;
+    bool is_pyoject = static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::dtype().num()) == npy_api::NPY_OBJECT_;
 
     if (!is_pyoject) {
         if (props::vector)

@@ -164,6 +164,18 @@ public:
         return get(typeid(T));
     }
 
+    using Fallback = std::function<std::type_index* (py::object)>;
+
+    static Fallback& fallback() {
+        static Fallback out;
+        return out;
+    }
+
+    static void type_fallback(Fallback func) {
+        assert(!fallback());
+        fallback() = func;
+    }
+
     // Gets constructor stats from a Python class
     static ConstructorStats& get(py::object class_) {
         auto &internals = py::detail::get_internals();
@@ -181,6 +193,8 @@ public:
             }
         }
         catch (std::out_of_range) {}
+        if (!t1 && fallback())
+            t1 = fallback()(class_);
         if (!t1) throw std::runtime_error("Unknown class passed to ConstructorStats::get()");
         auto &cs1 = get(*t1);
         // If we have both a t1 and t2 match, one is probably the trampoline class; return whichever
