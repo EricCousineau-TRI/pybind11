@@ -381,6 +381,9 @@ class dtype_user : public object {
     using op_norm_impl = typename op_norm_::template info<PyClass>::op;
     const char* ufunc_name = detail::get_ufunc_name(op_norm_impl::name());
     ufunc::get_builtin(ufunc_name).def_loop<Class>(&op_norm_impl::execute);
+    if (std::string(ufunc_name) == "divide") {
+      ufunc::get_builtin("true_divide").def_loop<Class>(&op_norm_impl::execute);
+    }
     return *this;
   }
 
