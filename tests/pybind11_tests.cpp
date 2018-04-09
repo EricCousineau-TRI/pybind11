@@ -10,7 +10,6 @@
 #include "pybind11_tests.h"
 #include "constructor_stats.h"
 
-#include <functional>
 #include <list>
 
 /*

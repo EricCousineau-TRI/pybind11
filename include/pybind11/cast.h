@@ -1826,13 +1826,20 @@ template <typename T> struct move_if_unreferenced<T, enable_if_t<all_of<
 >::value>> : std::true_type {};
 template <typename T> using move_never = negation<move_common<T>>;
 
+template <typename type, typename SFINAE = void>
+struct cast_is_known_safe : public std::false_type {};
+
+template <typename type>
+struct cast_is_known_safe<type,
+    enable_if_t<std::is_base_of<type_caster_generic, make_caster<type>>::value>> : public std::true_type {};
+
 // Detect whether returning a `type` from a cast on type's type_caster is going to result in a
 // reference or pointer to a local variable of the type_caster.  Basically, only
 // non-reference/pointer `type`s and reference/pointers from a type_caster_generic are safe;
 // everything else returns a reference/pointer to a local variable.
 template <typename type> using cast_is_temporary_value_reference = bool_constant<
     (std::is_reference<type>::value || std::is_pointer<type>::value) &&
-    !std::is_base_of<type_caster_generic, make_caster<type>>::value
+    !cast_is_known_safe<type>::value
 >;
 
 // When a value returned from a C++ function is being cast back to Python, we almost always want to
