@@ -11,6 +11,7 @@
 
 #include "numpy.h"
 #include "numpy_ufunc.h"
+#include "operators.h"
 #include "detail/inference.h"
 
 #include <array>
