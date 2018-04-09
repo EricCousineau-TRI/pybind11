@@ -9,7 +9,6 @@
 
 // TODO(eric.cousineau): See what mixing non-dtypes look like for pybind...
 
-#include <Eigen/Dense>
 #include <cstring>
 
 #include "pybind11_tests.h"
@@ -185,20 +184,14 @@ Custom operator+(const Custom& a, const ObjectB& b) {
     return Custom(9999);
 }
 
-template <typename T>
-using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
-
 class Container {
 public:
     Container() {
-        value_.resize(2, 2);
-        value_ <<
-            Custom(0), Custom(1),
-            Custom(2), Custom(3);
+        value_ = {{Custom(0), Custom(1)}};
     }
-    MatrixX<Custom>& value() { return value_; }
+    std::array<Custom, 2>& value() { return value_; }
 private:
-    MatrixX<Custom> value_;
+    std::array<Custom, 2> value_;
 };
 
 }  // namespace
@@ -333,11 +326,18 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     py::class_<Container>(m, "Container")
         .def(py::init())
-        .def("value", &Container::value,
-             py::return_value_policy::reference_internal);
+        .def("value", [](py::handle self) {
+            auto& me = self.cast<Container&>();
+            return py::array_t<Custom>({1, 2}, me.value().data(), self);
+        }, py::return_value_policy::reference_internal);
 
-    m.def("add_one", [](Eigen::Ref<MatrixX<Custom>> value) {
-        value.array() += 1;
+    m.def("add_one", [](py::handle in) {
+        auto value = py::cast<py::array_t<Custom>>(in.attr("flat"));
+        int count = value.size();
+        for (int i = 0; i < count; ++i) {
+            auto& x = value.mutable_at(i);
+            x += 1;
+        }
     });
 }
 

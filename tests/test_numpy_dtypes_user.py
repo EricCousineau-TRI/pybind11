@@ -271,12 +271,10 @@ def test_reference_arguments():
     # Test C++ -> Python reference
     c = m.Container()
     xc = c.value()
-    assert xc.shape == (2, 2)
+    assert xc.shape == (1, 2)
     xc += 10
     assert check_array(c.value(), [
-        [m.Custom(10), m.Custom(11)],
-        [m.Custom(12), m.Custom(13)]])
+        [m.Custom(10), m.Custom(11)]])
     m.add_one(c.value())
     assert check_array(c.value(), [
-        [m.Custom(11), m.Custom(12)],
-        [m.Custom(13), m.Custom(14)]])
+        [m.Custom(11), m.Custom(12)]])
