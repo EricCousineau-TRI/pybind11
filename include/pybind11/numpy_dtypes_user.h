@@ -237,8 +237,9 @@ inline const char* get_ufunc_name(const char* name) {
     {"__neg__", "negative"},
     {"__pos__", "numpy_does_not_have_positive__pos__"},  // Cause errror.
     {"__mul__", "multiply"},
-    {"__div__", "divide"},
-    {"__truediv__", "true_divide"},
+    // TODO(eric.cousineau): Figure out how to appropriately map `true_divide`
+    // vs. `divide` when the output type is adjusted?
+    {"__truediv__", "divide"},
     {"__pow__", "power"},
     {"__sub__", "subtract"},
     {"__abs__", "absolute"},
