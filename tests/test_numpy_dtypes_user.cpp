@@ -14,7 +14,6 @@
 #include "pybind11_tests.h"
 #include "constructor_stats.h"
 #include <pybind11/stl.h>
-#include <pybind11/eigen.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy_dtypes_user.h>
 
