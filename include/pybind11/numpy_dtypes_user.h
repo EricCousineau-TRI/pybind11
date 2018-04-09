@@ -165,12 +165,22 @@ struct dtype_user_caster {
     return h.release();
   }
 
-  static handle cast(const Class* src, return_value_policy, handle) {
+  static handle cast(const Class* src, return_value_policy policy, handle) {
     object h = DTypePyObject::find_existing(src);
     if (h) {
       return h.release();
     } else {
-      throw cast_error("Cannot find existing instance");
+      if (policy == return_value_policy::automatic_reference ||
+          policy == return_value_policy::reference) {
+        throw cast_error("Cannot find existing instance");
+      } else {
+        // Copy the instance.
+        DTypePyObject* obj = DTypePyObject::alloc_py();
+        obj->value = *src;
+        delete src;
+        h = reinterpret_borrow<object>((PyObject*)obj);
+        return h.release();
+      }
     }
   }
 
@@ -434,6 +444,9 @@ class dtype_user : public object {
   /// Defines dot product.
   template <typename Defer = void>
   dtype_user& def_loop(dtype_method::dot) {
+    // TODO(eric.cousineau): See if there is a way to define `dot` for an
+    // algebra that is not closed under addition / multiplication (e.g.
+    // symbolic variable -> symbolic expression).
     if (arrfuncs_->dotfunc)
       pybind11_fail("dtype: Cannot redefine `dot`");
     using detail::npy_intp;
