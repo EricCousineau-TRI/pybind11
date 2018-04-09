@@ -261,3 +261,22 @@ def test_implicit_arguments():
     c1 = m.Custom(s1)
     y = m.binary_op_loop(c1, s2a)
     assert m.same(y, m.CustomStr("1 == 1000"))
+
+
+def test_reference_arguments():
+    # Test Python -> C++ reference
+    x = np.array([m.Custom(0), m.Custom(1)])
+    m.add_one(x)
+    assert check_array(x, [m.Custom(1), m.Custom(2)])
+    # Test C++ -> Python reference
+    c = m.Container()
+    xc = c.value()
+    assert xc.shape == (2, 2)
+    xc += 10
+    assert check_array(c.value(), [
+        [m.Custom(10), m.Custom(11)],
+        [m.Custom(12), m.Custom(13)]])
+    m.add_one(c.value())
+    assert check_array(c.value(), [
+        [m.Custom(11), m.Custom(12)],
+        [m.Custom(13), m.Custom(14)]])

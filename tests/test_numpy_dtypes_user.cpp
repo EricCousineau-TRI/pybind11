@@ -9,11 +9,13 @@
 
 // TODO(eric.cousineau): See what mixing non-dtypes look like for pybind...
 
+#include <Eigen/Dense>
 #include <cstring>
 
 #include "pybind11_tests.h"
 #include "constructor_stats.h"
 #include <pybind11/stl.h>
+#include <pybind11/eigen.h>
 #include <pybind11/operators.h>
 #include <pybind11/numpy_dtypes_user.h>
 
@@ -183,6 +185,22 @@ Custom operator+(const Custom& a, const ObjectB& b) {
     return Custom(9999);
 }
 
+template <typename T>
+using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+class Container {
+public:
+    Container() {
+        value_.resize(2, 2);
+        value_ <<
+            Custom(0), Custom(1),
+            Custom(2), Custom(3);
+    }
+    MatrixX<Custom>& value() { return value_; }
+private:
+    MatrixX<Custom> value_;
+};
+
 }  // namespace
 
 #if defined(PYBIND11_CPP14)
@@ -312,6 +330,15 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             // Will recurse if we don't have an overload for the given type.
             return m.attr("same")(a, b).cast<bool>();
         });
+
+    py::class_<Container>(m, "Container")
+        .def(py::init())
+        .def("value", &Container::value,
+             py::return_value_policy::reference_internal);
+
+    m.def("add_one", [](Eigen::Ref<MatrixX<Custom>> value) {
+        value.array() += 1;
+    });
 }
 
 #else  // defined(PYBIND11_CPP14)
