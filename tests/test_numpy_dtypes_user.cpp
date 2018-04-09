@@ -139,6 +139,10 @@ public:
 
     Custom operator-() const { return -value_; }
 
+    Custom operator/(const Custom& rhs) const {
+        return Custom(value_ / rhs.value_);
+    }
+
     bool same_as(const Custom& rhs) const {
         return value_ == rhs.value_ && str() == rhs.str();
     }
@@ -260,6 +264,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::self += py::self)
         .def_loop(py::self + double{})
         .def_loop(double{} + py::self)
+        .def_loop(py::self / py::self)
         .def(py::self += double{})
         .def_loop(py::self * py::self)
         .def_loop(py::self - py::self)

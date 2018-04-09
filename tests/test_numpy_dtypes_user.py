@@ -207,6 +207,7 @@ def test_array_ufunc():
     assert check_array(1 + x, [m.Custom(5)])
     assert check_array(x * y, [m.Custom(8)])
     assert check_array(x - y, [m.Custom(2)])
+    assert check_array(x / y, [m.Custom(2)])
     assert check_array(-x, [m.Custom(-4)])
     assert check_array(x == y, [m.CustomStr("4 == 2 && '' == 'World'")])
     assert check_array(x < y, [False])

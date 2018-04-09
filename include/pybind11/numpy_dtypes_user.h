@@ -237,6 +237,7 @@ inline const char* get_ufunc_name(const char* name) {
     {"__neg__", "negative"},
     {"__pos__", "numpy_does_not_have_positive__pos__"},  // Cause errror.
     {"__mul__", "multiply"},
+    {"__div__", "divide"},
     {"__truediv__", "true_divide"},
     {"__pow__", "power"},
     {"__sub__", "subtract"},
