@@ -205,6 +205,10 @@ PYBIND11_NUMPY_OBJECT_DTYPE(ObjectA);
 PYBIND11_NUMPY_OBJECT_DTYPE(ObjectB);
 
 TEST_SUBMODULE(numpy_dtype_user, m) {
+    // Supress warnings
+    (void)py::detail::npy_format_descriptor<ObjectA>::name;
+    (void)py::detail::npy_format_descriptor<ObjectB>::name;
+
     ConstructorStats::type_fallback([](py::object cls) -> std::type_index* {
         return const_cast<std::type_index*>(py::detail::dtype_info::find_entry(cls));
     });
