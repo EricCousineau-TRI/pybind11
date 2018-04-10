@@ -251,7 +251,7 @@ private:
             size_t ncore = core_funcs_.size();
             size_t t_index = core_type_args_.size();
             int nargs = nin_ + nout_;
-            core_type_args_.resize(ncore * nargs);
+            core_type_args_.resize(ncore * static_cast<size_t>(nargs));
             for (size_t i = 0; i < dtype_args.size(); ++i) {
                 core_type_args_.at(t_index++) = (char)dtype_args[i];
             }
