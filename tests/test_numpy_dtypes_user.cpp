@@ -176,10 +176,10 @@ Custom operator+(double a, const Custom& b) {
 struct ObjectA {};
 struct ObjectB {};
 
-Custom operator+(const Custom& a, const ObjectA& b) {
+Custom operator+(const Custom&, const ObjectA&) {
     return Custom(1000);
 }
-Custom operator+(const Custom& a, const ObjectB& b) {
+Custom operator+(const Custom&, const ObjectB&) {
     return Custom(9999);
 }
 
