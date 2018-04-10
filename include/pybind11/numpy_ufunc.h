@@ -145,6 +145,8 @@ public:
         entries.reset(new entries_t(name));
     }
 
+    ufunc(const ufunc&) = default;
+
     ~ufunc() {
         if (entries)
             finalize();
