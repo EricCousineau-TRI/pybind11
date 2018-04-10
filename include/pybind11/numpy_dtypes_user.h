@@ -578,8 +578,10 @@ class dtype_user : public object {
     // recursive loops.
     tp_as_number.nb_float = &handle_nb_conversion<double>;
     tp_as_number.nb_int = &handle_nb_conversion<int>;
+#if PY_VERSION_HEX < 0x03000000
     tp_as_number.nb_long = &handle_nb_conversion<int>;
     tp_as_number.nb_coerce = &disable_nb_coerce;
+#endif
     // Create views into created type.
     self() = reinterpret_borrow<object>(handle((PyObject*)&ClassObject_Type));
     cls_ = self();
