@@ -202,8 +202,8 @@ private:
         // Determine if we need to make a new ufunc.
         bool is_core = true;
         for (int i = 0; i < N; ++i) {
-            size_t is = static_cast<size_t>(i);
-            if (dtype_args[i] >= detail::npy_api::constants::NPY_USERDEF_)
+            size_t ii = static_cast<size_t>(i);
+            if (dtype_args[ii] >= detail::npy_api::constants::NPY_USERDEF_)
                 is_core = false;
         }
         if (is_core) {
