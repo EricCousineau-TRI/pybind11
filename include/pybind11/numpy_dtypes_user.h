@@ -111,7 +111,10 @@ struct dtype_user_instance {
   static dtype_user_instance* alloc_py() {
     auto cls = dtype_info::get_entry<Class>().cls;
     PyTypeObject* cls_raw = (PyTypeObject*)cls.ptr();
-    return (dtype_user_instance*)cls_raw->tp_alloc((PyTypeObject*)cls.ptr(), 0);
+    auto obj = (dtype_user_instance*)cls_raw->tp_alloc((PyTypeObject*)cls.ptr(), 0);
+    // Ensure we clear out the memory.
+    memset(&obj->value, 0, sizeof(Class));
+    return obj;
   }
 
   // Implementation for `tp_new` slot.
@@ -158,6 +161,14 @@ struct dtype_user_caster {
     if (!h) {
       // Make new instance.
       DTypePyObject* obj = DTypePyObject::alloc_py();
+      // {
+      //   pybind11::list values;
+      //   char* buffer = reinterpret_cast<char*>(&obj->value);
+      //   for (int i = 0; i < sizeof(Class); ++i) {
+      //     values.append((int)buffer[i]);
+      //   }
+      //   pybind11::print("Assigning", sizeof(Class), values);
+      // }
       obj->value = src;
       h = reinterpret_borrow<object>((PyObject*)obj);
       return h.release();
