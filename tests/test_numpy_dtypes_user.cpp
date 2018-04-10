@@ -332,7 +332,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     m.def("add_one", [](py::handle in) {
         auto value = py::cast<py::array_t<Custom>>(in.attr("flat"));
-        int count = value.size();
+        int count = static_cast<int>(value.size());
         for (int i = 0; i < count; ++i) {
             auto& x = value.mutable_at(i);
             x += 1;
