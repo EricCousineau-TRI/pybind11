@@ -164,7 +164,7 @@ install:
     fi
     $SCRIPT_RUN_PREFIX sh -c "for s in 0 15; do sleep \$s; \
       apt-get -qy --no-install-recommends install \
-        $PY_DEBUG python$PYTHON-dev python$PY-pytest python$PY-scipy python$PY-pip \
+        $PY_DEBUG python$PYTHON-dev python$PY-pytest python$PY-scipy \
         libeigen3-dev libboost-dev cmake make ${EXTRA_PACKAGES} && break; done"
   else
 
@@ -202,6 +202,7 @@ install:
     export CMAKE_INCLUDE_PATH="${CMAKE_INCLUDE_PATH:+$CMAKE_INCLUDE_PATH:}$PWD/eigen"
   fi
   if [ -n "$NUMPY_PATCH" ]; then
+    $SCRIPT_RUN_PREFIX apt-get -qy install python$PY-pip git
     $SCRIPT_RUN_PREFIX pip install \
         git+https://github.com/EricCousineau-TRI/numpy@feature/prefer_user_copyswap \
         --install-option="--jobs=6"
