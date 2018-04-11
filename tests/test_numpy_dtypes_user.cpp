@@ -297,7 +297,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         })
         .def_loop("logical_and", [](const Custom&, const Custom&) -> double {
             return 10;
-        });
+        })
+        .def("str", &Custom::str);
     // Somewhat more expressive.
 
     auto binary_op = [](const Custom& a, const Custom& b) {
