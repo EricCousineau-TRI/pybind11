@@ -9,39 +9,39 @@ matrix:
   # - Tests setup.py sdist and install (all header files should be present).
   # - Makes sure that everything still works without optional deps (numpy/scipy/eigen) and
   #   also tests the automatic discovery functions in CMake (Python version, C++ standard).
-  - os: linux
-    env: STYLE DOCS PIP
-    cache: false
-    before_install:
-    - pyenv global $(pyenv whence 2to3)  # activate all python versions
-    - PY_CMD=python3
-    - $PY_CMD -m pip install --user --upgrade pip wheel
-    install:
-    - $PY_CMD -m pip install --user --upgrade sphinx sphinx_rtd_theme breathe flake8 pep8-naming pytest
-    - curl -fsSL ftp://ftp.stack.nl/pub/users/dimitri/doxygen-1.8.12.linux.bin.tar.gz | tar xz
-    - export PATH="$PWD/doxygen-1.8.12/bin:$PATH"
-    script:
-    - tools/check-style.sh
-    - flake8
-    - $PY_CMD -m sphinx -W -b html docs docs/.build
-    - |
-      # Make sure setup.py distributes and installs all the headers
-      $PY_CMD setup.py sdist
-      $PY_CMD -m pip install --user -U ./dist/*
-      installed=$($PY_CMD -c "import pybind11; print(pybind11.get_include(True) + '/pybind11')")
-      diff -rq $installed ./include/pybind11
-    - |
-      # Barebones build
-      cmake -DCMAKE_BUILD_TYPE=Debug -DPYBIND11_WERROR=ON -DDOWNLOAD_CATCH=ON
-      make pytest -j 2
-      make cpptest -j 2
+  # - os: linux
+  #   env: STYLE DOCS PIP
+  #   cache: false
+  #   before_install:
+  #   - pyenv global $(pyenv whence 2to3)  # activate all python versions
+  #   - PY_CMD=python3
+  #   - $PY_CMD -m pip install --user --upgrade pip wheel
+  #   install:
+  #   - $PY_CMD -m pip install --user --upgrade sphinx sphinx_rtd_theme breathe flake8 pep8-naming pytest
+  #   - curl -fsSL ftp://ftp.stack.nl/pub/users/dimitri/doxygen-1.8.12.linux.bin.tar.gz | tar xz
+  #   - export PATH="$PWD/doxygen-1.8.12/bin:$PATH"
+  #   script:
+  #   - tools/check-style.sh
+  #   - flake8
+  #   - $PY_CMD -m sphinx -W -b html docs docs/.build
+  #   - |
+  #     # Make sure setup.py distributes and installs all the headers
+  #     $PY_CMD setup.py sdist
+  #     $PY_CMD -m pip install --user -U ./dist/*
+  #     installed=$($PY_CMD -c "import pybind11; print(pybind11.get_include(True) + '/pybind11')")
+  #     diff -rq $installed ./include/pybind11
+  #   - |
+  #     # Barebones build
+  #     cmake -DCMAKE_BUILD_TYPE=Debug -DPYBIND11_WERROR=ON -DDOWNLOAD_CATCH=ON
+  #     make pytest -j 2
+  #     make cpptest -j 2
   # The following are regular test configurations, including optional dependencies.
   # With regard to each other they differ in Python version, C++ standard and compiler.
-  - os: linux
-    env: PYTHON=2.7 CPP=11 GCC=4.8
-    addons:
-      apt:
-        packages: [cmake=2.\*, cmake-data=2.\*]
+  # - os: linux
+  #   env: PYTHON=2.7 CPP=11 GCC=4.8
+  #   addons:
+  #     apt:
+  #       packages: [cmake=2.\*, cmake-data=2.\*]
   # - os: linux
   #   env: PYTHON=3.6 CPP=11 GCC=4.8
   #   addons:
