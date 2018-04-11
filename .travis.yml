@@ -203,6 +203,7 @@ install:
   fi
   if [ -n "$NUMPY_PATCH" ]; then
     $SCRIPT_RUN_PREFIX apt-get -qy install python$PY-pip git
+    $SCRIPT_RUN_PREFIX pip install cython
     $SCRIPT_RUN_PREFIX pip install \
         git+https://github.com/EricCousineau-TRI/numpy@feature/prefer_user_copyswap \
         --install-option="--jobs=6"
