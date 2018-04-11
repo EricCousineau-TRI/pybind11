@@ -53,6 +53,9 @@ matrix:
     env: PYTHON=2.7 CPP=14 GCC=6 CMAKE=1
   - sudo: true
     services: docker
+    env: PYTHON=2.7 CPP=14 GCC=6 CMAKE=1 NUMPY_PATCH=1
+  - sudo: true
+    services: docker
     env: PYTHON=3.5 CPP=14 GCC=6 DEBUG=1
   - sudo: true
     services: docker
@@ -197,6 +200,11 @@ install:
     curl -fsSL https://bitbucket.org/eigen/eigen/get/3.3.4.tar.bz2 | \
         tar --extract -j --directory=eigen --strip-components=1
     export CMAKE_INCLUDE_PATH="${CMAKE_INCLUDE_PATH:+$CMAKE_INCLUDE_PATH:}$PWD/eigen"
+  fi
+  if [ -n "$NUMPY_PATCH" ]; then
+    $SCRIPT_RUN_PREFIX pip install \
+        git+https://github.com/EricCousineau-TRI/numpy@feature/prefer_user_copyswap \
+        --install-option="--jobs=6"
   fi
   set +e
 script:
