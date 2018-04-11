@@ -108,6 +108,7 @@ public:
         print_copy_created(this, other);
     }
     Custom& operator=(const Custom& other) {
+        py::gil_scoped_acquire acq;
         print_copy_assigned(this, other.value_);
         value_ = other.value_;
         clone(other.str_, str_);
