@@ -648,7 +648,6 @@ class dtype_user : public object {
         return 0;
     };
     arrfuncs.copyswap = (void*)+[](void* dst, void* src, int swap, void* /*arr*/) {
-        // TODO(eric.cousineau): Figure out actual purpose of this.
         if (!src) return;
         Class* r_dst = (Class*)dst;
         Class* r_src = (Class*)src;
@@ -658,6 +657,25 @@ class dtype_user : public object {
                 "dtype_user: `swap` not implemented");
         } else {
             *r_dst = *r_src;
+        }
+    };
+    arrfuncs.copyswapn = (void*)+[](void* dst, npy_intp dstride, void* src,
+                          npy_intp sstride, npy_intp n, int swap, void*) {
+        if (!src) return;
+        if (swap) {
+            PyErr_SetString(
+                PyExc_NotImplementedError,
+                "dtype_user: `swap` not implemented");
+        } else {
+            char* c_dst = (char*)dst;
+            char* c_src = (char*)src;
+            for (int k = 0; k < n; k++) {
+                Class* r_dst = (Class*)c_dst;
+                Class* r_src = (Class*)c_src;
+                *r_dst = *r_src;
+                c_dst += dstride;
+                c_src += sstride;
+            }
         }
     };
     // - Ensure this doesn't overwrite our `equal` unfunc.
