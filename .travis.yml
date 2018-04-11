@@ -42,55 +42,55 @@ matrix:
     addons:
       apt:
         packages: [cmake=2.\*, cmake-data=2.\*]
-  - os: linux
-    env: PYTHON=3.6 CPP=11 GCC=4.8
-    addons:
-      apt:
-        sources: [deadsnakes]
-        packages: [python3.6-dev python3.6-venv, cmake=2.\*, cmake-data=2.\*]
+  # - os: linux
+  #   env: PYTHON=3.6 CPP=11 GCC=4.8
+  #   addons:
+  #     apt:
+  #       sources: [deadsnakes]
+  #       packages: [python3.6-dev python3.6-venv, cmake=2.\*, cmake-data=2.\*]
   - sudo: true
     services: docker
     env: PYTHON=2.7 CPP=14 GCC=6 CMAKE=1
   - sudo: true
     services: docker
     env: PYTHON=2.7 CPP=14 GCC=6 CMAKE=1 NUMPY_PATCH=1
-  - sudo: true
-    services: docker
-    env: PYTHON=3.5 CPP=14 GCC=6 DEBUG=1
-  - sudo: true
-    services: docker
-    env: PYTHON=3.6 CPP=17 GCC=7
-  - os: linux
-    env: PYTHON=3.6 CPP=17 CLANG=5.0
-    addons:
-      apt:
-        sources: [deadsnakes, llvm-toolchain-trusty-5.0, ubuntu-toolchain-r-test]
-        packages: [python3.6-dev python3.6-venv clang-5.0 llvm-5.0-dev, lld-5.0]
-  - os: osx
-    osx_image: xcode7.3
-    env: PYTHON=2.7 CPP=14 CLANG CMAKE=1
-  - os: osx
-    osx_image: xcode9
-    env: PYTHON=3.6 CPP=14 CLANG DEBUG=1
-  # Test a PyPy 2.7 build
-  - os: linux
-    env: PYPY=5.8 PYTHON=2.7 CPP=11 GCC=4.8
-    addons:
-      apt:
-        packages: [libblas-dev, liblapack-dev, gfortran]
-  # Build in 32-bit mode and tests against the CMake-installed version
-  - sudo: true
-    services: docker
-    env: ARCH=i386 PYTHON=3.5 CPP=14 GCC=6 INSTALL=1
-    script:
-      - |
-        $SCRIPT_RUN_PREFIX sh -c "set -e
-        cmake ${CMAKE_EXTRA_ARGS} -DPYBIND11_INSTALL=1 -DPYBIND11_TEST=0
-        make install
-        cp -a tests /pybind11-tests
-        mkdir /build-tests && cd /build-tests
-        cmake ../pybind11-tests ${CMAKE_EXTRA_ARGS} -DPYBIND11_WERROR=ON
-        make pytest -j 2"
+  # - sudo: true
+  #   services: docker
+  #   env: PYTHON=3.5 CPP=14 GCC=6 DEBUG=1
+  # - sudo: true
+  #   services: docker
+  #   env: PYTHON=3.6 CPP=17 GCC=7
+  # - os: linux
+  #   env: PYTHON=3.6 CPP=17 CLANG=5.0
+  #   addons:
+  #     apt:
+  #       sources: [deadsnakes, llvm-toolchain-trusty-5.0, ubuntu-toolchain-r-test]
+  #       packages: [python3.6-dev python3.6-venv clang-5.0 llvm-5.0-dev, lld-5.0]
+  # - os: osx
+  #   osx_image: xcode7.3
+  #   env: PYTHON=2.7 CPP=14 CLANG CMAKE=1
+  # - os: osx
+  #   osx_image: xcode9
+  #   env: PYTHON=3.6 CPP=14 CLANG DEBUG=1
+  # # Test a PyPy 2.7 build
+  # - os: linux
+  #   env: PYPY=5.8 PYTHON=2.7 CPP=11 GCC=4.8
+  #   addons:
+  #     apt:
+  #       packages: [libblas-dev, liblapack-dev, gfortran]
+  # # Build in 32-bit mode and tests against the CMake-installed version
+  # - sudo: true
+  #   services: docker
+  #   env: ARCH=i386 PYTHON=3.5 CPP=14 GCC=6 INSTALL=1
+  #   script:
+  #     - |
+  #       $SCRIPT_RUN_PREFIX sh -c "set -e
+  #       cmake ${CMAKE_EXTRA_ARGS} -DPYBIND11_INSTALL=1 -DPYBIND11_TEST=0
+  #       make install
+  #       cp -a tests /pybind11-tests
+  #       mkdir /build-tests && cd /build-tests
+  #       cmake ../pybind11-tests ${CMAKE_EXTRA_ARGS} -DPYBIND11_WERROR=ON
+  #       make pytest -j 2"
 cache:
   directories:
   - $HOME/.local/bin
