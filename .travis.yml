@@ -164,7 +164,7 @@ install:
     fi
     $SCRIPT_RUN_PREFIX sh -c "for s in 0 15; do sleep \$s; \
       apt-get -qy --no-install-recommends install \
-        $PY_DEBUG python$PYTHON-dev python$PY-pytest python$PY-scipy \
+        $PY_DEBUG python$PYTHON-dev python$PY-pytest python$PY-scipy python$PY-pip \
         libeigen3-dev libboost-dev cmake make ${EXTRA_PACKAGES} && break; done"
   else
 
