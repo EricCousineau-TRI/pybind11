@@ -75,7 +75,8 @@ def test_scalar_algebra():
 
 def test_array_creation():
     # Zeros.
-    x = np.zeros((2, 2), dtype=m.Custom)
+    # x = np.zeros((2, 2), dtype=m.Custom)  # May cause segfaults (numpy#10898)
+    x = np.zeros((2, 2)).astype(m.Custom)
     assert x.shape == (2, 2)
     assert x.dtype == m.Custom
     # Generic creation.
@@ -98,8 +99,9 @@ def test_array_creation_extended():
         x = np.ones((2, 2), dtype=m.Custom)
     x = np.ones((1, 2)).astype(m.Custom)
     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
-    # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
-    # assert check_array(x, [[m.Custom(10), m.Custom(10)]])
+    # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)  # Causes segfault (numpy#10898)
+    x = np.zeros((1, 2)).astype(m.Custom); x[:] = m.Custom(10)
+    assert check_array(x, [[m.Custom(10), m.Custom(10)]])
     # `np.eye(..., dtype=m.Custom)` requires a converter from `int` to
     # `m.Custom` (or something that tells it to use `double`).
     # Prefer to avoid, as it complicates other implicit conversions,
