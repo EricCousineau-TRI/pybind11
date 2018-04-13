@@ -24,6 +24,33 @@ namespace py = pybind11;
 
 namespace {
 
+// Clones a unique_ptr using type's copy constructor.
+template <typename T>
+void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
+    if (!src)
+        dst.reset();
+    else
+        dst.reset(new T(*src));
+}
+
+template <typename T>
+class copyable_unique_ptr : public std::unique_ptr<T> {
+public:
+    using base = std::unique_ptr<T>;
+    copyable_unique_ptr() : base() {}
+    copyable_unique_ptr(const copyable_unique_ptr& x)
+        : base(new T(*x)) {}
+    copyable_unique_ptr(copyable_unique_ptr&& x) : base(std::move(x)) {}
+    copyable_unique_ptr& operator=(const copyable_unique_ptr& x) {
+        this->reset(new T(*x));
+        return *this;
+    }
+    copyable_unique_ptr& operator=(copyable_unique_ptr&& x) {
+        base::operator=(std::move(x));
+        return *this;
+    }
+};
+
 // Trivial string class.
 class CustomStr {
 public:
@@ -50,7 +77,7 @@ public:
 private:
     std::array<char, len> buffer;
     // Data member to ensure that we do not get segfaults when carrying around `shared_ptr`s.
-    std::shared_ptr<int> dummy;
+    copyable_unique_ptr<int> dummy;
 };
 
 // Basic structure, meant to be an implicitly convertible value for `Custom`.
@@ -70,15 +97,6 @@ double operator+(SimpleStruct, SimpleStruct) {
 }
 double operator+(SimpleStruct, double) {
     return 1;
-}
-
-// Clones a unique_ptr using type's copy constructor.
-template <typename T>
-void clone(const unique_ptr<T>& src, unique_ptr<T>& dst) {
-    if (!src)
-        dst.reset();
-    else
-        dst.reset(new T(*src));
 }
 
 class Custom {

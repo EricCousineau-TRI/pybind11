@@ -98,8 +98,8 @@ def test_array_creation_extended():
         x = np.ones((2, 2), dtype=m.Custom)
     x = np.ones((1, 2)).astype(m.Custom)
     assert check_array(x, [[m.Custom(1), m.Custom(1)]])
-    x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
-    assert check_array(x, [[m.Custom(10), m.Custom(10)]])
+    # x = np.full((1, 2), m.Custom(10), dtype=m.Custom)
+    # assert check_array(x, [[m.Custom(10), m.Custom(10)]])
     # `np.eye(..., dtype=m.Custom)` requires a converter from `int` to
     # `m.Custom` (or something that tells it to use `double`).
     # Prefer to avoid, as it complicates other implicit conversions,
@@ -283,7 +283,7 @@ def test_reference_arguments():
         [m.Custom(11), m.Custom(12)]])
 
 
-@pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
+# @pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
 def test_copy():
     x = np.array([m.Custom(1, "a")])
     y = np.copy(x)
