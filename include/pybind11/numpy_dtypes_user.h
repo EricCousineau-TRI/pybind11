@@ -612,6 +612,7 @@ class dtype_user : public object {
         'r',                    /* type */
         '=',                    /* byteorder */
         npy_api::NPY_NEEDS_PYAPI_ | npy_api::NPY_USE_GETITEM_ |
+            npy_api::NPY_ITEM_REFCOUNT_ |
             npy_api::NPY_USE_SETITEM_ |
             npy_api::NPY_NEEDS_INIT_, /* flags */
         0,                      /* type_num */
