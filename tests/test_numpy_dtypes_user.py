@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from pybind11_tests import ConstructorStats
@@ -13,8 +14,7 @@ with pytest.suppress(ImportError):
 pytestmark = pytest.mark.skipif(
     not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
 
-prefer_user_copyswap = np and (
-    'prefer_user_copyswap' in getattr(np.lib, 'dev_patch_features', []))
+prefer_user_copyswap = np and 'NUMPY_PATCH' in os.environ
 
 
 def test_scalar_meta():
