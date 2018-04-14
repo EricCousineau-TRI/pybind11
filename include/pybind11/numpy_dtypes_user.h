@@ -161,14 +161,6 @@ struct dtype_user_caster {
     if (!h) {
       // Make new instance.
       DTypePyObject* obj = DTypePyObject::alloc_py();
-      // {
-      //   pybind11::list values;
-      //   char* buffer = reinterpret_cast<char*>(&obj->value);
-      //   for (int i = 0; i < sizeof(Class); ++i) {
-      //     values.append((int)buffer[i]);
-      //   }
-      //   pybind11::print("Assigning", sizeof(Class), values);
-      // }
       obj->value = src;
       h = reinterpret_borrow<object>((PyObject*)obj);
       return h.release();
