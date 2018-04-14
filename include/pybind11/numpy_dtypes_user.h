@@ -291,11 +291,50 @@ struct dtype_user_npy_format_descriptor {
     }
 };
 
+
+template <typename From, typename To, typename Func>
+struct dtype_conversion_t {
+  Func func;
+  bool allow_implicit_coercion{};
+};
+
+template <typename FuncIn>
+static auto dtype_conversion_impl(
+    FuncIn&& func_in, bool allow_implicit_coercion) {
+  auto func_infer = detail::function_inference::run(func_in);
+  using FuncInfer = decltype(func_infer);
+  using From = detail::intrinsic_t<typename FuncInfer::Args::template type_at<0>>;
+  using To = detail::intrinsic_t<typename FuncInfer::Return>;
+  using Func = typename FuncInfer::Func;
+  return dtype_conversion_t<From, To, Func>{
+      std::forward<Func>(func_infer.func), allow_implicit_coercion};
+}
+
 NAMESPACE_END(detail)
 
 /// Dtype methods which cannot be defined via a UFunc.
 struct dtype_method {
   struct dot {};
+
+  template <typename From, typename To>
+  static auto explicit_conversion() {
+    return detail::dtype_conversion_impl([](const From& in) -> To { return in; }, false);
+  }
+
+  template <typename Func>
+  static auto explicit_conversion(Func&& func) {
+    return detail::dtype_conversion_impl(std::forward<Func>(func), false);
+  }
+
+  template <typename From, typename To>
+  static auto implicit_conversion() {
+    return detail::dtype_conversion_impl([](const From& in) -> To { return in; }, true);
+  }
+
+  template <typename Func>
+  static auto implicit_conversion(Func&& func) {
+    return detail::dtype_conversion_impl(std::forward<Func>(func), true);
+  }
 };
 
 /**
@@ -337,9 +376,10 @@ class dtype_user : public object {
     // N.B. This works because `object` is defined to have the same memory
     // layout as `PyObject*`, thus can be registered in lieu of `PyObject*` -
     // this also effectively increases the refcount and releases the object.
-    this->def_loop_cast([](const Class& self) { return pybind11::cast(self); });
+    this->def_loop(dtype_method::explicit_conversion(
+        [](const Class& self) { return pybind11::cast(self); }));
     object cls = self();
-    this->def_loop_cast([cls](object obj) -> Class {
+    this->def_loop(dtype_method::explicit_conversion([cls](object obj) -> Class {
       // N.B. We use the *constructor* rather than implicit conversions because
       // implicit conversions may not be sufficient when dealing with `object`
       // dtypes. As an example, a class can only explicitly cast to float, but
@@ -350,7 +390,7 @@ class dtype_user : public object {
         obj = cls(obj);
       }
       return obj.cast<Class>();
-    });
+    }));
   }
 
   ~dtype_user() {
@@ -421,24 +461,21 @@ class dtype_user : public object {
   }
 
   /// Defines loop cast, and optionally permit implicit conversions.
-  template <typename Func_>
-  dtype_user& def_loop_cast(const Func_& func, bool allow_implicit_coercion = false) {
-    auto func_infer = detail::function_inference::run(func);
-    using Func = decltype(func_infer);
-    using From = detail::intrinsic_t<typename Func::Args::template type_at<0>>;
-    using To = detail::intrinsic_t<typename Func::Return>;
-    detail::ufunc_register_cast<From, To>(func, allow_implicit_coercion);
+  template <typename From, typename To, typename Func>
+  dtype_user& def_loop(detail::dtype_conversion_t<From, To, Func> conv) {
+    detail::ufunc_register_cast<From, To>(
+        conv.func, conv.allow_implicit_coercion);
     // Define implicit conversion on the class.
-    if (allow_implicit_coercion) {
+    if (conv.allow_implicit_coercion) {
       if (std::is_same<To, Class>::value) {
+        // TODO(eric.cousineau): Is this a good idea? It's quite confusing to
+        // discard the function here.
         auto& entry = detail::dtype_info::get_mutable_entry<Class>();
-        // VERY risky flag (e.g. implicit from `int` -> `double` -> `Class`.
-        constexpr bool transitive_convert = false;
         entry.implicit_conversions.push_back(
-            detail::create_implicit_caster<From, Class, transitive_convert>());
+            detail::create_implicit_caster<From, Class>());
       } else {
         auto enabled = std::is_same<From, Class>{};
-        register_nb_conversion<To>(enabled, func_infer.func);
+        register_nb_conversion<To>(enabled, conv.func);
       }
     }
     return *this;

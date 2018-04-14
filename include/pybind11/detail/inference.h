@@ -63,12 +63,13 @@ auto type_pack_apply(type_pack<T...> = {}) {
 
 struct function_inference {
     // Collects both a functor object and its signature for ease of inference.
-    template <typename Func, typename ReturnT, typename ... ArgsT>
+    template <typename Func_, typename ReturnT, typename ... ArgsT>
     struct inferred_info {
       // TODO(eric.cousineau): Ensure that this permits copy elision when combined
       // with `std::forward<Func>(func)`, while still behaving well with primitive
       // types.
-      std::decay_t<Func> func;
+      using Func = std::decay_t<Func_>;
+      Func func;
 
       using Return = ReturnT;
       using Args = type_pack<ArgsT...>;

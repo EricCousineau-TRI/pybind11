@@ -227,9 +227,10 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init<const char*>())
         .def("__str__", &CustomStr::str)
         .def("__repr__", &CustomStr::str)
-        .def_loop_cast([](const CustomStr&) -> double {
-            py::pybind11_fail("Cannot cast");
-        })
+        .def_loop(py::dtype_method::explicit_conversion(
+            [](const CustomStr&) -> double {
+                py::pybind11_fail("Cannot cast");
+            }))
         .def(py::self == py::self);
 
     // Not explicitly convertible: `double`
@@ -246,7 +247,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop(py::self + py::self)
         .def_loop(double{} + py::self)
         .def_loop(py::self + double{})
-        .def_loop_cast([](const SimpleStruct& in) -> Custom { return in; }, true);
+        .def_loop(
+            py::dtype_method::implicit_conversion<SimpleStruct, Custom>());
 
     custom
         .def(py::init())
@@ -267,12 +269,14 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         // N.B. For `np.ones`, we could register a converter from `int64_t` to `Custom`, but this would cause a segfault,
         // because `np.ones` uses `np.copyto(..., casting="unsafe")`, which does *not* respect NPY_NEEDS_INITIALIZATION.
         // - Explicit casting (e.g., we have additional arguments).
-        .def_loop_cast([](const Custom& in) { return in.value(); })
-        .def_loop_cast([](const double& in) -> Custom { return in; })
+        .def_loop(py::dtype_method::explicit_conversion(
+            [](const Custom& in) -> double { return in.value(); }))
+        .def_loop(py::dtype_method::explicit_conversion<double, Custom>())
             // - Implicit coercion + conversion
-        .def_loop_cast(&Custom::operator SimpleStruct, true)
+        .def_loop(py::dtype_method::implicit_conversion(
+            &Custom::operator SimpleStruct))
            // - - N.B. This shouldn't be a normal operation (upcasting?), as it may result in data loss.
-        .def_loop_cast([](const SimpleStruct& in) -> Custom { return in; }, true)
+        .def_loop(py::dtype_method::implicit_conversion<SimpleStruct, Custom>())
             // TODO(eric.cousineau): Figure out type for implicit coercion.
             // Operators + ufuncs, with some just-operators (e.g. in-place)
         .def_loop(py::self + py::self)
