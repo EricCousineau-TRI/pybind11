@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from pybind11_tests import ConstructorStats
@@ -12,6 +13,8 @@ with pytest.suppress(ImportError):
 
 pytestmark = pytest.mark.skipif(
     not np or hasattr(m, "DISABLED"), reason="requires numpy and C++ >= 14")
+
+prefer_user_copyswap = np and 'NUMPY_PATCH' in os.environ
 
 
 def test_scalar_meta():
@@ -278,3 +281,14 @@ def test_reference_arguments():
     m.add_one(c.value())
     assert check_array(c.value(), [
         [m.Custom(11), m.Custom(12)]])
+
+
+@pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
+def test_copy():
+    x = np.array([m.Custom(1, "a")])
+    y = np.copy(x)
+    x[0] = m.Custom(10, "c")
+    assert x[0].value() == 10
+    assert x[0].str() == "c"
+    assert y[0].value() == 1
+    assert y[0].str() == "a"
