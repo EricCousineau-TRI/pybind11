@@ -335,6 +335,8 @@ struct dtype_method {
   static auto implicit_conversion(Func&& func) {
     return detail::dtype_conversion_impl(std::forward<Func>(func), true);
   }
+
+  struct ufunc_only {};
 };
 
 /**
@@ -415,17 +417,11 @@ class dtype_user : public object {
     return *this;
   }
 
-  /// Define operator UFunc loop.
+  /// Define UFunc loop operator.
   template <detail::op_id id, detail::op_type ot,
       typename L, typename R>
   dtype_user& def_loop(
-      const detail::op_<id, ot, L, R>&, bool add_op = true) {
-    if (add_op) {
-      using op_ = detail::op_<id, ot, L, R>;
-      using op_impl = typename op_::template info<PyClass>::op;
-      // Define operators.
-      this->def(op_impl::name(), &op_impl::execute, is_operator());
-    }
+      const detail::op_<id, ot, L, R>&, dtype_method::ufunc_only) {
     // Register ufunction with builtin name.
     // Use `op_l`. Mapping `__radd__` to `add` would require remapping argument
     // order, and screw that. We can just use the fact that `op_impl` is
@@ -439,6 +435,19 @@ class dtype_user : public object {
       ufunc::get_builtin("true_divide").def_loop<Class>(&op_norm_impl::execute);
     }
     return *this;
+  }
+
+  /// Define Python and UFunc loop operator.
+  template <detail::op_id id, detail::op_type ot,
+      typename L, typename R>
+  dtype_user& def_loop(const detail::op_<id, ot, L, R>& op) {
+    // Define Python class operator.
+    using op_ = detail::op_<id, ot, L, R>;
+    using op_impl = typename op_::template info<PyClass>::op;
+    this->def(op_impl::name(), &op_impl::execute, is_operator());
+
+    // Define dtype operators.
+    return def_loop(op, dtype_method::ufunc_only());
   }
 
   /// Defines a scalar function, and a UFunc loop, mapping to a buitlin name if
