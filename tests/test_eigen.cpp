@@ -347,6 +347,12 @@ TEST_SUBMODULE(eigen, m) {
     m.def("cpp_matrix_shape", [](const MatrixX<ADScalar>& A) {
         return py::make_tuple(A.rows(), A.cols());
     });
+    // TODO(eric.cousineau): Unless `dtype=ADScalar` (user-defined) and not
+    // `dtype=object`, we should kill any usages of `Eigen::Ref<>` or any
+    // const-references.
+    m.def("cpp_matrix_shape_ref", [](const Eigen::Ref<MatrixX<ADScalar>>& A) {
+        return py::make_tuple(A.rows(), A.cols());
+    });
 
     // test_named_arguments
     // Make sure named arguments are working properly:
