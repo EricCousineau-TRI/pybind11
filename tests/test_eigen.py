@@ -203,6 +203,11 @@ def test_eigen_passing_adscalar():
         m.iss1105_col_obj(adscalar_vec_row[None, :])
     assert "incompatible function arguments" in str(excinfo)
 
+    # Ensure that matrices are of the same shape for dtype=object.
+    xf = np.array([1, -1], dtype=float)
+    xad = np.array([m.AutoDiffXd(0, []), m.AutoDiffXd(0, [])], dtype=object)
+    assert m.cpp_matrix_shape(xf) == m.cpp_matrix_shape(xad)
+
 
 def test_negative_stride_from_python(msg):
     """Eigen doesn't support (as of yet) negative strides. When a function takes an Eigen matrix by

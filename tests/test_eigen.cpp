@@ -22,6 +22,10 @@
 
 using MatrixXdR = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 typedef Eigen::AutoDiffScalar<Eigen::VectorXd> ADScalar;
+
+template <typename Scalar>
+using MatrixX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
+
 typedef Eigen::Matrix<ADScalar, Eigen::Dynamic, 1> VectorXADScalar;
 typedef Eigen::Matrix<ADScalar, 1, Eigen::Dynamic> VectorXADScalarR;
 PYBIND11_NUMPY_OBJECT_DTYPE(ADScalar);
@@ -335,6 +339,14 @@ TEST_SUBMODULE(eigen, m) {
 
     m.def("iss1105_col_obj", [](VectorXADScalar) { return true; });
     m.def("iss1105_row_obj", [](VectorXADScalarR) { return true; });
+
+    // Test the shape of a matrix via `type_caster`s.
+    m.def("cpp_matrix_shape", [](const MatrixX<double>& A) {
+        return py::make_tuple(A.rows(), A.cols());
+    });
+    m.def("cpp_matrix_shape", [](const MatrixX<ADScalar>& A) {
+        return py::make_tuple(A.rows(), A.cols());
+    });
 
     // test_named_arguments
     // Make sure named arguments are working properly:
