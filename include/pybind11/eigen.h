@@ -113,9 +113,8 @@ struct eigen_extract_stride<Eigen::Map<PlainObjectType, MapOptions, StrideType>>
 template <typename PlainObjectType, int Options, typename StrideType>
 struct eigen_extract_stride<Eigen::Ref<PlainObjectType, Options, StrideType>> { using type = StrideType; };
 
-template <typename Scalar> bool is_pyobject_() {
-    return static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::value) == npy_api::NPY_OBJECT_;
-}
+template <typename Scalar>
+using is_pyobject_dtype = std::is_base_of<npy_format_descriptor_object, npy_format_descriptor<Scalar>>;
 
 // Helper struct for extracting information from an Eigen type
 template <typename Type_> struct EigenProps {
@@ -326,7 +325,7 @@ struct type_caster<Type, enable_if_t<is_eigen_dense_plain<Type>::value>> {
         int result = 0;
         // Allocate the new type, then build a numpy reference into it
         value = Type(fits.rows, fits.cols);
-        bool is_pyobject = is_pyobject_<Scalar>();
+        constexpr bool is_pyobject = is_pyobject_dtype<Scalar>::value;
 
         if (!is_pyobject) {
             auto ref = reinterpret_steal<array>(eigen_ref_array<props>(value));
