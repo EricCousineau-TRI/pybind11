@@ -185,12 +185,12 @@ def test_eigen_passing_adscalar():
     # The original adscalar_mat remains unchanged in spite of passing by reference.
     np.testing.assert_array_equal(conv_double_to_adscalar(adscalar_mat, vice_versa=True), ref)
 
-    # Changes in Python are not reflected in C++ when internal_reference is returned
+    # Changes in Python are not reflected in C++ when internal_reference is returned.
+    # These conversions should be disabled at runtime.
     return_tester = m.ReturnTester()
-    a = return_tester.get_ADScalarMat()
-    a[1, 1] = m.AutoDiffXd(4, np.ones(1))
-    b = return_tester.get_ADScalarMat()
-    assert(np.isclose(b[1, 1].value(), 7.))
+    with pytest.raises(RuntimeError) as excinfo:
+        a = return_tester.get_ADScalarMat()
+    assert "dtype=object" in str(excinfo)
 
     # Checking Issue 1105
     assert m.iss1105_col_obj(adscalar_vec_col[:, None])

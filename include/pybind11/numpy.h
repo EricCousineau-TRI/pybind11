@@ -1243,7 +1243,7 @@ public:
 
 #define PYBIND11_NUMPY_OBJECT_DTYPE(Type) \
     namespace pybind11 { namespace detail { \
-        template <> struct npy_format_descriptor<Type> :
+        template <> struct npy_format_descriptor<Type> : \
             public npy_format_descriptor_object {}; \
     }}
 

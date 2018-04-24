@@ -148,9 +148,7 @@ template <typename Type_> struct EigenProps {
         const auto dims = a.ndim();
         if (dims < 1 || dims > 2)
             return false;
-        bool is_pyobject = false;
-        if (is_pyobject_<Scalar>())
-            is_pyobject = true;
+        constexpr bool is_pyobject = is_pyobject_dtype<Scalar>::value;
         ssize_t scalar_size = (is_pyobject ? static_cast<ssize_t>(sizeof(PyObject*)) :
                                static_cast<ssize_t>(sizeof(Scalar)));
         if (dims == 2) { // Matrix type: require exact match (or dynamic)
