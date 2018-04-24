@@ -233,7 +233,8 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
     }
     else {
         if (base) {
-            throw cast_error("dtype=object arrays must be copied, and cannot be referenced");
+            // Should be disabled by `cast_impl`.
+            throw cast_error("should not have reached here (dtype=object)");
         }
         handle empty_base{};
         auto policy = return_value_policy::copy;
@@ -376,22 +377,40 @@ private:
     // Cast implementation
     template <typename CType>
     static handle cast_impl(CType *src, return_value_policy policy, handle parent) {
-        switch (policy) {
-            case return_value_policy::take_ownership:
-            case return_value_policy::automatic:
-                return eigen_encapsulate<props>(src);
-            case return_value_policy::move:
-                return eigen_encapsulate<props>(new CType(std::move(*src)));
-            case return_value_policy::copy:
-                return eigen_array_cast<props>(*src);
-            case return_value_policy::reference:
-            case return_value_policy::automatic_reference:
-                return eigen_ref_array<props>(*src);
-            case return_value_policy::reference_internal:
-                return eigen_ref_array<props>(*src, parent);
-            default:
-                throw cast_error("unhandled return_value_policy: should not happen!");
-        };
+        constexpr bool is_pyobject = is_pyobject_dtype<Scalar>::value;
+        if (!is_pyobject) {
+            switch (policy) {
+                case return_value_policy::take_ownership:
+                case return_value_policy::automatic:
+                    return eigen_encapsulate<props>(src);
+                case return_value_policy::move:
+                    return eigen_encapsulate<props>(new CType(std::move(*src)));
+                case return_value_policy::copy:
+                    return eigen_array_cast<props>(*src);
+                case return_value_policy::reference:
+                case return_value_policy::automatic_reference:
+                    return eigen_ref_array<props>(*src);
+                case return_value_policy::reference_internal:
+                    return eigen_ref_array<props>(*src, parent);
+                default:
+                    throw cast_error("unhandled return_value_policy: should not happen!");
+            };
+        } else {
+            // For arrays of `dtype=object`, referencing is invalid, so we should squash that as soon as possible.
+            switch (policy) {
+                case return_value_policy::automatic:
+                case return_value_policy::move:
+                case return_value_policy::copy:
+                case return_value_policy::automatic_reference:
+                    return eigen_array_cast<props>(*src);
+                case return_value_policy::take_ownership:
+                case return_value_policy::reference:
+                case return_value_policy::reference_internal:
+                    throw cast_error("dtype=object arrays must be copied, and cannot be referenced");
+                default:
+                    throw cast_error("unhandled return_value_policy: should not happen!");
+            };
+        }
     }
 
 public:
@@ -521,9 +540,9 @@ public:
         bool need_copy = !isinstance<Array>(src);
 
         EigenConformable<props::row_major> fits;
-        bool is_pyobject = false;
-        if (is_pyobject_<Scalar>()) {
-            is_pyobject = true;
+        constexpr bool is_pyobject = is_pyobject_dtype<Scalar>::value;
+        static_assert(!(is_pyobject && need_writeable), "dtype=object cannot provide writeable references");
+        if (is_pyobject) {
             need_copy = true;
         }
         if (!need_copy) {
