@@ -233,17 +233,21 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
                       src.data(), base);
     }
     else {
+        if (base) {
+            throw cast_error("dtype=object arrays must be copied, and cannot be referenced");
+        }
+        handle empty_base{};
+        auto policy = return_value_policy::copy;
         if (props::vector) {
             a = array(
                 npy_format_descriptor<Scalar>::dtype(),
                 { (size_t) src.size() },
                 nullptr,
-                base
+                empty_base
             );
-            auto policy = base ? return_value_policy::automatic_reference : return_value_policy::copy;
             for (ssize_t i = 0; i < src.size(); ++i) {
                 const Scalar src_val = props::fixed_rows ? src(0, i) : src(i, 0);
-                auto value_ = reinterpret_steal<object>(make_caster<Scalar>::cast(src_val, policy, base));
+                auto value_ = reinterpret_steal<object>(make_caster<Scalar>::cast(src_val, policy, empty_base));
                 if (!value_)
                     return handle();
                 a.attr("itemset")(i, value_);
@@ -254,12 +258,11 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
                 npy_format_descriptor<Scalar>::dtype(),
                 {(size_t) src.rows(), (size_t) src.cols()},
                 nullptr,
-                base
+                empty_base
             );
-            auto policy = base ? return_value_policy::automatic_reference : return_value_policy::copy;
             for (ssize_t i = 0; i < src.rows(); ++i) {
                 for (ssize_t j = 0; j < src.cols(); ++j) {
-                    auto value_ = reinterpret_steal<object>(make_caster<Scalar>::cast(src(i, j), policy, base));
+                    auto value_ = reinterpret_steal<object>(make_caster<Scalar>::cast(src(i, j), policy, empty_base));
                     if (!value_)
                         return handle();
                     a.attr("itemset")(i, j, value_);
