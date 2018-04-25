@@ -231,8 +231,13 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
     }
     else {
         if (base) {
-            // Should be disabled by `cast_impl`.
-            throw cast_error("should not have reached here (dtype=object)");
+            // Should be disabled by upstream calls to this method.
+            // TODO(eric.cousineau): Write tests to ensure that this is not
+            // reachable.
+            throw cast_error(
+                "dtype=object does not permit array referencing. "
+                "(NOTE: this generally not be reachable, as upstream APIs "
+                "should fail before this.");
         }
         handle empty_base{};
         auto policy = return_value_policy::copy;

@@ -198,6 +198,9 @@ def test_eigen_passing_adscalar():
     with pytest.raises(RuntimeError) as excinfo:
         m.double_adscalarc(adscalar_vec_col)
     assert "dtype=object" in str(excinfo)
+    with pytest.raises(RuntimeError) as excinfo:
+        m.double_adscalarr(adscalar_vec_row)
+    assert "dtype=object" in str(excinfo)
 
     # Checking Issue 1105
     assert m.iss1105_col_obj(adscalar_vec_col[:, None])

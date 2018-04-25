@@ -108,7 +108,7 @@ TEST_SUBMODULE(eigen, m) {
     m.def("double_threec", [](py::EigenDRef<Eigen::Vector3f> x) { x *= 2; });
     m.def("double_adscalarc", [](py::EigenDRef<VectorXADScalar> x) { x *= 2; });
     m.def("double_threer", [](py::EigenDRef<Eigen::RowVector3f> x) { x *= 2; });
-    // m.def("double_adscalarr", [](py::EigenDRef<VectorXADScalarR> x) { x *= 2; });
+    m.def("double_adscalarr", [](py::EigenDRef<VectorXADScalarR> x) { x *= 2; });
     m.def("double_mat_cm", [](Eigen::MatrixXf x) -> Eigen::MatrixXf { return 2.0f * x; });
     m.def("double_mat_rm", [](DenseMatrixR x) -> DenseMatrixR { return 2.0f * x; });
 
