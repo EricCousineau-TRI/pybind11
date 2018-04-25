@@ -465,6 +465,7 @@ struct return_value_policy_override<Return, enable_if_t<is_eigen_dense_map<Retur
 template <typename MapType> struct eigen_map_caster {
 private:
     using props = EigenProps<MapType>;
+    using Scalar = typename props::Scalar;
 
 public:
 
@@ -475,18 +476,33 @@ public:
     // that this means you need to ensure you don't destroy the object in some other way (e.g. with
     // an appropriate keep_alive, or with a reference to a statically allocated matrix).
     static handle cast(const MapType &src, return_value_policy policy, handle parent) {
-        switch (policy) {
-            case return_value_policy::copy:
-                return eigen_array_cast<props>(src);
-            case return_value_policy::reference_internal:
-                return eigen_array_cast<props>(src, parent, is_eigen_mutable_map<MapType>::value);
-            case return_value_policy::reference:
-            case return_value_policy::automatic:
-            case return_value_policy::automatic_reference:
-                return eigen_array_cast<props>(src, none(), is_eigen_mutable_map<MapType>::value);
-            default:
-                // move, take_ownership don't make any sense for a ref/map:
-                pybind11_fail("Invalid return_value_policy for Eigen Map/Ref/Block type");
+        if (!is_pyobject_dtype<Scalar>::value) {
+            switch (policy) {
+                case return_value_policy::copy:
+                    return eigen_array_cast<props>(src);
+                case return_value_policy::reference_internal:
+                    return eigen_array_cast<props>(src, parent, is_eigen_mutable_map<MapType>::value);
+                case return_value_policy::reference:
+                case return_value_policy::automatic:
+                case return_value_policy::automatic_reference:
+                    return eigen_array_cast<props>(src, none(), is_eigen_mutable_map<MapType>::value);
+                default:
+                    // move, take_ownership don't make any sense for a ref/map:
+                    pybind11_fail("Invalid return_value_policy for Eigen Map/Ref/Block type");
+            }
+        } else {
+            switch (policy) {
+                case return_value_policy::reference:
+                case return_value_policy::reference_internal:
+                    throw cast_error("dtype=object arrays must be copied, and cannot be referenced");
+                case return_value_policy::copy:
+                case return_value_policy::automatic:
+                case return_value_policy::automatic_reference:
+                    return eigen_array_cast<props>(src);
+                default:
+                    // move, take_ownership don't make any sense for a ref/map:
+                    pybind11_fail("Invalid return_value_policy for Eigen Map/Ref/Block type");
+            }
         }
     }
 
@@ -539,7 +555,12 @@ public:
 
         EigenConformable<props::row_major> fits;
         constexpr bool is_pyobject = is_pyobject_dtype<Scalar>::value;
-        static_assert(!(is_pyobject && need_writeable), "dtype=object cannot provide writeable references");
+        // TODO(eric.cousineau): Re-enable this once this does not aversely
+        // affect current state of downstream project.
+        //static_assert(!(is_pyobject && need_writeable), "dtype=object cannot provide writeable references");
+        if (is_pyobject && need_writeable) {
+            throw cast_error("dtype=object cannot provide writeable references");
+        }
         if (is_pyobject) {
             need_copy = true;
         }

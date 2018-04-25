@@ -182,14 +182,21 @@ def test_eigen_passing_adscalar():
     incremented_adscalar_mat = conv_double_to_adscalar(m.incr_adscalar_matrix(adscalar_mat, 7.),
                                                        vice_versa=True)
     np.testing.assert_array_equal(incremented_adscalar_mat, ref + 7)
-    # The original adscalar_mat remains unchanged in spite of passing by reference.
+    # The original adscalar_mat remains unchanged in spite of passing by reference, since
+    # `Eigen::Ref<const CType>` permits copying, and copying is the only valid operation for
+    # `dtype=object`.
     np.testing.assert_array_equal(conv_double_to_adscalar(adscalar_mat, vice_versa=True), ref)
 
     # Changes in Python are not reflected in C++ when internal_reference is returned.
     # These conversions should be disabled at runtime.
+    # - Return arguments.
     return_tester = m.ReturnTester()
     with pytest.raises(RuntimeError) as excinfo:
-        a = return_tester.get_ADScalarMat()
+        return_tester.get_ADScalarMat()
+    assert "dtype=object" in str(excinfo)
+    # - Input arguments, writeable `Ref<>`s.
+    with pytest.raises(RuntimeError) as excinfo:
+        m.double_adscalarc(adscalar_vec_col)
     assert "dtype=object" in str(excinfo)
 
     # Checking Issue 1105

@@ -104,11 +104,11 @@ TEST_SUBMODULE(eigen, m) {
     m.def("double_adscalar_col", [](const VectorXADScalar &x) -> VectorXADScalar { return 2.0f * x; });
     m.def("double_row", [](const Eigen::RowVectorXf &x) -> Eigen::RowVectorXf { return 2.0f * x; });
     m.def("double_adscalar_row", [](const VectorXADScalarR &x) -> VectorXADScalarR { return 2.0f * x; });
-    // m.def("double_adscalarc", [](py::EigenDRef<VectorXADScalar> x) { x *= 2; });  // This should fail at compile-time.
-    // m.def("double_adscalarr", [](py::EigenDRef<VectorXADScalarR> x) { x *= 2; });  // This should fail at compile-time.
     m.def("double_complex", [](const Eigen::VectorXcf &x) -> Eigen::VectorXcf { return 2.0f * x; });
     m.def("double_threec", [](py::EigenDRef<Eigen::Vector3f> x) { x *= 2; });
+    m.def("double_adscalarc", [](py::EigenDRef<VectorXADScalar> x) { x *= 2; });
     m.def("double_threer", [](py::EigenDRef<Eigen::RowVector3f> x) { x *= 2; });
+    // m.def("double_adscalarr", [](py::EigenDRef<VectorXADScalarR> x) { x *= 2; });
     m.def("double_mat_cm", [](Eigen::MatrixXf x) -> Eigen::MatrixXf { return 2.0f * x; });
     m.def("double_mat_rm", [](DenseMatrixR x) -> DenseMatrixR { return 2.0f * x; });
 
@@ -348,9 +348,6 @@ TEST_SUBMODULE(eigen, m) {
     m.def("cpp_matrix_shape", [](const MatrixX<ADScalar>& A) {
         return py::make_tuple(A.rows(), A.cols());
     });
-    // TODO(eric.cousineau): Unless `dtype=ADScalar` (user-defined) and not
-    // `dtype=object`, we should kill any usages of `Eigen::Ref<>` or any
-    // const-references.
     m.def("cpp_matrix_shape_ref", [](const Eigen::Ref<const MatrixX<ADScalar>>& A) {
         return py::make_tuple(A.rows(), A.cols());
     });
