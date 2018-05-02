@@ -55,6 +55,22 @@ public:
 };
 PYBIND11_DECLARE_HOLDER_TYPE(T, custom_unique_ptr<T>);
 
+class NontrivialDeleter {
+    int value{1};
+public:
+    NontrivialDeleter() = default;
+    NontrivialDeleter(int value_in) : value(value_in) {}
+
+    template <typename T>
+    void operator()(T* p) const {
+        sum += value;
+        py::print(py::str("NontrivialDeleter: value={}, sum={}").format(value, sum));
+        delete p;
+    }
+
+    static int sum;
+};
+int NontrivialDeleter::sum = 0;
 
 TEST_SUBMODULE(smart_ptr, m) {
 
@@ -182,6 +198,29 @@ TEST_SUBMODULE(smart_ptr, m) {
     };
     py::class_<MyObject4b, MyObject4a>(m, "MyObject4b")
         .def(py::init<int>());
+
+    // Object derived but with a unique_ptr with a nontrivial deleter.
+    class MyObject4c : public MyObject4b {
+    public:
+        MyObject4c(int i) : MyObject4b(i) { print_created(this); }
+        ~MyObject4c() { print_destroyed(this); }
+
+        using holder_type = std::unique_ptr<MyObject4c, NontrivialDeleter>;
+    };
+    py::class_<MyObject4c, MyObject4b, MyObject4c::holder_type>(m, "MyObject4c")
+        .def(py::init<int>())
+        .def(py::init(
+            [](int i, int deleter_value) {
+                return MyObject4c::holder_type(new MyObject4c(i), deleter_value);
+            }))
+        // Upcast to 4b, but with nontrivial holder.
+        .def_static("create_as_4b",
+            [](int i, int deleter_value) {
+                return std::unique_ptr<MyObject4b, NontrivialDeleter>(new MyObject4c(i), deleter_value);
+            });
+    m.def("get_nontrivial_deleter_sum", []() {
+        return NontrivialDeleter::sum;
+    });
 
     // test_large_holder
     class MyObject5 { // managed by huge_unique_ptr

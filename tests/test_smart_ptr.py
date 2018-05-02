@@ -135,6 +135,21 @@ def test_unique_deleter():
     assert cstats4a.alive() == 1  # Should now only be one leftover from previous test
     assert cstats4b.alive() == 0  # Should be deleted
 
+    cstats4c = ConstructorStats.get(m.MyObject4c)
+    o = m.MyObject4c(23, 10)
+    assert cstats4c.alive() == 1
+    assert m.get_nontrivial_deleter_sum() == 0
+    del o
+    assert cstats4c.alive() == 0
+    assert m.get_nontrivial_deleter_sum() == 10
+    o = m.MyObject4c.create_as_4b(23, 100)
+    assert cstats4c.alive() == 1
+    del o
+    assert cstats4c.alive() == 0
+    # This is correct, because `pybind11` will still use the correct holder due
+    # to dynamic downcasting (`type_caster_base<>::src_and_type`) type erasure.
+    assert m.get_nontrivial_deleter_sum() == 110
+
 
 def test_large_holder():
     o = m.MyObject5(5)
