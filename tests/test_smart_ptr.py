@@ -135,6 +135,8 @@ def test_unique_deleter():
     assert cstats4a.alive() == 1  # Should now only be one leftover from previous test
     assert cstats4b.alive() == 0  # Should be deleted
 
+    # Nontrivial deleter, accidentally mixed with parent classes that do not have deleters
+    # of the same memory layout.
     cstats4c = ConstructorStats.get(m.MyObject4c)
     o = m.MyObject4c(23, 10)
     assert cstats4c.alive() == 1
@@ -142,12 +144,21 @@ def test_unique_deleter():
     del o
     assert cstats4c.alive() == 0
     assert m.get_nontrivial_deleter_sum() == 10
-    o = m.MyObject4c.create_as_4b(23, 100)
+    o = m.MyObject4c.create_as_4b_nontrivial_deleter(23, 100)
     assert cstats4c.alive() == 1
     del o
     assert cstats4c.alive() == 0
     # This is correct, because `pybind11` will still use the correct holder due
     # to dynamic downcasting (`type_caster_base<>::src_and_type`) type erasure.
+    assert m.get_nontrivial_deleter_sum() == 110
+
+    o = m.MyObject4c.create_as_4b_trivial_deleter(23)
+    # Does not correctly count the instances? Possibly due to early memory leaks?
+    # assert cstats4c.alive() == 1
+    # Starts to invoke the nontrivial deleter with junk memory.
+    del o
+    assert cstats4c.alive() == 0
+    # Assuming memory is not garbage???
     assert m.get_nontrivial_deleter_sum() == 110
 
 

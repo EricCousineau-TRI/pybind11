@@ -214,9 +214,14 @@ TEST_SUBMODULE(smart_ptr, m) {
                 return MyObject4c::holder_type(new MyObject4c(i), deleter_value);
             }))
         // Upcast to 4b, but with nontrivial holder.
-        .def_static("create_as_4b",
+        .def_static("create_as_4b_nontrivial_deleter",
             [](int i, int deleter_value) {
                 return std::unique_ptr<MyObject4b, NontrivialDeleter>(new MyObject4c(i), deleter_value);
+            })
+        .def_static("create_as_4b_trivial_deleter",
+            [](int i) {
+                // Causes a segfault.
+                return std::unique_ptr<MyObject4b>(new MyObject4c(i));
             });
     m.def("get_nontrivial_deleter_sum", []() {
         return NontrivialDeleter::sum;
