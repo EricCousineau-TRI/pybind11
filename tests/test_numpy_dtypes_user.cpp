@@ -281,7 +281,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         // - Explicit casting (e.g., we have additional arguments).
         .def_loop(py::dtype_method::explicit_conversion(
             [](const Custom& in) -> double { return in.value(); }))
-        .def_loop(py::dtype_method::explicit_conversion<double, Custom>())
+        .def_loop(py::dtype_method::implicit_conversion<double, Custom>())  // TMP, should be explicit
             // - Implicit coercion + conversion
         .def_loop(py::dtype_method::implicit_conversion(
             &Custom::operator SimpleStruct))

@@ -283,6 +283,9 @@ def test_reference_arguments():
         [m.Custom(11), m.Custom(12)]])
     # Test assignment with implicit conversion.
     xc[:] = [0., 0.]  # NO segfault
+    xs = np.array(m.Custom(1))
+    xs.itemset(0, 0.)
+    print(xs)
     xc[:] = 0.  # Segfault
 
 
