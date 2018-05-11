@@ -390,6 +390,13 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     m.def("distinguish_overload", [](int in) {
         return "Int";
     });
+
+    m.def("float_overload", [](py::array_t<float> in) {
+        return "Vector";
+    });
+    m.def("float_overload", [](int in) {
+        return "Int";
+    });
 }
 
 #else  // defined(PYBIND11_CPP14)
