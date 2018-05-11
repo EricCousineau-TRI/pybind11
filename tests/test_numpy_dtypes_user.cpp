@@ -396,7 +396,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     });
     m.def("float_overload", [](int in) {
         return "Int";
-    });
+    }, py::arg("in").noconvert());
 }
 
 #else  // defined(PYBIND11_CPP14)
