@@ -383,9 +383,9 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     m.def("distinguish", [](py::array_t<ImplicitArg> in) {
         return "Vector";
     });
-    m.def("distinguish", [](int in) {
-        return "Int";
-    });
+    // m.def("distinguish", [](int in) {
+    //     return "Int";
+    // });
 }
 
 #else  // defined(PYBIND11_CPP14)
