@@ -69,6 +69,16 @@ struct dtype_info {
     return get_mutable_internals().at(id);
   }
 
+  static const dtype_info* maybe_get_entry(std::type_index id) {
+    const auto& internals = get_mutable_internals();
+    auto iter = internals.find(id);
+    if (iter != internals.end()) {
+      return &iter->second;
+    } else {
+      return nullptr;
+    }
+  }
+
   static const std::type_index* find_entry(object cls) {
     auto& map = get_internals();
     for (auto& iter : map) {
