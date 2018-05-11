@@ -309,6 +309,16 @@ def test_implicit_arg():
     xv = m.implicit_arg_vector(iv)
     assert xv.dtype == m.ImplicitArg
     assert xv.shape == (2,)
+    m.implicit_arg_vector([1, 2])
+    m.implicit_arg_vector([1., 2.])
+    m.implicit_arg_vector(np.array([1., 2.]))
+
+
+def test_overload():
+    # assert m.distinguish(0) == "Int"
+    # assert m.distinguish([0.]) == "Vector"
+    assert m.distinguish(np.array([0], dtype=int)) == "Vector"
+    assert m.distinguish(np.array([0.])) == "Vector"
 
 
 def test_result_type():
@@ -320,9 +330,3 @@ def test_result_type():
     # with pytest.raises(TypeError):
     #     # Why???
         dt = np.result_type(m.ImplicitArg, 1.)
-
-
-def test_overload():
-    assert m.distinguish(0) == "Int"
-    assert m.distinguish([0.]) == "Vector"
-    assert m.distinguish(np.array([0.])) == "Vector"
