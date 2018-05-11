@@ -319,6 +319,7 @@ def test_overload():
     # assert m.distinguish_overload([0.]) == "Vector"
     # print(long(np.array([m.ImplicitArg()])))
     # ... This sucks?
+    assert m.float_overload(np.array([0.])) == "Vector"
     assert m.float_overload(np.array([0])) == "Vector"
     # assert m.float_overload(0) == "Int"
     assert m.distinguish_no_overload(np.array([0])) == "Vector"
