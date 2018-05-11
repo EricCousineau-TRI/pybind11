@@ -362,6 +362,8 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     py::module np = py::module::import("numpy");
     py::dtype np_int64 = py::reinterpret_borrow<py::dtype>(
         np.attr("dtype")(np.attr("int64")));
+    py::dtype np_float16 = py::reinterpret_borrow<py::dtype>(
+        np.attr("dtype")(np.attr("float16")));
 
     py::dtype_user<ImplicitArg>(m, "ImplicitArg")
         .def(py::init())
@@ -369,7 +371,11 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def_loop(
             py::dtype_method::implicit_conversion<int64_t, ImplicitArg>(), np_int64)
         .def_loop(
-            py::dtype_method::implicit_conversion<double, ImplicitArg>());
+            py::dtype_method::implicit_conversion<double, ImplicitArg>())
+        .def_loop(
+            py::dtype_method::implicit_conversion([](int16_t) -> ImplicitArg {
+                throw std::runtime_error("No actual half float conversion available");
+            }), np_float16);
 
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
