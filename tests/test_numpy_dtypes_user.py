@@ -315,10 +315,10 @@ def test_implicit_arg():
 
 
 def test_overload():
-    # assert m.distinguish(0) == "Int"
-    # assert m.distinguish([0.]) == "Vector"
-    assert m.distinguish(np.array([0], dtype=int)) == "Vector"
-    assert m.distinguish(np.array([0.])) == "Vector"
+    # assert m.distinguish_overload(0) == "Int"
+    # assert m.distinguish_overload([0.]) == "Vector"
+    assert m.distinguish_no_overload(np.array([0])) == "Vector"
+    assert m.distinguish_overload(np.array([0])) == "Vector"
 
 
 def test_result_type():

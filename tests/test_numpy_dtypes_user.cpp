@@ -380,12 +380,16 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
 
-    m.def("distinguish", [](py::array_t<ImplicitArg> in) {
+    m.def("distinguish_no_overload", [](py::array_t<ImplicitArg> in) {
         return "Vector";
     });
-    // m.def("distinguish", [](int in) {
-    //     return "Int";
-    // });
+
+    m.def("distinguish_overload", [](py::array_t<ImplicitArg> in) {
+        return "Vector";
+    });
+    m.def("distinguish_overload", [](int in) {
+        return "Int";
+    });
 }
 
 #else  // defined(PYBIND11_CPP14)
