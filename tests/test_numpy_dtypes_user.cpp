@@ -367,7 +367,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init())
         .def(py::init<double>())
         .def_loop(
-            py::dtype_method::implicit_conversion<int, ImplicitArg>()); //, np_int64);
+            py::dtype_method::implicit_conversion<int64_t, ImplicitArg>(), np_int64);
 
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
