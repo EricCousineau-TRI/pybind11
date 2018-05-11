@@ -302,3 +302,12 @@ def test_implicit_arg():
     xv = m.implicit_arg_vector(iv)
     assert xv.dtype == m.ImplicitArg
     assert xv.shape == (2,)
+
+def test_result_type():
+    dt = np.result_type(m.ImplicitArg, np.int64)
+    assert dt == m.ImplicitArg
+    dt = np.result_type(m.ImplicitArg, np.float)
+    assert dt == m.ImplicitArg
+    with pytest.raises(TypeError):
+        # Why???
+        dt = np.result_type(m.ImplicitArg, 1.)

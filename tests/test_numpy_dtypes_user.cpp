@@ -360,14 +360,16 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
     });
 
     py::module np = py::module::import("numpy");
-    py::dtype my_value;
     py::dtype np_int64 = py::reinterpret_borrow<py::dtype>(
         np.attr("dtype")(np.attr("int64")));
+
     py::dtype_user<ImplicitArg>(m, "ImplicitArg")
         .def(py::init())
         .def(py::init<double>())
         .def_loop(
-            py::dtype_method::implicit_conversion<int64_t, ImplicitArg>(), np_int64);
+            py::dtype_method::implicit_conversion<int64_t, ImplicitArg>(), np_int64)
+        .def_loop(
+            py::dtype_method::implicit_conversion<double, ImplicitArg>());
 
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
