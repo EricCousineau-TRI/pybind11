@@ -284,9 +284,9 @@ def test_reference_arguments():
     # Test assignment with implicit conversion.
     xc[:] = [0., 0.]  # NO segfault
     xs = np.array(m.Custom(1))
-    xs.itemset(0, 0.)
-    print(xs)
-    xc[:] = 0.  # Segfault
+    # xs.itemset(0, 0.)
+    # print(xs)
+    # xc[:] = 0.  # Segfault
 
 
 @pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
@@ -320,3 +320,9 @@ def test_result_type():
     # with pytest.raises(TypeError):
     #     # Why???
         dt = np.result_type(m.ImplicitArg, 1.)
+
+
+def test_overload():
+    assert m.distinguish(0) == "Int"
+    assert m.distinguish([0.]) == "Vector"
+    assert m.distinguish(np.array([0.])) == "Vector"

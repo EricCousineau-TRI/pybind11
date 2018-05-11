@@ -281,7 +281,7 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         // - Explicit casting (e.g., we have additional arguments).
         .def_loop(py::dtype_method::explicit_conversion(
             [](const Custom& in) -> double { return in.value(); }))
-        .def_loop(py::dtype_method::implicit_conversion<double, Custom>())  // TMP, should be explicit
+        .def_loop(py::dtype_method::explicit_conversion<double, Custom>())
             // - Implicit coercion + conversion
         .def_loop(py::dtype_method::implicit_conversion(
             &Custom::operator SimpleStruct))
@@ -379,6 +379,13 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
+
+    m.def("distinguish", [](py::array_t<ImplicitArg> in) {
+        return "Vector";
+    });
+    m.def("distinguish", [](int in) {
+        return "Int";
+    });
 }
 
 #else  // defined(PYBIND11_CPP14)
