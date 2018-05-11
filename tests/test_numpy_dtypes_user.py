@@ -282,6 +282,7 @@ def test_reference_arguments():
     assert check_array(c.value(), [
         [m.Custom(11), m.Custom(12)]])
     # Test assignment with implicit conversion.
+    xc[:] = [0., 0.]  # NO segfault
     xc[:] = 0.  # Segfault
 
 
