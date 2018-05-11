@@ -460,8 +460,8 @@ class dtype_user : public object {
     return def_loop(op, dtype_method::ufunc_only());
   }
 
-  /// Defines a scalar function, and a UFunc loop, mapping to a buitlin name if
-  /// needed.
+  /// Defines a scalar function and overloads an existing NumPy UFunc loop,
+  /// mapping to a buitlin name in `numpy`.
   template <typename Func>
   dtype_user& def_loop(const char* name, const Func& func) {
     cls().def(name, func);

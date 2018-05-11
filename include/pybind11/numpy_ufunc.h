@@ -165,7 +165,8 @@ public:
     }
 
     template <typename Type, typename Func>
-    ufunc& def_loop(Func func) {
+    ufunc& def_loop(Func func_in) {
+        auto func = detail::function_inference::run(func_in).func;
         do_register<Type>(detail::ufunc_to_ptr(func));
         return *this;
     }
