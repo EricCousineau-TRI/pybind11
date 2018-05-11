@@ -369,7 +369,10 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
         .def(py::init())
         .def(py::init<double>())
         .def_loop(
-            py::dtype_method::implicit_conversion<int64_t, ImplicitArg>(), np_int64)
+            py::dtype_method::implicit_conversion([](int64_t in) -> ImplicitArg {
+                double value = static_cast<double>(in);
+                return value;
+            }), np_int64)
         .def_loop(
             py::dtype_method::implicit_conversion<double, ImplicitArg>())
         .def_loop(
@@ -379,24 +382,6 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
 
     m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
     m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
-
-    m.def("distinguish_no_overload", [](py::array_t<ImplicitArg> in) {
-        return "Vector";
-    });
-
-    m.def("distinguish_overload", [](py::array_t<ImplicitArg> in) {
-        return "Vector";
-    });
-    m.def("distinguish_overload", [](int in) {
-        return "Int";
-    });
-
-    m.def("float_overload", [](py::array_t<float> in) {
-        return "Vector";
-    });
-    m.def("float_overload", [](int in) {
-        return "Int";
-    }, py::arg("in").noconvert());
 }
 
 #else  // defined(PYBIND11_CPP14)

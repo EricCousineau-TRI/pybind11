@@ -281,12 +281,6 @@ def test_reference_arguments():
     m.add_one(c.value())
     assert check_array(c.value(), [
         [m.Custom(11), m.Custom(12)]])
-    # Test assignment with implicit conversion.
-    xc[:] = [0., 0.]  # NO segfault
-    xs = np.array(m.Custom(1))
-    # xs.itemset(0, 0.)
-    # print(xs)
-    # xc[:] = 0.  # Segfault
 
 
 @pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
@@ -314,24 +308,10 @@ def test_implicit_arg():
     m.implicit_arg_vector(np.array([1., 2.]))
 
 
-def test_overload():
-    # assert m.distinguish_overload(0) == "Int"
-    # assert m.distinguish_overload([0.]) == "Vector"
-    # print(long(np.array([m.ImplicitArg()])))
-    # ... This sucks?
-    assert m.float_overload(np.array([0.])) == "Vector"
-    assert m.float_overload(np.array([0])) == "Vector"
-    # assert m.float_overload(0) == "Int"
-    assert m.distinguish_no_overload(np.array([0])) == "Vector"
-    assert m.distinguish_overload(np.array([0])) == "Vector"
-
-
 def test_result_type():
     dt = np.result_type(m.ImplicitArg, np.int64)
     assert dt == m.ImplicitArg
     dt = np.result_type(m.ImplicitArg, np.float)
     assert dt == m.ImplicitArg
-    if True:
-    # with pytest.raises(TypeError):
-    #     # Why???
-        dt = np.result_type(m.ImplicitArg, 1.)
+    dt = np.result_type(m.ImplicitArg, 1.)
+    assert dt == m.ImplicitArg
