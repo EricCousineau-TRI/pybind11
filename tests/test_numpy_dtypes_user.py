@@ -299,6 +299,6 @@ def test_implicit_arg():
     assert isinstance(x, m.ImplicitArg)
     iv = np.array([1, 2])
     assert iv.dtype == np.int64
-    xv = m.implicit_arg_vector([1, 2])
+    xv = m.implicit_arg_vector(iv)
     assert xv.dtype == m.ImplicitArg
     assert xv.shape == (2,)
