@@ -292,3 +292,13 @@ def test_copy():
     assert x[0].str() == "c"
     assert y[0].value() == 1
     assert y[0].str() == "a"
+
+def test_implicit_arg():
+    # Test implicit casting from an integer.
+    x = m.implicit_arg_scalar(1)
+    assert isinstance(x, m.ImplicitArg)
+    iv = np.array([1, 2])
+    assert iv.dtype == np.int64
+    xv = m.implicit_arg_vector([1, 2])
+    assert xv.dtype == m.ImplicitArg
+    assert xv.shape == (2,)

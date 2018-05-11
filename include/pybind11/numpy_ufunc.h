@@ -97,7 +97,8 @@ void assert_ufunc_dtype_valid() {
 
 template <typename From, typename To, typename Func>
 void ufunc_register_cast(
-    Func&& func, bool allow_coercion, type_pack<From, To> = {}) {
+    Func&& func, bool allow_coercion,
+    dtype from = {}, dtype to = {}, type_pack<From, To> = {}) {
   assert_ufunc_dtype_valid<From>();
   assert_ufunc_dtype_valid<To>();
   static auto cast_lambda = detail::function_inference::run(func).func;
@@ -110,8 +111,13 @@ void ufunc_register_cast(
           to[i] = cast_lambda(from[i]);
   };
   auto& api = npy_api::get();
-  auto from = npy_format_descriptor<From>::dtype();
-  int to_num = npy_format_descriptor<To>::dtype().num();
+  if (!from) {
+    from = npy_format_descriptor<From>::dtype();
+  }
+  if (!to) {
+    to = npy_format_descriptor<To>::dtype();
+  }
+  int to_num = to.num();
   auto from_raw = (PyArray_Descr*)from.ptr();
   if (from.num() == npy_api::NPY_OBJECT_ && !std::is_same<From, object>::value)
       pybind11_fail(

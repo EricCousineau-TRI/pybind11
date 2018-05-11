@@ -194,6 +194,15 @@ private:
     std::array<Custom, 2> value_;
 };
 
+class ImplicitArg {
+public:
+    ImplicitArg() {}
+    ImplicitArg(double value) : value_(value) {}
+    double value() const { return value_; }
+private:
+    double value_{};
+};
+
 }  // namespace
 
 #if defined(PYBIND11_CPP14)
@@ -201,6 +210,7 @@ private:
 PYBIND11_NUMPY_DTYPE_USER(CustomStr);
 PYBIND11_NUMPY_DTYPE_USER(SimpleStruct);
 PYBIND11_NUMPY_DTYPE_USER(Custom);
+PYBIND11_NUMPY_DTYPE_USER(ImplicitArg);
 
 PYBIND11_NUMPY_OBJECT_DTYPE(ObjectA);
 PYBIND11_NUMPY_OBJECT_DTYPE(ObjectB);
@@ -348,6 +358,19 @@ TEST_SUBMODULE(numpy_dtype_user, m) {
             x += 1;
         }
     });
+
+    py::module np = py::module::import("numpy");
+    py::dtype my_value;
+    py::dtype np_int64 = py::reinterpret_borrow<py::dtype>(
+        np.attr("dtype")(np.attr("int64")));
+    py::dtype_user<ImplicitArg>(m, "ImplicitArg")
+        .def(py::init())
+        .def(py::init<double>())
+        .def_loop(
+            py::dtype_method::implicit_conversion<int, ImplicitArg>()); //, np_int64);
+
+    m.def("implicit_arg_scalar", [](ImplicitArg in) { return in; });
+    m.def("implicit_arg_vector", [](py::array_t<ImplicitArg> in) { return in; });
 }
 
 #else  // defined(PYBIND11_CPP14)

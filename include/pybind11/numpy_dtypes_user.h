@@ -481,9 +481,10 @@ class dtype_user : public object {
 
   /// Defines loop cast, and optionally permit implicit conversions.
   template <typename From, typename To, typename Func>
-  dtype_user& def_loop(detail::dtype_conversion_t<From, To, Func> conv) {
+  dtype_user& def_loop(
+      detail::dtype_conversion_t<From, To, Func> conv, dtype from = {}, dtype to = {}) {
     detail::ufunc_register_cast<From, To>(
-        conv.func, conv.allow_implicit_coercion);
+        conv.func, conv.allow_implicit_coercion, from, to);
     // Define implicit conversion on the class.
     if (conv.allow_implicit_coercion) {
       if (std::is_same<To, Class>::value) {
@@ -536,7 +537,7 @@ class dtype_user : public object {
 
   void check() const {
     auto warn = [](const std::string& msg) {
-      // TODO(eric.cousineau): Figure out better waring type.
+      // TODO(eric.cousineau): Figure out better warning type.
       PyErr_WarnEx(PyExc_UserWarning, msg.c_str(), 0);
     };
     // This `dict` should indicate whether we've directly overridden methods.
