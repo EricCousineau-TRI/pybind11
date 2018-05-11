@@ -281,6 +281,8 @@ def test_reference_arguments():
     m.add_one(c.value())
     assert check_array(c.value(), [
         [m.Custom(11), m.Custom(12)]])
+    # Test assignment with implicit conversion.
+    xc[:] = 0.  # Segfault
 
 
 @pytest.mark.skipif(not prefer_user_copyswap, reason="requires NumPy patch")
@@ -293,6 +295,7 @@ def test_copy():
     assert y[0].value() == 1
     assert y[0].str() == "a"
 
+
 def test_implicit_arg():
     # Test implicit casting from an integer.
     x = m.implicit_arg_scalar(1)
@@ -302,6 +305,7 @@ def test_implicit_arg():
     xv = m.implicit_arg_vector(iv)
     assert xv.dtype == m.ImplicitArg
     assert xv.shape == (2,)
+
 
 def test_result_type():
     dt = np.result_type(m.ImplicitArg, np.int64)
