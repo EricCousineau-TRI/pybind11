@@ -1757,6 +1757,7 @@ detail::initimpl::pickle_factory<GetState, SetState> pickle(GetState &&g, SetSta
 template <typename Type> class enum_ : public class_<Type> {
 public:
     using class_<Type>::def;
+    using class_<Type>::def_property_readonly;
     using class_<Type>::def_property_readonly_static;
     using Scalar = typename std::underlying_type<Type>::type;
 
@@ -1774,9 +1775,16 @@ public:
             }
             return pybind11::str("{}.???").format(name);
         });
-        def_property_readonly_static("__doc__", [m_entries_ptr](handle self) {
+        def_property_readonly("name", [m_entries_ptr](Type value) -> pybind11::str {
+            for (const auto &kv : reinterpret_borrow<dict>(m_entries_ptr)) {
+                if (pybind11::cast<Type>(kv.second[int_(0)]) == value)
+                    return pybind11::str(kv.first);
+            }
+            return pybind11::str("???");
+        });
+        def_property_readonly_static("__doc__", [m_entries_ptr](handle self_) {
             std::string docstring;
-            const char *tp_doc = ((PyTypeObject *) self.ptr())->tp_doc;
+            const char *tp_doc = ((PyTypeObject *) self_.ptr())->tp_doc;
             if (tp_doc)
                 docstring += std::string(tp_doc) + "\n\n";
             docstring += "Members:";
@@ -1789,7 +1797,7 @@ public:
             }
             return docstring;
         });
-        def_property_readonly_static("__members__", [m_entries_ptr](handle /* self */) {
+        def_property_readonly_static("__members__", [m_entries_ptr](handle /* self_ */) {
             dict m;
             for (const auto &kv : reinterpret_borrow<dict>(m_entries_ptr))
                 m[kv.first] = kv.second[int_(0)];
@@ -2043,6 +2051,7 @@ void register_exception_translator(ExceptionTranslator&& translator) {
 template <typename type>
 class exception : public object {
 public:
+    exception() = default;
     exception(handle scope, const char *name, PyObject *base = PyExc_Exception) {
         std::string full_name = scope.attr("__name__").cast<std::string>() +
                                 std::string(".") + name;
@@ -2059,6 +2068,14 @@ public:
     }
 };
 
+NAMESPACE_BEGIN(detail)
+// Returns a reference to a function-local static exception object used in the simple
+// register_exception approach below.  (It would be simpler to have the static local variable
+// directly in register_exception, but that makes clang <3.5 segfault - issue #1349).
+template <typename CppException>
+exception<CppException> &get_exception_object() { static exception<CppException> ex; return ex; }
+NAMESPACE_END(detail)
+
 /**
  * Registers a Python exception in `m` of the given `name` and installs an exception translator to
  * translate the C++ exception to the created Python exception using the exceptions what() method.
@@ -2069,13 +2086,15 @@ template <typename CppException>
 exception<CppException> &register_exception(handle scope,
                                             const char *name,
                                             PyObject *base = PyExc_Exception) {
-    static exception<CppException> ex(scope, name, base);
+    auto &ex = detail::get_exception_object<CppException>();
+    if (!ex) ex = exception<CppException>(scope, name, base);
+
     register_exception_translator([](std::exception_ptr p) {
         if (!p) return;
         try {
             std::rethrow_exception(p);
         } catch (const CppException &e) {
-            ex(e.what());
+            detail::get_exception_object<CppException>()(e.what());
         }
     });
     return ex;
