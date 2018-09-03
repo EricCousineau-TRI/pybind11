@@ -44,14 +44,22 @@ namespace std {
     struct hash<TplCtorClass> { size_t operator()(const TplCtorClass &) const { return 0; } };
 }
 
+struct Sub {
+    Sub(const std::string& name_in)
+        : name(name_in) {}
+    std::string name;
+    virtual ~Sub() {}
+};
+
+struct SubChild : public Sub {
+    SubChild(const std::string& name_in, int value_in)
+        : Sub(name_in), value(value_in) {}
+    int value{};
+};
+
 struct Item {
-    struct Sub {
-        Sub(const std::string& name_in)
-            : name(name_in) {}
-        std::string name;
-    };
     Item(const std::string& name, std::vector<int> values_in)
-        : sub(new Sub(name)), values(values_in) {}
+        : sub(new SubChild(name, values_in.size())), values(values_in) {}
     std::shared_ptr<Sub> sub;
     std::vector<int> values;
 };
@@ -79,12 +87,15 @@ TEST_SUBMODULE(stl, m) {
     // Unnumbered regression (caused by #936): pointers to stl containers aren't castable
     static std::vector<RValueCaster> lvv{2};
     m.def("cast_ptr_vector", []() { return &lvv; });
-    // WRITE SOMETHING
+
+    // Attempt to reproduce pybind/pybind11#1465 from RobotLocomotion/drake#9368.
     py::class_<Item>(m, "Item")
         .def_readonly("sub", &Item::sub)
         .def_readonly("values", &Item::values);
-    py::class_<Item::Sub, std::shared_ptr<Item::Sub>>(m.attr("Item"), "Sub")
-        .def_readonly("name", &Item::Sub::name);
+    py::class_<Sub, std::shared_ptr<Sub>>(m, "Sub")
+        .def_readonly("name", &Sub::name);
+    py::class_<SubChild, Sub, std::shared_ptr<SubChild>>(m, "SubChild")
+        .def_readonly("value", &SubChild::value);
     py::class_<Container>(m, "Container")
         .def(py::init())
         .def("add", &Container::add)

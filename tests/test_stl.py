@@ -32,6 +32,7 @@ def test_vector(doc):
         print(item.sub)
         assert item.sub != None
         assert item.sub.name == name
+        assert item.sub.value == len(value)
         assert item.values == value
 
 
