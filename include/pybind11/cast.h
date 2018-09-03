@@ -1562,7 +1562,7 @@ public:
 
     explicit operator type*() { return this->value; }
     explicit operator type&() { return *(this->value); }
-    explicit operator holder_type*() { return std::addressof(holder); }
+    explicit operator holder_type*() { return &holder; }
 
     // Workaround for Intel compiler bug
     // see pybind11 issue 94
@@ -1700,7 +1700,7 @@ struct move_only_holder_caster : type_caster_base<type> {
         // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
         // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
         auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, holder_erased(std::addressof(src)));
+        return type_caster_base<type>::cast_holder(ptr, &src);
     }
 
   // Disable these?
