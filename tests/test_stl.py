@@ -29,11 +29,12 @@ def test_vector(doc):
         c.add(name, value)
     items = c.cast_vector_const_lvalue()
     for name, value, item in zip(names, values, items):
-        print(item.sub)
-        assert item.sub != None
-        assert item.sub.name == name
-        assert item.sub.value == len(value)
-        assert item.values == value
+        sub = item.get_sub()
+        print(sub)
+        assert sub != None
+        assert sub.name == name
+        assert sub.value == len(value)
+        assert item.get_values() == value
 
 
 def test_array(doc):

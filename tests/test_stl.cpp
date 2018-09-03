@@ -44,7 +44,14 @@ namespace std {
     struct hash<TplCtorClass> { size_t operator()(const TplCtorClass &) const { return 0; } };
 }
 
+#define NO_COPY_NO_MOVE_NO_ASSIGN(Classname)      \
+  Classname(const Classname&) = delete;                 \
+  void operator=(const Classname&) = delete;            \
+  Classname(Classname&&) = delete;                      \
+  void operator=(Classname&&) = delete;
+
 struct Sub {
+    NO_COPY_NO_MOVE_NO_ASSIGN(Sub)
     Sub(const std::string& name_in)
         : name(name_in) {}
     std::string name;
@@ -52,21 +59,28 @@ struct Sub {
 };
 
 struct SubChild : public Sub {
+    NO_COPY_NO_MOVE_NO_ASSIGN(SubChild)
     SubChild(const std::string& name_in, int value_in)
         : Sub(name_in), value(value_in) {}
     int value{};
 };
 
 struct Item {
-    Item(const std::string& name, std::vector<int> values_in)
-        : sub(new SubChild(name, values_in.size())), values(values_in) {}
+    Item(const std::shared_ptr<Sub>& sub_in, const std::vector<int>& values_in)
+        : sub(sub_in), values(values_in) {}
+
+    const std::shared_ptr<Sub>& get_sub() const { return sub; }
+    const std::vector<int>& get_values() const { return values; }
+
     std::shared_ptr<Sub> sub;
     std::vector<int> values;
 };
 
 struct Container {
     Item add(const std::string& name, std::vector<int> values_in) {
-        values.push_back(Item(name, values_in));
+        values.push_back(Item(
+            std::shared_ptr<Sub>(new SubChild(name, values_in.size())),
+            values_in));
         return values.back();
     }
     const std::vector<Item>& cast_vector_const_lvalue() const {
@@ -88,10 +102,10 @@ TEST_SUBMODULE(stl, m) {
     static std::vector<RValueCaster> lvv{2};
     m.def("cast_ptr_vector", []() { return &lvv; });
 
-    // Attempt to reproduce pybind/pybind11#1465 from RobotLocomotion/drake#9368.
+    // g
     py::class_<Item>(m, "Item")
-        .def_readonly("sub", &Item::sub)
-        .def_readonly("values", &Item::values);
+        .def("get_sub", &Item::get_sub)
+        .def("get_values", &Item::get_values);
     py::class_<Sub, std::shared_ptr<Sub>>(m, "Sub")
         .def_readonly("name", &Sub::name);
     py::class_<SubChild, Sub, std::shared_ptr<SubChild>>(m, "SubChild")
