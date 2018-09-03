@@ -2167,7 +2167,7 @@ class gil_scoped_acquire {
 public:
     PYBIND11_NOINLINE gil_scoped_acquire() {
         auto const &internals = detail::get_internals();
-        tstate = (PyThreadState *) PYBIND11_TLS_GET_VALUE(internals.tstate);
+        tstate = (PyThreadState *) PyThread_get_key_value(internals.tstate);
 
         if (!tstate) {
             tstate = PyThreadState_New(internals.istate);
@@ -2176,7 +2176,10 @@ public:
                     pybind11_fail("scoped_acquire: could not create thread state!");
             #endif
             tstate->gilstate_counter = 0;
-            PYBIND11_TLS_REPLACE_VALUE(internals.tstate, tstate);
+            #if PY_MAJOR_VERSION < 3
+                PyThread_delete_key_value(internals.tstate);
+            #endif
+            PyThread_set_key_value(internals.tstate, tstate);
         } else {
             release = detail::get_thread_state_unchecked() != tstate;
         }
@@ -2215,7 +2218,7 @@ public:
             #endif
             PyThreadState_Clear(tstate);
             PyThreadState_DeleteCurrent();
-            PYBIND11_TLS_DELETE_VALUE(detail::get_internals().tstate);
+            PyThread_delete_key_value(detail::get_internals().tstate);
             release = false;
         }
     }
@@ -2240,7 +2243,11 @@ public:
         tstate = PyEval_SaveThread();
         if (disassoc) {
             auto key = internals.tstate;
-            PYBIND11_TLS_DELETE_VALUE(key);
+            #if PY_MAJOR_VERSION < 3
+                PyThread_delete_key_value(key);
+            #else
+                PyThread_set_key_value(key, nullptr);
+            #endif
         }
     }
     ~gil_scoped_release() {
@@ -2249,7 +2256,10 @@ public:
         PyEval_RestoreThread(tstate);
         if (disassoc) {
             auto key = detail::get_internals().tstate;
-            PYBIND11_TLS_REPLACE_VALUE(key, tstate);
+            #if PY_MAJOR_VERSION < 3
+                PyThread_delete_key_value(key);
+            #endif
+            PyThread_set_key_value(key, tstate);
         }
     }
 private:
