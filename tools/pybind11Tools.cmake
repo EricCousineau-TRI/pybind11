@@ -130,11 +130,20 @@ function(pybind11_add_module target_name)
 
   add_library(${target_name} ${lib_type} ${exclude_from_all} ${ARG_UNPARSED_ARGUMENTS})
 
+  target_include_directories(${target_name}
+    PRIVATE ${PYBIND11_INCLUDE_DIR}  # from project CMakeLists.txt
+    PRIVATE ${pybind11_INCLUDE_DIR}  # from pybind11Config
+    PRIVATE ${PYTHON_INCLUDE_DIRS})
+
   if(TARGET pybind11::module)
     # Use interface target library.
     target_link_libraries(${target_name} PRIVATE pybind11::module)
   else()
-    target_include_directories(${target_name}
+    if(ARG_SYSTEM)
+      set(inc_isystem SYSTEM)
+    endif()
+
+    target_include_directories(${target_name} ${inc_isystem}
       PRIVATE ${PYBIND11_INCLUDE_DIR}  # from project CMakeLists.txt
       PRIVATE ${pybind11_INCLUDE_DIR}  # from pybind11Config
       PRIVATE ${PYTHON_INCLUDE_DIRS})
