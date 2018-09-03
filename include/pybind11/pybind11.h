@@ -148,7 +148,7 @@ protected:
             capture *cap = const_cast<capture *>(reinterpret_cast<const capture *>(data));
 
             /* Override policy for rvalues -- usually to enforce rvp::move on an rvalue */
-            const auto policy = return_value_policy_override<Return>::policy(call.func.policy);
+            return_value_policy policy = return_value_policy_override<Return>::policy(call.func.policy);
 
             /* Function scope guard -- defaults to the compile-to-nothing `void_type` */
             using Guard = extract_guard_t<Extra...>;
@@ -309,7 +309,7 @@ protected:
             rec->def = new PyMethodDef();
             std::memset(rec->def, 0, sizeof(PyMethodDef));
             rec->def->ml_name = rec->name;
-            rec->def->ml_meth = reinterpret_cast<PyCFunction>(*dispatcher);
+            rec->def->ml_meth = reinterpret_cast<PyCFunction>(reinterpret_cast<void (*) (void)>(*dispatcher));
             rec->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
 
             capsule rec_capsule(rec, [](void *ptr) {
@@ -1600,25 +1600,25 @@ private:
             auto sh = std::dynamic_pointer_cast<typename holder_type::element_type>(
                     v_h.value_ptr<type>()->shared_from_this());
             if (sh) {
-                new (&v_h.holder<holder_type>()) holder_type(std::move(sh));
+                new (std::addressof(v_h.holder<holder_type>())) holder_type(std::move(sh));
                 v_h.set_holder_constructed();
             }
         } catch (const std::bad_weak_ptr &) {}
 
         if (!v_h.holder_constructed() && inst->owned) {
-            new (&v_h.holder<holder_type>()) holder_type(v_h.value_ptr<type>());
+            new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<type>());
             v_h.set_holder_constructed();
         }
     }
 
     static void init_holder_from_existing(const detail::value_and_holder &v_h,
             const holder_type *holder_ptr, std::true_type /*is_copy_constructible*/) {
-        new (&v_h.holder<holder_type>()) holder_type(*reinterpret_cast<const holder_type *>(holder_ptr));
+        new (std::addressof(v_h.holder<holder_type>())) holder_type(*reinterpret_cast<const holder_type *>(holder_ptr));
     }
 
     static void init_holder_from_existing(const detail::value_and_holder &v_h,
             const holder_type *holder_ptr, std::false_type /*is_copy_constructible*/) {
-        new (&v_h.holder<holder_type>()) holder_type(std::move(*const_cast<holder_type *>(holder_ptr)));
+        new (std::addressof(v_h.holder<holder_type>())) holder_type(std::move(*const_cast<holder_type *>(holder_ptr)));
     }
 
     /// Initialize holder object, variant 2: try to construct from existing holder object, if possible
@@ -1635,7 +1635,7 @@ private:
     /// Initialize a holder object simply (to be converted).
     static void init_holder_simple(detail::instance *inst, detail::value_and_holder &v_h, type* value) {
         if (inst->owned || detail::always_construct_holder<holder_type>::value) {
-            new (&v_h.holder<holder_type>()) holder_type(value);
+            new (std::addressof(v_h.holder<holder_type>())) holder_type(value);
             v_h.set_holder_constructed();
         }
     }
@@ -2167,7 +2167,7 @@ class gil_scoped_acquire {
 public:
     PYBIND11_NOINLINE gil_scoped_acquire() {
         auto const &internals = detail::get_internals();
-        tstate = (PyThreadState *) PyThread_get_key_value(internals.tstate);
+        tstate = (PyThreadState *) PYBIND11_TLS_GET_VALUE(internals.tstate);
 
         if (!tstate) {
             tstate = PyThreadState_New(internals.istate);
@@ -2176,10 +2176,7 @@ public:
                     pybind11_fail("scoped_acquire: could not create thread state!");
             #endif
             tstate->gilstate_counter = 0;
-            #if PY_MAJOR_VERSION < 3
-                PyThread_delete_key_value(internals.tstate);
-            #endif
-            PyThread_set_key_value(internals.tstate, tstate);
+            PYBIND11_TLS_REPLACE_VALUE(internals.tstate, tstate);
         } else {
             release = detail::get_thread_state_unchecked() != tstate;
         }
@@ -2218,7 +2215,7 @@ public:
             #endif
             PyThreadState_Clear(tstate);
             PyThreadState_DeleteCurrent();
-            PyThread_delete_key_value(detail::get_internals().tstate);
+            PYBIND11_TLS_DELETE_VALUE(detail::get_internals().tstate);
             release = false;
         }
     }
@@ -2243,11 +2240,7 @@ public:
         tstate = PyEval_SaveThread();
         if (disassoc) {
             auto key = internals.tstate;
-            #if PY_MAJOR_VERSION < 3
-                PyThread_delete_key_value(key);
-            #else
-                PyThread_set_key_value(key, nullptr);
-            #endif
+            PYBIND11_TLS_DELETE_VALUE(key);
         }
     }
     ~gil_scoped_release() {
@@ -2256,10 +2249,7 @@ public:
         PyEval_RestoreThread(tstate);
         if (disassoc) {
             auto key = detail::get_internals().tstate;
-            #if PY_MAJOR_VERSION < 3
-                PyThread_delete_key_value(key);
-            #endif
-            PyThread_set_key_value(key, tstate);
+            PYBIND11_TLS_REPLACE_VALUE(key, tstate);
         }
     }
 private:
@@ -2287,6 +2277,7 @@ class gil_scoped_release { };
 
 error_already_set::~error_already_set() {
     if (type) {
+        error_scope scope;
         gil_scoped_acquire gil;
         type.release().dec_ref();
         value.release().dec_ref();

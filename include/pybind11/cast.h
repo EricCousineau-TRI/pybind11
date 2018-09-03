@@ -17,6 +17,7 @@
 #include <array>
 #include <limits>
 #include <tuple>
+#include <type_traits>
 
 #if defined(PYBIND11_CPP17)
 #  if defined(__has_include)
@@ -1125,21 +1126,34 @@ public:
         return true;
     }
 
-    static handle cast(T src, return_value_policy /* policy */, handle /* parent */) {
-        if (std::is_floating_point<T>::value) {
-            return PyFloat_FromDouble((double) src);
-        } else if (sizeof(T) <= sizeof(ssize_t)) {
-            // This returns a long automatically if needed
-            if (std::is_signed<T>::value)
-                return PYBIND11_LONG_FROM_SIGNED(src);
-            else
-                return PYBIND11_LONG_FROM_UNSIGNED(src);
-        } else {
-            if (std::is_signed<T>::value)
-                return PyLong_FromLongLong((long long) src);
-            else
-                return PyLong_FromUnsignedLongLong((unsigned long long) src);
-        }
+    template<typename U = T>
+    static typename std::enable_if<std::is_floating_point<U>::value, handle>::type
+    cast(U src, return_value_policy /* policy */, handle /* parent */) {
+        return PyFloat_FromDouble((double) src);
+    }
+
+    template<typename U = T>
+    static typename std::enable_if<!std::is_floating_point<U>::value && std::is_signed<U>::value && (sizeof(U) <= sizeof(long)), handle>::type
+    cast(U src, return_value_policy /* policy */, handle /* parent */) {
+        return PYBIND11_LONG_FROM_SIGNED((long) src);
+    }
+
+    template<typename U = T>
+    static typename std::enable_if<!std::is_floating_point<U>::value && std::is_unsigned<U>::value && (sizeof(U) <= sizeof(unsigned long)), handle>::type
+    cast(U src, return_value_policy /* policy */, handle /* parent */) {
+        return PYBIND11_LONG_FROM_UNSIGNED((unsigned long) src);
+    }
+
+    template<typename U = T>
+    static typename std::enable_if<!std::is_floating_point<U>::value && std::is_signed<U>::value && (sizeof(U) > sizeof(long)), handle>::type
+    cast(U src, return_value_policy /* policy */, handle /* parent */) {
+        return PyLong_FromLongLong((long long) src);
+    }
+
+    template<typename U = T>
+    static typename std::enable_if<!std::is_floating_point<U>::value && std::is_unsigned<U>::value && (sizeof(U) > sizeof(unsigned long)), handle>::type
+    cast(U src, return_value_policy /* policy */, handle /* parent */) {
+        return PyLong_FromUnsignedLongLong((unsigned long long) src);
     }
 
     PYBIND11_TYPE_CASTER(T, _<std::is_integral<T>::value>("int", "float"));
@@ -1548,7 +1562,7 @@ public:
 
     explicit operator type*() { return this->value; }
     explicit operator type&() { return *(this->value); }
-    explicit operator holder_type*() { return &holder; }
+    explicit operator holder_type*() { return std::addressof(holder); }
 
     // Workaround for Intel compiler bug
     // see pybind11 issue 94
@@ -1686,7 +1700,7 @@ struct move_only_holder_caster : type_caster_base<type> {
         // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
         // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
         auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, holder_erased(&src));
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(std::addressof(src)));
     }
 
   // Disable these?
@@ -1869,9 +1883,13 @@ template <typename type> using cast_is_temporary_value_reference = bool_constant
 
 // When a value returned from a C++ function is being cast back to Python, we almost always want to
 // force `policy = move`, regardless of the return value policy the function/method was declared
-// with.  Some classes (most notably Eigen::Ref and related) need to avoid this, and so can do so by
-// specializing this struct.
+// with.
 template <typename Return, typename SFINAE = void> struct return_value_policy_override {
+    static return_value_policy policy(return_value_policy p) { return p; }
+};
+
+template <typename Return> struct return_value_policy_override<Return,
+        detail::enable_if_t<std::is_base_of<type_caster_generic, make_caster<Return>>::value, void>> {
     static return_value_policy policy(return_value_policy p) {
         return !std::is_lvalue_reference<Return>::value && !std::is_pointer<Return>::value
             ? return_value_policy::move : p;
