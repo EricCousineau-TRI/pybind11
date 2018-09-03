@@ -22,6 +22,18 @@ def test_vector(doc):
     # Test regression caused by 936: pointers to stl containers weren't castable
     assert m.cast_ptr_vector() == ["lvalue", "lvalue"]
 
+    c = m.Container()
+    names = ["a", "b"]
+    values = [[1, 2], [3, 4]]
+    for name, value in zip(names, values):
+        c.add(name, value)
+    items = c.cast_vector_const_lvalue()
+    for name, value, item in zip(names, values, items):
+        print(item.sub)
+        assert item.sub != None
+        assert item.sub.name == name
+        assert item.values == value
+
 
 def test_array(doc):
     """std::array <-> list"""

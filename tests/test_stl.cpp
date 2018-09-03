@@ -44,6 +44,28 @@ namespace std {
     struct hash<TplCtorClass> { size_t operator()(const TplCtorClass &) const { return 0; } };
 }
 
+struct Item {
+    struct Sub {
+        Sub(const std::string& name_in)
+            : name(name_in) {}
+        std::string name;
+    };
+    Item(const std::string& name, std::vector<int> values_in)
+        : sub(new Sub(name)), values(values_in) {}
+    std::shared_ptr<Sub> sub;
+    std::vector<int> values;
+};
+
+struct Container {
+    Item add(const std::string& name, std::vector<int> values_in) {
+        values.push_back(Item(name, values_in));
+        return values.back();
+    }
+    const std::vector<Item>& cast_vector_const_lvalue() const {
+        return values;
+    }
+    std::vector<Item> values;
+};
 
 TEST_SUBMODULE(stl, m) {
     // test_vector
@@ -57,6 +79,16 @@ TEST_SUBMODULE(stl, m) {
     // Unnumbered regression (caused by #936): pointers to stl containers aren't castable
     static std::vector<RValueCaster> lvv{2};
     m.def("cast_ptr_vector", []() { return &lvv; });
+    // WRITE SOMETHING
+    py::class_<Item>(m, "Item")
+        .def_readonly("sub", &Item::sub)
+        .def_readonly("values", &Item::values);
+    py::class_<Item::Sub, std::shared_ptr<Item::Sub>>(m.attr("Item"), "Sub")
+        .def_readonly("name", &Item::Sub::name);
+    py::class_<Container>(m, "Container")
+        .def(py::init())
+        .def("add", &Container::add)
+        .def("cast_vector_const_lvalue", &Container::cast_vector_const_lvalue);
 
     // test_array
     m.def("cast_array", []() { return std::array<int, 2> {{1 , 2}}; });
