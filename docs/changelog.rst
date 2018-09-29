@@ -21,6 +21,25 @@ v2.3.0 (Not yet released)
 * The ``value()``  method of ``py::enum_`` now accepts an optional docstring
   that will be shown in the documentation of the associated enumeration.
 
+v2.2.3 (April 29, 2018)
+-----------------------------------------------------
+
+* The pybind11 header location detection was replaced by a new implementation
+  that no longer depends on ``pip`` internals (the recently released ``pip``
+  10 has restricted access to this API).
+  `#1190 <https://github.com/pybind/pybind11/pull/1190>`_.
+
+* Small adjustment to an implementation detail to work around a compiler segmentation fault in Clang 3.3/3.4.
+  `#1350 <https://github.com/pybind/pybind11/pull/1350>`_.
+
+* The minimal supported version of the Intel compiler was >= 17.0 since
+  pybind11 v2.1. This check is now explicit, and a compile-time error is raised
+  if the compiler meet the requirement.
+  `#1363 <https://github.com/pybind/pybind11/pull/1363>`_.
+
+* Fixed an endianness-related fault in the test suite.
+  `#1287 <https://github.com/pybind/pybind11/pull/1287>`_.
+
 v2.2.2 (February 7, 2018)
 -----------------------------------------------------
 
@@ -578,7 +597,7 @@ Happy Christmas!
   being (notably dynamic attributes in custom types).
   `#527 <https://github.com/pybind/pybind11/pull/527>`_.
 
-* Significant work on the documentation -- in particular, the monolitic
+* Significant work on the documentation -- in particular, the monolithic
   ``advanced.rst`` file was restructured into a easier to read hierarchical
   organization. `#448 <https://github.com/pybind/pybind11/pull/448>`_.
 
@@ -646,8 +665,8 @@ Happy Christmas!
        <https://github.com/pybind/pybind11/pull/527>`_.
 
 
-    3. This version of pybind11 uses a redesigned mechnism for instantiating
-       trempoline classes that are used to override virtual methods from within
+    3. This version of pybind11 uses a redesigned mechanism for instantiating
+       trampoline classes that are used to override virtual methods from within
        Python. This led to the following user-visible syntax change: instead of
 
        .. code-block:: cpp

@@ -934,8 +934,9 @@ protected:
     static std::vector<ssize_t> c_strides(const std::vector<ssize_t> &shape, ssize_t itemsize) {
         auto ndim = shape.size();
         std::vector<ssize_t> strides(ndim, itemsize);
-        for (size_t i = ndim - 1; i > 0; --i)
-            strides[i - 1] = strides[i] * shape[i];
+        if (ndim > 0)
+            for (size_t i = ndim - 1; i > 0; --i)
+                strides[i - 1] = strides[i] * shape[i];
         return strides;
     }
 
@@ -1425,19 +1426,22 @@ private:
         (::std::vector<::pybind11::detail::field_descriptor> \
          {PYBIND11_MAP2_LIST (PYBIND11_FIELD_DESCRIPTOR_EX, Type, __VA_ARGS__)})
 
+struct npy_format_descriptor_object {
+public:
+    enum { value = npy_api::NPY_OBJECT_ };
+    static pybind11::dtype dtype() {
+        if (auto ptr = npy_api::get().PyArray_DescrFromType_(value)) {
+            return reinterpret_borrow<pybind11::dtype>(ptr);
+        }
+        pybind11_fail("Unsupported buffer format!");
+    }
+    static constexpr auto name = _("object");
+};
+
 #define PYBIND11_NUMPY_OBJECT_DTYPE(Type) \
     namespace pybind11 { namespace detail { \
-        template <> struct npy_format_descriptor<Type> { \
-        public: \
-            enum { value = npy_api::NPY_OBJECT_ }; \
-            static pybind11::dtype dtype() { \
-                if (auto ptr = npy_api::get().PyArray_DescrFromType_(value)) { \
-                    return reinterpret_borrow<pybind11::dtype>(ptr); \
-                } \
-                pybind11_fail("Unsupported buffer format!"); \
-            } \
-            static constexpr auto name = _("object"); \
-        }; \
+        template <> struct npy_format_descriptor<Type> : \
+            public npy_format_descriptor_object {}; \
     }}
 
 #endif // __CLION_IDE__

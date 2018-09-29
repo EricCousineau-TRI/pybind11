@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
 #
-#  Syntax: mkdoc.py [-I<path> ..] [.. a list of header files ..]
+#  Syntax: mkdoc.py [-I<path> ..] [-quiet] [.. a list of header files ..]
 #
 #  Extract documentation from C++ header files to use it in Python bindings
 #
@@ -102,52 +103,70 @@ def process_comment(comment):
     param_group = '([\[\w:\]]+)'
 
     s = result
-    s = re.sub(r'\\c\s+%s' % cpp_group, r'``\1``', s)
-    s = re.sub(r'\\a\s+%s' % cpp_group, r'*\1*', s)
-    s = re.sub(r'\\e\s+%s' % cpp_group, r'*\1*', s)
-    s = re.sub(r'\\em\s+%s' % cpp_group, r'*\1*', s)
-    s = re.sub(r'\\b\s+%s' % cpp_group, r'**\1**', s)
-    s = re.sub(r'\\ingroup\s+%s' % cpp_group, r'', s)
-    s = re.sub(r'\\param%s?\s+%s' % (param_group, cpp_group),
+    s = re.sub(r'[@\\]c\s+%s' % cpp_group, r'``\1``', s)
+    s = re.sub(r'[@\\]p\s+%s' % cpp_group, r'``\1``', s)
+    s = re.sub(r'[@\\]a\s+%s' % cpp_group, r'*\1*', s)
+    s = re.sub(r'[@\\]e\s+%s' % cpp_group, r'*\1*', s)
+    s = re.sub(r'[@\\]em\s+%s' % cpp_group, r'*\1*', s)
+    s = re.sub(r'[@\\]b\s+%s' % cpp_group, r'**\1**', s)
+    s = re.sub(r'[@\\]ingroup\s+%s' % cpp_group, r'', s)
+    s = re.sub(r'[@\\]param%s?\s+%s' % (param_group, cpp_group),
                r'\n\n$Parameter ``\2``:\n\n', s)
-    s = re.sub(r'\\tparam%s?\s+%s' % (param_group, cpp_group),
+    s = re.sub(r'[@\\]tparam%s?\s+%s' % (param_group, cpp_group),
                r'\n\n$Template parameter ``\2``:\n\n', s)
+    s = re.sub(r'[@\\]retval\s+%s' % cpp_group,
+               r'\n\n$Returns ``\1``:\n\n', s)
 
     for in_, out_ in {
+        'result': 'Returns',
+        'returns': 'Returns',
         'return': 'Returns',
-        'author': 'Author',
         'authors': 'Authors',
+        'author': 'Authors',
         'copyright': 'Copyright',
         'date': 'Date',
+        'note': 'Note',
+        'remarks': 'Remark',
         'remark': 'Remark',
         'sa': 'See also',
         'see': 'See also',
         'extends': 'Extends',
-        'throw': 'Throws',
-        'throws': 'Throws'
+        'throws': 'Throws',
+        'throw': 'Throws'
     }.items():
-        s = re.sub(r'\\%s\s*' % in_, r'\n\n$%s:\n\n' % out_, s)
+        s = re.sub(r'[@\\]%s\s*' % in_, r'\n\n$%s:\n\n' % out_, s)
 
-    s = re.sub(r'\\details\s*', r'\n\n', s)
-    s = re.sub(r'\\brief\s*', r'', s)
-    s = re.sub(r'\\short\s*', r'', s)
-    s = re.sub(r'\\ref\s*', r'', s)
+    s = re.sub(r'[@\\]details\s*', r'\n\n', s)
+    s = re.sub(r'[@\\]brief\s*', r'', s)
+    s = re.sub(r'[@\\]short\s*', r'', s)
+    s = re.sub(r'[@\\]ref\s*', r'', s)
 
-    s = re.sub(r'\\code\s?(.*?)\s?\\endcode',
+    s = re.sub(r'[@\\]code\s?(.*?)\s?[@\\]endcode',
                r"```\n\1\n```\n", s, flags=re.DOTALL)
+
+    s = re.sub(r'%(\S+)', r'\1', s)
 
     # HTML/TeX tags
     s = re.sub(r'<tt>(.*?)</tt>', r'``\1``', s, flags=re.DOTALL)
     s = re.sub(r'<pre>(.*?)</pre>', r"```\n\1\n```\n", s, flags=re.DOTALL)
     s = re.sub(r'<em>(.*?)</em>', r'*\1*', s, flags=re.DOTALL)
     s = re.sub(r'<b>(.*?)</b>', r'**\1**', s, flags=re.DOTALL)
-    s = re.sub(r'\\f\$(.*?)\\f\$', r'$\1$', s, flags=re.DOTALL)
+    s = re.sub(r'[@\\]f\$(.*?)[@\\]f\$', r'$\1$', s, flags=re.DOTALL)
     s = re.sub(r'<li>', r'\n\n* ', s)
     s = re.sub(r'</?ul>', r'', s)
     s = re.sub(r'</li>', r'\n\n', s)
 
     s = s.replace('``true``', '``True``')
     s = s.replace('``false``', '``False``')
+
+    # Exceptions
+    s = s.replace('std::bad_alloc', 'MemoryError')
+    s = s.replace('std::domain_error', 'ValueError')
+    s = s.replace('std::exception', 'RuntimeError')
+    s = s.replace('std::invalid_argument', 'ValueError')
+    s = s.replace('std::length_error', 'ValueError')
+    s = s.replace('std::out_of_range', 'ValueError')
+    s = s.replace('std::range_error', 'ValueError')
 
     # Re-flow text
     wrapper = textwrap.TextWrapper()
@@ -207,14 +226,16 @@ def extract(filename, node, prefix):
 
 
 class ExtractionThread(Thread):
-    def __init__(self, filename, parameters):
+    def __init__(self, filename, parameters, quiet):
         Thread.__init__(self)
         self.filename = filename
         self.parameters = parameters
+        self.quiet = quiet
         job_semaphore.acquire()
 
     def run(self):
-        print('Processing "%s" ..' % self.filename, file=sys.stderr)
+        if not self.quiet:
+            print('Processing "%s" ..' % self.filename, file=sys.stderr)
         try:
             index = cindex.Index(
                 cindex.conf.lib.clang_createIndex(False, True))
@@ -224,7 +245,7 @@ class ExtractionThread(Thread):
             job_semaphore.release()
 
 if __name__ == '__main__':
-    parameters = ['-x', 'c++', '-std=c++11']
+    parameters = ['-x', 'c++', '-D__MKDOC_PY__']
     filenames = []
 
     if platform.system() == 'Darwin':
@@ -241,20 +262,31 @@ if __name__ == '__main__':
             parameters.append('-isysroot')
             parameters.append(sysroot_dir)
 
+    quiet = False
+    std = '-std=c++11'
+
     for item in sys.argv[1:]:
-        if item.startswith('-'):
+        if item == '-quiet':
+            quiet = True
+        elif item.startswith('-std='):
+            std = item
+        elif item.startswith('-'):
             parameters.append(item)
         else:
             filenames.append(item)
 
+    parameters.append(std)
+
     if len(filenames) == 0:
-        print('Syntax: %s [.. a list of header files ..]' % sys.argv[0])
+        print('Syntax: %s [.. a list of header files ..]' % sys.argv[0],
+              file=sys.stderr)
         exit(-1)
 
-    print('''/*
-  This file contains docstrings for the Python bindings.
-  Do not edit! These were automatically extracted by mkdoc.py
- */
+    print('''#pragma once
+
+// GENERATED FILE DO NOT EDIT
+// This file contains docstrings for the Python bindings that were
+// automatically extracted by mkdoc.py from pybind11.
 
 #define __EXPAND(x)                                      x
 #define __COUNT(_1, _2, _3, _4, _5, _6, _7, COUNT, ...)  COUNT
@@ -278,10 +310,11 @@ if __name__ == '__main__':
 
     output.clear()
     for filename in filenames:
-        thr = ExtractionThread(filename, parameters)
+        thr = ExtractionThread(filename, parameters, quiet)
         thr.start()
 
-    print('Waiting for jobs to finish ..', file=sys.stderr)
+    if not quiet:
+        print('Waiting for jobs to finish ..', file=sys.stderr)
     for i in range(job_count):
         job_semaphore.acquire()
 
