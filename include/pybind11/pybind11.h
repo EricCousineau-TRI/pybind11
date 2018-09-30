@@ -2103,18 +2103,21 @@ template <return_value_policy Policy = return_value_policy::reference_internal,
     return make_key_iterator<Policy>(std::begin(value), std::end(value), extra...);
 }
 
-template <typename InputType, typename OutputType> void implicitly_convertible() {
+NAMESPACE_BEGIN(detail)
+
+template <typename InputType, typename OutputType, bool transitive_convert = false>
+type_info::implicit_conversion_func create_implicit_caster() {
     struct set_flag {
         bool &flag;
         set_flag(bool &flag) : flag(flag) { flag = true; }
         ~set_flag() { flag = false; }
     };
-    auto implicit_caster = [](PyObject *obj, PyTypeObject *type) -> PyObject * {
+    return [](PyObject *obj, PyTypeObject *type) -> PyObject * {
         static bool currently_used = false;
         if (currently_used) // implicit conversions are non-reentrant
             return nullptr;
         set_flag flag_helper(currently_used);
-        if (!detail::make_caster<InputType>().load(obj, false))
+        if (!detail::make_caster<InputType>().load(obj, transitive_convert))
             return nullptr;
         tuple args(1);
         args[0] = obj;
@@ -2123,9 +2126,15 @@ template <typename InputType, typename OutputType> void implicitly_convertible()
             PyErr_Clear();
         return result;
     };
+}
 
-    if (auto tinfo = detail::get_type_info(typeid(OutputType)))
+NAMESPACE_END(detail)
+
+template <typename InputType, typename OutputType> void implicitly_convertible() {
+    if (auto tinfo = detail::get_type_info(typeid(OutputType))) {
+        auto implicit_caster = detail::create_implicit_caster<InputType, OutputType>();
         tinfo->implicit_conversions.push_back(implicit_caster);
+    }
     else
         pybind11_fail("implicitly_convertible: Unable to find type " + type_id<OutputType>());
 }

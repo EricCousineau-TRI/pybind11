@@ -114,13 +114,15 @@ struct internals {
 /// Additional type information which does not fit into the PyTypeObject.
 /// Changes to this struct also require bumping `PYBIND11_INTERNALS_VERSION`.
 struct type_info {
+    using implicit_conversion_func = PyObject *(*)(PyObject *, PyTypeObject *);
+
     PyTypeObject *type;
     const std::type_info *cpptype;
     size_t type_size, type_align, holder_size_in_ptrs;
     void *(*operator_new)(size_t);
     void (*init_instance)(instance *, holder_erased);
     void (*dealloc)(value_and_holder &v_h);
-    std::vector<PyObject *(*)(PyObject *, PyTypeObject *)> implicit_conversions;
+    std::vector<implicit_conversion_func> implicit_conversions;
     std::vector<std::pair<const std::type_info *, void *(*)(void *)>> implicit_casts;
     std::vector<bool (*)(PyObject *, void *&)> *direct_conversions;
     buffer_info *(*get_buffer)(PyObject *, void *) = nullptr;

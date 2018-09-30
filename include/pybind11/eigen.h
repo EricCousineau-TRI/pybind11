@@ -220,7 +220,7 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
     constexpr ssize_t elem_size = sizeof(typename props::Scalar);
     array a;
     using Scalar = typename props::Type::Scalar;
-    bool is_pyobject = static_cast<pybind11::detail::npy_api::constants>(npy_format_descriptor<Scalar>::value) == npy_api::NPY_OBJECT_;
+    bool is_pyobject = is_pyobject_dtype<Scalar>::value;
 
     if (!is_pyobject) {
         if (props::vector)
