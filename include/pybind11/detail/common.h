@@ -171,7 +171,17 @@
 #define PYBIND11_PLUGIN_IMPL(name) \
     extern "C" PYBIND11_EXPORT PyObject *PyInit_##name()
 
-#else
+#define PYBIND11_CHECK_REIMPORT(m)                      \
+    { \
+        static int key; \
+        auto& modules = pybind11::get_or_create_shared_data< \
+            std::unordered_map<int*, pybind11::handle>>("__pybind11_modules"); \
+        pybind11::handle& original = modules[&key]; \
+        if (original) return original.ptr(); \
+        original = m; \
+    }
+
+#else // implies PY_MAJOR_VERSION <= 2
 #define PYBIND11_INSTANCE_METHOD_NEW(ptr, class_) PyMethod_New(ptr, nullptr, class_)
 #define PYBIND11_INSTANCE_METHOD_CHECK PyMethod_Check
 #define PYBIND11_INSTANCE_METHOD_GET_FUNCTION PyMethod_GET_FUNCTION
@@ -198,6 +208,7 @@
         (void)pybind11_init_wrapper();                      \
     }                                                       \
     PyObject *pybind11_init_wrapper()
+#define PYBIND11_CHECK_REIMPORT(m)
 #endif
 
 #if PY_VERSION_HEX >= 0x03050000 && PY_VERSION_HEX < 0x03050200
@@ -285,6 +296,7 @@ extern "C" {
     PYBIND11_PLUGIN_IMPL(name) {                                               \
         PYBIND11_CHECK_PYTHON_VERSION                                          \
         auto m = pybind11::module(PYBIND11_TOSTRING(name));                    \
+        PYBIND11_CHECK_REIMPORT(m)                                             \
         try {                                                                  \
             PYBIND11_CONCAT(pybind11_init_, name)(m);                          \
             return m.ptr();                                                    \
