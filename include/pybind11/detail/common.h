@@ -182,7 +182,7 @@
         pybind11::cpp_function dummy([]() {}); \
         original.attr("__pybind11_lifeline") = dummy; \
         (void) pybind11::weakref(dummy, pybind11::cpp_function( \
-            [&modules](pybind11::handle ref) { modules.erase(&key); ref.dec_ref(); })).release(); \
+            [&modules](pybind11::handle ref) { py::print("remove"); modules.erase(&key); ref.dec_ref(); })).release(); \
     }
 
 #else // implies PY_MAJOR_VERSION <= 2
