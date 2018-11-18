@@ -23,6 +23,15 @@ def test_vector(doc):
     assert m.cast_ptr_vector() == ["lvalue", "lvalue"]
 
 
+def test_deque(doc):
+    """std::deque <-> list"""
+    lst = m.cast_deque()
+    assert lst == [1]
+    lst.append(2)
+    assert m.load_deque(lst)
+    assert m.load_deque(tuple(lst))
+
+
 def test_array(doc):
     """std::array <-> list"""
     lst = m.cast_array()
@@ -201,6 +210,14 @@ def test_missing_header_message():
     assert expected_message in str(excinfo.value)
 
 
+def test_function_with_string_and_vector_string_arg():
+    """Check if a string is NOT implicitly converted to a list, which was the
+    behavior before fix of issue #1258"""
+    assert m.func_with_string_or_vector_string_arg_overload(('A', 'B', )) == 2
+    assert m.func_with_string_or_vector_string_arg_overload(['A', 'B']) == 2
+    assert m.func_with_string_or_vector_string_arg_overload('A') == 3
+
+
 def test_stl_ownership():
     cstats = ConstructorStats.get(m.Placeholder)
     assert cstats.alive() == 0
@@ -208,3 +225,15 @@ def test_stl_ownership():
     assert len(r) == 1
     del r
     assert cstats.alive() == 0
+
+
+def test_array_cast_sequence():
+    assert m.array_cast_sequence((1, 2, 3)) == [1, 2, 3]
+
+
+def test_issue_1561():
+    """ check fix for issue #1561 """
+    bar = m.Issue1561Outer()
+    bar.list = [m.Issue1561Inner('bar')]
+    bar.list
+    assert bar.list[0].data == 'bar'
