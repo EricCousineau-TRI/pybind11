@@ -32,14 +32,14 @@ DtypeCheck get_dtype_check(const char* name) {
 std::vector<DtypeCheck> get_concrete_dtype_checks() {
     return {
         // Normalization
-        get_dtype_check<int8_t>("int8"),
-        get_dtype_check<uint8_t>("uint8"),
-        get_dtype_check<int16_t>("int16"),
-        get_dtype_check<uint16_t>("uint16"),
-        get_dtype_check<int32_t>("int32"),
-        get_dtype_check<uint32_t>("uint32"),
-        get_dtype_check<int64_t>("int64"),
-        get_dtype_check<uint64_t>("uint64")
+        get_dtype_check<std::int8_t>("int8"),
+        get_dtype_check<std::uint8_t>("uint8"),
+        get_dtype_check<std::int16_t>("int16"),
+        get_dtype_check<std::uint16_t>("uint16"),
+        get_dtype_check<std::int32_t>("int32"),
+        get_dtype_check<std::uint32_t>("uint32"),
+        get_dtype_check<std::int64_t>("int64"),
+        get_dtype_check<std::uint64_t>("uint64")
     };
 }
 
@@ -57,16 +57,16 @@ DtypeSizeCheck get_dtype_size_check() {
     check.name = py::type_id<T>();
     check.size_cpp = sizeof(T);
     check.dtype = py::dtype::of<T>();
-    check.size_numpy = check.dtype.attr("alignment").template cast<int>();
+    check.size_numpy = check.dtype.attr("itemsize").template cast<int>();
     return check;
 }
 
 std::vector<DtypeSizeCheck> get_platform_dtype_size_checks() {
     return {
         get_dtype_size_check<short>(),
-        get_dtype_size_check<ushort>(),
+        get_dtype_size_check<unsigned short>(),
         get_dtype_size_check<int>(),
-        get_dtype_size_check<uint>(),
+        get_dtype_size_check<unsigned int>(),
         get_dtype_size_check<long>(),
         get_dtype_size_check<unsigned long>(),
         get_dtype_size_check<long long>(),

@@ -14,6 +14,7 @@
 #include <numeric>
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
@@ -108,13 +109,16 @@ inline numpy_internals& get_numpy_internals() {
     return *ptr;
 }
 
+template <typename T> struct same_size {
+    template <typename U> using as = bool_constant<sizeof(T) == sizeof(U)>;
+};
+
 // Lookup a type according to its size, and return a value corresponding to the NumPy typenum.
-template <typename Concrete,
-    typename Check1, typename Check2, typename Check3 = Check2>
-constexpr int platform_lookup(int check1, int check2, int check3 = -1) {
-    return (sizeof(Concrete) == sizeof(Check1)) ? check1 :
-               (sizeof(Concrete) == sizeof(Check2)) ? check2 :
-                 (sizeof(Concrete) == sizeof(Check3)) ? check3 : -1;
+template <typename Concrete, typename... Check>
+constexpr int platform_lookup(const std::array<int, sizeof...(Check)> codes) {
+    using code_index = std::integral_constant<int, constexpr_first<same_size<Concrete>::template as, Check...>()>;
+    static_assert(code_index::value != sizeof...(Check), "Unable to match type on this platform");
+    return codes[code_index::value];
 }
 
 struct npy_api {
@@ -141,14 +145,17 @@ struct npy_api {
         NPY_UINT8_ = NPY_UBYTE_,
         NPY_INT16_ = NPY_SHORT_,
         NPY_UINT16_ = NPY_USHORT_,
-        NPY_INT32_ = platform_lookup<int32_t, short, int, long>(
-            NPY_SHORT_, NPY_INT_, NPY_LONG_),
-        NPY_UINT32_ = platform_lookup<uint32_t, unsigned short, unsigned int, unsigned long>(
-            NPY_USHORT_, NPY_UINT_, NPY_ULONG_),
-        NPY_INT64_ = platform_lookup<int64_t, int, long, long long>(
-            NPY_INT_, NPY_LONG_, NPY_LONGLONG_),
-        NPY_UINT64_ = platform_lookup<uint64_t, uint, unsigned long, unsigned long long>(
-            NPY_UINT_, NPY_ULONG_, NPY_ULONGLONG_),
+        // `npy_common.h` defines the integer aliases. In order, it checks:
+        // NPY_BITSOF_LONG, NPY_BITSOF_LONGLONG, NPY_BITSOF_INT, NPY_BITSOF_SHORT, NPY_BITSOF_CHAR
+        // and assigns the alias to the first matching size, so we should check in this order.
+        NPY_INT32_ = platform_lookup<std::int32_t, long, int, short>({{
+            NPY_LONG_, NPY_INT_, NPY_SHORT_}}),
+        NPY_UINT32_ = platform_lookup<std::uint32_t, unsigned long, unsigned int, unsigned short>({{
+            NPY_ULONG_, NPY_UINT_, NPY_USHORT_}}),
+        NPY_INT64_ = platform_lookup<std::int64_t, long, long long, int>({{
+            NPY_LONG_, NPY_LONGLONG_, NPY_INT_}}),
+        NPY_UINT64_ = platform_lookup<std::uint64_t, unsigned long, unsigned long long, unsigned int>({{
+            NPY_ULONG_, NPY_ULONGLONG_, NPY_UINT_}}),
     };
 
     typedef struct {
