@@ -248,8 +248,9 @@ template <typename props> handle eigen_array_cast(typename props::Type const &sr
                 nullptr,
                 empty_base
             );
+            constexpr bool is_row = props::fixed_rows && props::rows == 1;
             for (ssize_t i = 0; i < src.size(); ++i) {
-                const Scalar src_val = props::fixed_rows ? src(0, i) : src(i, 0);
+                const Scalar src_val = is_row ? src(0, i) : src(i, 0);
                 auto value_ = reinterpret_steal<object>(make_caster<Scalar>::cast(src_val, policy, empty_base));
                 if (!value_)
                     return handle();
@@ -456,14 +457,6 @@ public:
 
 private:
     Type value;
-};
-
-// Eigen Ref/Map classes have slightly different policy requirements, meaning we don't want to force
-// `move` when a Ref/Map rvalue is returned; we treat Ref<> sort of like a pointer (we care about
-// the underlying data, not the outer shell).
-template <typename Return>
-struct return_value_policy_override<Return, enable_if_t<is_eigen_dense_map<Return>::value>> {
-    static return_value_policy policy(return_value_policy p) { return p; }
 };
 
 // Base class for casting reference/map/block/etc. objects back to python.

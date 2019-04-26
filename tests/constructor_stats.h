@@ -192,7 +192,7 @@ public:
                 }
             }
         }
-        catch (std::out_of_range) {}
+        catch (const std::out_of_range &) {}
         if (!t1 && fallback())
             t1 = fallback()(class_);
         if (!t1) throw std::runtime_error("Unknown class passed to ConstructorStats::get()");
