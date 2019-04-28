@@ -978,6 +978,9 @@ public:
     }
 
     static handle cast(const itype *src, return_value_policy policy, handle parent) {
+        if (policy == return_value_policy::automatic) {
+            throw std::runtime_error("BAD");
+        }
         auto st = src_and_type(src);
         return type_caster_generic::cast(
             st.first, policy, parent, st.second,
