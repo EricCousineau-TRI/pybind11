@@ -301,36 +301,43 @@ def test_drake_11424():
     m.def_virtual_c1(scope)
 
     class C1(scope.VirtualC1):
-        def __init__(self): scope.VirtualC1.__init__(self)
+        # def __init__(self): scope.VirtualC1.__init__(self)
         def get_name(self): return "C1"
 
-    # # This should be the pointer for the classes.
-    # ids_1 = (id(scope.VirtualC1), id(C1))
+    # This should be the pointer for the classes.
+    ids_1 = (id(scope.VirtualC1), id(C1))
 
-    # assert scope.VirtualC1().get_name() == "VirtualC1"
-    # assert C1().get_name() == "C1"
+    assert scope.VirtualC1().get_name() == "VirtualC1"
+    assert C1().get_name() == "C1"
 
-    # # Now delete everything (and ensure it's deleted).
-    scope_w = weakref.ref(scope)
-    C1_w = weakref.ref(C1)
-    del scope
-    del C1  # Removing this fixes: `TypeError: __init__(self, ...) called with invalid `self` argument"
-    pytest.gc_collect()
-    assert scope_w() is None
-    assert C1_w() is None
+    do_delete = True
+    if do_delete:
+        # Now delete everything (and ensure it's deleted).
+        wref_list = [weakref.ref(x) for x in [C1]]
+        # del scope
+        del C1  # Removing this fixes: `TypeError: __init__(self, ...) called with invalid `self` argument"
+        print("GC")
+        pytest.gc_collect()
+        assert all([x() is None for x in wref_list])
 
     # Now repeat.
+    # scope = Scope()
+    # m.def_virtual_c2(scope)
 
-    scope = Scope()
-    m.def_virtual_c2(scope)
-
-    class C2(scope.VirtualC2):
-        def __init__(self): scope.VirtualC2.__init__(self)
+    class C2(scope.VirtualC1):
+        # def __init__(self): scope.VirtualC2.__init__(self)
         def get_name(self): return "C2"
 
-    ids_2 = (id(scope.VirtualC2), id(C2))
+    ids_2 = (id(scope.VirtualC1), id(C2))
     print(ids_1)
     print(ids_2)
+    # if do_delete:
+    #     # This seems to be true, generally?
+    #     assert ids_1 == ids_2[::-1]
 
-    assert scope.VirtualC2().get_name() == "VirtualC2"
+    assert scope.VirtualC1().get_name() == "VirtualC1"
     assert C2().get_name() == "C2"
+
+
+import sys
+sys.stdout = sys.stderr
