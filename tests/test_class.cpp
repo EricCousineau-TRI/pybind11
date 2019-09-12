@@ -303,6 +303,40 @@ TEST_SUBMODULE(class_, m) {
         .def("foo", static_cast<int (ProtectedB::*)() const>(&PublicistB::foo));
 #endif
 
+    // Test drake#11424.
+    m.def("def_virtual_c1", [](py::object scope) {
+        class VirtualC1 {
+            public:
+                virtual ~VirtualC1() {}
+                virtual std::string get_name() const { return "VirtualC1"; }
+            };
+        class PyVirtualC1 : public VirtualC1 {
+        public:
+            std::string get_name() const override {
+                PYBIND11_OVERLOAD(std::string, VirtualC1, get_name, );
+            }
+        };
+        py::class_<VirtualC1, PyVirtualC1>(scope, "VirtualC1")
+            .def(py::init())
+            .def("get_name", &VirtualC1::get_name);
+    });
+    m.def("def_virtual_c2", [](py::object scope) {
+        class VirtualC2 {
+            public:
+                virtual ~VirtualC2() {}
+                virtual std::string get_name() const { return "VirtualC2"; }
+            };
+        class PyVirtualC2 : public VirtualC2 {
+        public:
+            std::string get_name() const override {
+                PYBIND11_OVERLOAD(std::string, VirtualC2, get_name, );
+            }
+        };
+        py::class_<VirtualC2, PyVirtualC2>(scope, "VirtualC2")
+            .def(py::init())
+            .def("get_name", &VirtualC2::get_name);
+    });
+
     // test_brace_initialization
     struct BraceInitialization {
         int field1;
