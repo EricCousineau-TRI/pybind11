@@ -300,15 +300,17 @@ def test_drake_11424():
     scope = Scope()
     m.def_virtual_c1(scope)
 
-    class C1(scope.VirtualC1):
+    class C1(scope.VirtualC1): pass
         # def __init__(self): scope.VirtualC1.__init__(self)
-        def get_name(self): return "C1"
+        #def get_name(self): return "C1"
 
     # This should be the pointer for the classes.
     ids_1 = (id(scope.VirtualC1), id(C1))
 
-    assert scope.VirtualC1().get_name() == "VirtualC1"
-    assert C1().get_name() == "C1"
+    get_name = scope.call_virtual_c1
+
+    assert get_name(scope.VirtualC1()) == "VirtualC1"
+    assert get_name(C1()) == "VirtualC1"
 
     do_delete = True
     if do_delete:
@@ -335,8 +337,8 @@ def test_drake_11424():
     #     # This seems to be true, generally?
     #     assert ids_1 == ids_2[::-1]
 
-    assert scope.VirtualC1().get_name() == "VirtualC1"
-    assert C2().get_name() == "C2"
+    assert get_name(scope.VirtualC1()) == "VirtualC1"
+    assert get_name(C2()) == "C2"
 
 
 import sys

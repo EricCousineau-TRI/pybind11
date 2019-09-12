@@ -319,6 +319,8 @@ TEST_SUBMODULE(class_, m) {
         py::class_<VirtualC1, PyVirtualC1>(scope, "VirtualC1")
             .def(py::init())
             .def("get_name", &VirtualC1::get_name);
+        scope.attr("call_virtual_c1") = py::cpp_function(
+            [](const VirtualC1& obj) { return obj.get_name(); });
     });
     m.def("def_virtual_c2", [](py::object scope) {
         class VirtualC2 {
