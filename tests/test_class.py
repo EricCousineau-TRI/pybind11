@@ -1,4 +1,5 @@
 import pytest
+import weakref
 
 from pybind11_tests import class_ as m
 from pybind11_tests import UserType, ConstructorStats
@@ -279,3 +280,40 @@ def test_aligned():
     if hasattr(m, "Aligned"):
         p = m.Aligned().ptr()
         assert p % 1024 == 0
+
+
+def test_drake_11424_side_bug():
+    # Encountered while trying to do mini-repro of:
+    # https://github.com/RobotLocomotion/drake/issues/11424 (upstream: pybind11#1922)
+
+    # A scope which can be used to define items (for defining classes with pybind11)
+    class Scope(object): pass
+
+    scope = Scope()
+    m.def_virtual_c1(scope)
+
+    class C1(scope.VirtualC1): pass
+
+    # These are fine.
+    scope.VirtualC1()
+    C1()
+
+    ids_1 = (id(scope.VirtualC1), id(C1))
+    # Now delete everything (and ensure it's deleted).
+    wref_list = [weakref.ref(x) for x in [scope.VirtualC1, C1]]
+    del scope
+    del C1  # Removing this fixes the error below, presumably because VirtualC1 is kept alive.
+    print("GC")
+    pytest.gc_collect()
+    assert all([x() is None for x in wref_list])
+
+    # Now repeat.
+    scope = Scope()
+    m.def_virtual_c2(scope)
+
+    class C2(scope.VirtualC2): pass
+
+    ids_2 = (id(scope.VirtualC2), id(C2))
+    assert ids_1 == ids_2[::-1]  # Same as for pybind11#1922: seems to be true for CPython at least?
+    scope.VirtualC2()  # This is fine
+    C2()  # Not fine? "TypeError: __init__(self, ...) called with invalid `self` argument"

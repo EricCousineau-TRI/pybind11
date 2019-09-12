@@ -367,6 +367,26 @@ TEST_SUBMODULE(class_, m) {
             .def(py::init<>())
             .def("ptr", &Aligned::ptr);
     #endif
+
+    // Accidentally secondary bug when investigating drake#11424.
+    m.def("def_virtual_c1", [](py::object scope) {
+        class VirtualC1 {
+        public:
+            virtual ~VirtualC1() {}
+        };
+        class PyVirtualC1 : public VirtualC1 {};
+        py::class_<VirtualC1, PyVirtualC1>(scope, "VirtualC1")
+            .def(py::init());
+    });
+    m.def("def_virtual_c2", [](py::object scope) {
+        class VirtualC2 {
+        public:
+            virtual ~VirtualC2() {}
+        };
+        class PyVirtualC2 : public VirtualC2 {};
+        py::class_<VirtualC2, PyVirtualC2>(scope, "VirtualC2")
+            .def(py::init());
+    });
 }
 
 template <int N> class BreaksBase { public: virtual ~BreaksBase() = default; };
