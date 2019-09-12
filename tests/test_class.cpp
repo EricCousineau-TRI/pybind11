@@ -466,6 +466,24 @@ TEST_SUBMODULE(class_, m) {
         py::class_<OtherDuplicateNested>(gt, "OtherDuplicateNested");
         py::class_<OtherDuplicateNested>(gt, "YetAnotherDuplicateNested");
     });
+
+    // Test drake#11424.
+    class ExampleVirt2 {
+        public:
+            virtual ~ExampleVirt2() {}
+            virtual std::string get_name() const { return "ExampleVirt2"; }
+        };
+    class PyExampleVirt2 : public ExampleVirt2 {
+    public:
+        std::string get_name() const override {
+            PYBIND11_OVERLOAD(std::string, ExampleVirt2, get_name, );
+        }
+    };
+    py::class_<ExampleVirt2, PyExampleVirt2>(m, "ExampleVirt2")
+        .def(py::init())
+        .def("get_name", &ExampleVirt2::get_name);
+    m.def("example_virt2_get_name",
+        [](const ExampleVirt2& obj) { return obj.get_name(); });
 }
 
 template <int N> class BreaksBase { public:

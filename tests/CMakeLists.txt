@@ -222,21 +222,21 @@ if(PYBIND11_TEST_FILES_EIGEN_I GREATER -1)
 endif()
 
 # Optional dependency for some tests (boost::variant is only supported with version >= 1.56)
-find_package(Boost 1.56)
+# find_package(Boost 1.56)
 
-if(Boost_FOUND)
-  if(NOT TARGET Boost::headers)
-    if(TARGET Boost::boost)
-      # Classic FindBoost
-      add_library(Boost::headers ALIAS Boost::boost)
-    else()
-      # Very old FindBoost, or newer Boost than CMake in older CMakes
-      add_library(Boost::headers IMPORTED INTERFACE)
-      set_property(TARGET Boost::headers PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-                                                  ${Boost_INCLUDE_DIRS})
-    endif()
-  endif()
-endif()
+# if(Boost_FOUND)
+#   if(NOT TARGET Boost::headers)
+#     if(TARGET Boost::boost)
+#       # Classic FindBoost
+#       add_library(Boost::headers ALIAS Boost::boost)
+#     else()
+#       # Very old FindBoost, or newer Boost than CMake in older CMakes
+#       add_library(Boost::headers IMPORTED INTERFACE)
+#       set_property(TARGET Boost::headers PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+#                                                   ${Boost_INCLUDE_DIRS})
+#     endif()
+#   endif()
+# endif()
 
 # Compile with compiler warnings turned on
 function(pybind11_enable_warnings target_name)
