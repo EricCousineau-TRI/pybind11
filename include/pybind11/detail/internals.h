@@ -156,10 +156,12 @@ struct type_info {
 #  define PYBIND11_BUILD_ABI ""
 #endif
 
+// N.B. We append `drake` because our fork deviates from the nominal internal
+// structure.
 #if defined(WITH_THREAD)
-#  define PYBIND11_INTERNALS_KIND ""
+#  define PYBIND11_INTERNALS_KIND "_drake"
 #else
-#  define PYBIND11_INTERNALS_KIND "_without_thread"
+#  define PYBIND11_INTERNALS_KIND "_drake_without_thread"
 #endif
 
 #define PYBIND11_INTERNALS_ID "__pybind11_internals_v" \
