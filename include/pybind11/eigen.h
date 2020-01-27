@@ -79,11 +79,14 @@ template <bool EigenRowMajor> struct EigenConformable {
     EigenDStride stride{0, 0};      // Only valid if negativestrides is false!
     bool negativestrides = false;   // If true, do not use stride!
 
-    EigenConformable(bool fits = false) : conformable{fits} {}
+    EigenConformable(bool fits = false) : conformable{fits} {
+        py::print("EigenConformable: ", fits);
+    }
     // Matrix type:
     EigenConformable(EigenIndex r, EigenIndex c,
             EigenIndex rstride, EigenIndex cstride) :
         conformable{true}, rows{r}, cols{c} {
+        py::print("EigenConformable: ", r, c, rstride, cstride);
         // TODO: when Eigen bug #747 is fixed, remove the tests for non-negativity. http://eigen.tuxfamily.org/bz/show_bug.cgi?id=747
         if (rstride < 0 || cstride < 0) {
             negativestrides = true;
@@ -471,10 +474,15 @@ public:
                 py::print("  !copy");
                 return false;
             }
-            fits = props::conformable(copy);
-            if (!fits || !fits.template stride_compatible<props>()) {
-                py::print("  !fits");
-                return false;
+            // We do not need to fit if the array is effectively zero-sized.
+            const bool is_empty = copy.size() == 0;
+            const bool need_fit = !is_empty || need_writeable;
+            if (need_fit) {
+                fits = props::conformable(copy);
+                if (!fits || !fits.template stride_compatible<props>()) {
+                    py::print("  !fits");
+                    return false;
+                }
             }
             copy_or_ref = std::move(copy);
             loader_life_support::add_patient(copy_or_ref);
