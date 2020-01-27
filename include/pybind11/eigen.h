@@ -43,6 +43,8 @@ static_assert(EIGEN_VERSION_AT_LEAST(3,2,7), "Eigen support in pybind11 requires
 
 NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
 
+namespace py = ::pybind11;  // HACK
+
 // Provide a convenience alias for easier pass-by-ref usage with fully dynamic strides:
 using EigenDStride = Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>;
 template <typename MatrixType> using EigenDRef = Eigen::Ref<MatrixType, 0, EigenDStride>;
@@ -427,6 +429,9 @@ public:
         // First check whether what we have is already an array of the right type.  If not, we can't
         // avoid a copy (because the copy is also going to do type conversion).
         bool need_copy = !isinstance<Array>(src);
+        const bool tmp = need_writeable;
+        py::print("need_writeable: ", tmp);
+        py::print("need_copy: ", need_copy);
 
         EigenConformable<props::row_major> fits;
         if (!need_copy) {
@@ -435,29 +440,42 @@ public:
             Array aref = reinterpret_borrow<Array>(src);
 
             if (aref && (!need_writeable || aref.writeable())) {
+                py::print("aref:");
                 fits = props::conformable(aref);
-                if (!fits) return false; // Incompatible dimensions
-                if (!fits.template stride_compatible<props>())
+                if (!fits) {
+                    py::print("  !fits");
+                    return false; // Incompatible dimensions
+                }
+                if (!fits.template stride_compatible<props>()) {                    
+                    py::print("  !stride_compatible");
                     need_copy = true;
+                }
                 else
                     copy_or_ref = std::move(aref);
             }
             else {
+                py::print("!aref: need_copy");
                 need_copy = true;
             }
         }
 
         if (need_copy) {
+            py::print("if need_copy:");
             // We need to copy: If we need a mutable reference, or we're not supposed to convert
             // (either because we're in the no-convert overload pass, or because we're explicitly
             // instructed not to copy (via `py::arg().noconvert()`) we have to fail loading.
             if (!convert || need_writeable) return false;
 
             Array copy = Array::ensure(src);
-            if (!copy) return false;
-            fits = props::conformable(copy);
-            if (!fits || !fits.template stride_compatible<props>())
+            if (!copy) {
+                py::print("  !copy");
                 return false;
+            }
+            fits = props::conformable(copy);
+            if (!fits || !fits.template stride_compatible<props>()) {
+                py::print("  !fits");
+                return false;
+            }
             copy_or_ref = std::move(copy);
             loader_life_support::add_patient(copy_or_ref);
         }
