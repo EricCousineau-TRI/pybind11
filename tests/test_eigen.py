@@ -692,3 +692,10 @@ def test_custom_operator_new():
     o = m.CustomOperatorNew()
     np.testing.assert_allclose(o.a, 0.0)
     np.testing.assert_allclose(o.b.diagonal(), 1.0)
+
+
+def test_issue2141():
+    """Passing [None] to an array should cause a bad conversion."""
+    with pytest.raises(TypeError) as excinfo:
+        m.double_col([None])
+    assert "incompatible function arguments" in str(excinfo.value)
