@@ -1469,7 +1469,12 @@ class wrapper : public Base {
 #if PY_VERSION_HEX >= 0x03000000
       // Reverse single-finalization constraint in Python3.
       if (_PyGC_FINALIZED(patient_.ptr())) {
+  #if PY_VERSION_HEX < 0x03080000
         _PyGC_SET_FINALIZED(patient_.ptr(), 0);
+  #else
+        // Just increase refcount and cross your fingers.
+        patient_.inc_ref();
+  #endif  // PY_VERSION_HEX < 0x03080000
       }
 #endif  // PY_VERSION_HEX >= 0x03000000
   }
