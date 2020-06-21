@@ -284,3 +284,27 @@ def test_shared_ptr_gc():
     pytest.gc_collect()
     for i, v in enumerate(el.get()):
         assert i == v.value()
+
+
+class Cat(m.Animal):
+    def go(self, n_times):
+        return "meow! " * n_times
+
+
+def test_shared_ptr_slicing_derived():
+    # See: https://github.com/pybind/pybind11/issues/1774
+    cat = Cat()
+    assert m.Animal.go(cat, n_times=2) == "meow! meow! "
+
+    cage = m.Cage()
+    cage.add(cat)
+    assert isinstance(cage.get(), Cat)
+
+    del cat
+    pytest.gc_collect()
+
+    # WARNING: This object gets sliced; since the Python object gets gc'd, C++
+    # can only hold onto the base portion of the instance, `Animal` /
+    # `PyAnimal`.
+    assert not isinstance(cage.get(), Cat)
+    assert isinstance(cage.get(), m.Animal)

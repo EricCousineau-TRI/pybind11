@@ -363,4 +363,48 @@ TEST_SUBMODULE(smart_ptr, m) {
                 list.append(py::cast(e));
             return list;
         });
+
+    // test_shared_ptr_slicing_derived
+    // #1774: Returning new instances of a derived type via a virtual factory
+    //    function fails to keep the derived type alive
+    // Test code adapted from: https://git.io/JfNi8
+    class Animal {
+    public:
+        virtual ~Animal() { }
+        virtual std::string go(int n_times) = 0;
+    };
+
+    class PyAnimal : public Animal {
+    public:
+        std::string go(int n_times) override {
+            PYBIND11_OVERLOAD_PURE(std::string, Animal, go, n_times);
+        }
+    };
+
+    py::class_<Animal, PyAnimal, std::shared_ptr<Animal>> animal(m, "Animal");
+    animal
+        .def(py::init())
+        .def("go", &Animal::go, py::arg("n_times"));
+
+    class Cage {
+    public:
+        void add(std::shared_ptr<Animal> animal) {
+            if (animal_) {
+                throw std::runtime_error("Cage must be empty!");
+            }
+            animal_ = animal;
+        }
+        std::shared_ptr<Animal> get() const { return animal_; }
+        std::shared_ptr<Animal> release() {
+            return std::move(animal_);
+        }
+    private:
+        std::shared_ptr<Animal> animal_;
+    };
+
+    py::class_<Cage, std::shared_ptr<Cage>>(m, "Cage")
+        .def(py::init())
+        .def("add", &Cage::add, py::arg("animal"))
+        .def("get", &Cage::get)
+        .def("release", &Cage::release);
 }
