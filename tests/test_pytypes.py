@@ -282,8 +282,11 @@ def test_list_slicing():
 
 
 def test_str_with_none():
-    assert m.test_str_assign_none() is None
-    assert m.test_str_with_default_arg_none() is None
+    # See issue #2361
+    assert m.test_str_assign_none() == "None"
+    with pytest.raises(TypeError) as excinfo:
+        m.test_str_with_default_arg_none()
+    assert "incompatible function arguments" in str(excinfo.value)
 
 
 @pytest.mark.parametrize('method, args, fmt, expected_view', [
