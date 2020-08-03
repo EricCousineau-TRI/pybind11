@@ -281,8 +281,9 @@ def test_list_slicing():
     assert li[::2] == m.test_list_slicing(li)
 
 
-def test_str_with_cpp_default_none():
-    assert m.test_str_with_cpp_default_none() == (None, "Hello")
+def test_str_with_none():
+    assert m.test_str_assign_none() is None
+    assert m.test_str_with_default_arg_none() is None
 
 
 @pytest.mark.parametrize('method, args, fmt, expected_view', [
