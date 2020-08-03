@@ -319,6 +319,13 @@ TEST_SUBMODULE(pytypes, m) {
         return a[py::slice(0, -1, 2)];
     });
 
+    m.def("test_str_with_cpp_default_none", []() {
+        auto my_func = [](py::str value = py::none()) {
+            return value;
+        };
+        return py::make_tuple(my_func(), my_func("Hello"));
+    });
+
     m.def("test_memoryview_object", [](py::buffer b) {
         return py::memoryview(b);
     });

@@ -281,6 +281,10 @@ def test_list_slicing():
     assert li[::2] == m.test_list_slicing(li)
 
 
+def test_str_with_cpp_default_none():
+    assert m.test_str_with_cpp_default_none() == (None, "Hello")
+
+
 @pytest.mark.parametrize('method, args, fmt, expected_view', [
     (m.test_memoryview_object, (b'red',), 'B', b'red'),
     (m.test_memoryview_buffer_info, (b'green',), 'B', b'green'),
