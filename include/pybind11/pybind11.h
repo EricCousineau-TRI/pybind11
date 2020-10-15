@@ -1847,7 +1847,7 @@ private:
             if (!v_h.holder_constructed()) {
                 throw std::runtime_error("Bad edge case");
             }
-            holder_type& holder = v_h.holder<holder_type>();
+            auto& holder = v_h.holder<holder_type>();
             holder_check::accept_holder(holder_ptr, holder);
         }
 
@@ -1856,7 +1856,7 @@ private:
         handle h_type = self.get_type();
 
         // Use hacky Python-style inheritance check.
-        PyTypeObject *py_type = (PyTypeObject*)h_type.ptr();
+        auto *py_type = (PyTypeObject*)h_type.ptr();
         bool is_py_derived = py_type->tp_dealloc != detail::pybind11_object_dealloc;
 
         bool can_add_del = true;

@@ -85,7 +85,7 @@ using type_map = std::unordered_map<std::type_index, value_type, type_hash, type
 struct override_hash {
     inline size_t operator()(const std::pair<const PyObject *, std::string>& v) const {
         size_t value = std::hash<const void *>()(v.first);
-        value ^= std::hash<std::string>();
+        value ^= std::hash<std::string>()(v.second);
         return value;
     }
 };

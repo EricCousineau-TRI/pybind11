@@ -2,6 +2,8 @@
 from pybind11_tests import ownership_transfer as m
 from pybind11_tests import ConstructorStats
 
+import env  # noqa: F401
+
 import pytest
 import sys
 import weakref
@@ -44,7 +46,7 @@ ChildUnique = define_child(
 # TODO(eric.cousineau): See if this is at all possibly on PyPy.
 # Placing `pytest.gc_collect` near `del` statements indicates that we are not
 # capturing deletion properly.
-@pytest.unsupported_on_pypy
+@pytest.mark.skipif(env.PYPY, reason="Unsupported on PyPy")
 def test_shared_ptr_derived_slicing(capture):
     leaked_count = [0]
     is_py38 = sys.version_info[:2] >= (3, 8)
@@ -129,7 +131,7 @@ def test_shared_ptr_derived_slicing(capture):
     assert cstats_alive_except_leaked() == 0
 
 
-@pytest.unsupported_on_pypy
+@pytest.mark.skipif(env.PYPY, reason="Unsupported on PyPy")
 def test_unique_ptr_derived_slicing(capture):
     # [ Bad ]
     cstats = ChildBadUnique.get_cstats()
