@@ -430,6 +430,7 @@ def test_register_duplicate_class():
     expected = 'generic_type: type "YetAnotherDuplicateNested" is already registered!'
     assert str(exc_info.value) == expected
 
+
 @pytest.mark.skip(
     reason="Generally reproducible in CPython, Python 3, non-debug, on Linux. "
            "However, hard to pin this down for CI.")

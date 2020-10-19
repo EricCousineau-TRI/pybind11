@@ -356,7 +356,7 @@ def test_diamond_inheritance():
     assert d is d.c0().c1().b().c0().b()
 
 
-@pytest.unsupported_on_pypy
+@pytest.mark.skipif(env.PYPY, reason="Unsupported on PyPy")
 def test_mi_ownership_constraint():
     # See `test_ownership_transfer` for positive tests.
 
