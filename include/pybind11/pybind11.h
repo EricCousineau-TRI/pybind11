@@ -1585,7 +1585,7 @@ __builtins__['print'](pybind11_base_cls)
         if (result == nullptr) {
             throw error_already_set();
         }
-        // enum_meta_cls = d["pybind11_enum_meta_cls"];
+        enum_meta_cls = reinterpret_borrow<object>(reinterpret_cast<PyObject*>(get_internals().default_metaclass)); //d["pybind11_enum_meta_cls"];
         enum_base_cls = d["pybind11_enum_base_cls"];
     }
 
@@ -1754,8 +1754,8 @@ public:
     enum_(const handle &scope, const char *name, const Extra&... extra)
       : class_<Type>(
             scope, name,
-            detail::enum_meta_info::get().enum_base_cls,
-            // pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
+            // detail::enum_meta_info::get().enum_base_cls,
+            pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
             extra...),
         m_base(*this, scope) {
         detail::enum_meta_info::get();
