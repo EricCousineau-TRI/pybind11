@@ -1575,20 +1575,18 @@ struct enum_meta_info {
 
     enum_meta_info() {
         pybind11::dict d;
-        d["pybind11_meta_cls"] = get_internals().default_metaclass;
+        d["__builtins__"] = PyEval_GetBuiltins();
+        // d["pybind11_meta_cls"] = get_internals().default_metaclass;
         d["pybind11_base_cls"] = get_internals().instance_base;
-        PyObject *result = PyRun_String(R"""(\
-            class pybind11_enum_meta_cls(pybind11_meta_cls):
-                pass
-
-            class pybind11_enum_base_cls(pybind11_base_cls, metaclass=pybind11_enum_meta_cls):
-                pass
-            )""", Py_file_input, d.ptr(), d.ptr());
+        PyObject *result = PyRun_String(R"""(
+pybind11_enum_base_cls = pybind11_base_cls
+__builtins__['print'](pybind11_base_cls)
+)""", Py_file_input, d.ptr(), d.ptr());
         if (result == nullptr) {
             throw error_already_set();
         }
-        enum_meta_cls = reinterpret_borrow<object>(reinterpret_cast<PyObject*>(get_internals().default_metaclass)); //d["pybind11_enum_meta_cls"];
-        enum_base_cls = reinterpret_borrow<object>(handle(get_internals().instance_base)); //d["pybind11_enum_base_cls"];
+        // enum_meta_cls = d["pybind11_enum_meta_cls"];
+        enum_base_cls = d["pybind11_enum_base_cls"];
     }
 
     static const enum_meta_info& get() {
@@ -1757,9 +1755,10 @@ public:
       : class_<Type>(
             scope, name,
             detail::enum_meta_info::get().enum_base_cls,
-            pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
+            // pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
             extra...),
         m_base(*this, scope) {
+        detail::enum_meta_info::get();
         constexpr bool is_arithmetic = detail::any_of<std::is_same<arithmetic, Extra>...>::value;
         constexpr bool is_convertible = std::is_convertible<Type, Scalar>::value;
         m_base.init(is_arithmetic, is_convertible);
