@@ -3,6 +3,10 @@ import pytest
 from pybind11_tests import enums as m
 
 
+def test_meta():
+    print(m.UnscopedEnum.stuff())
+
+
 def test_unscoped_enum():
     assert str(m.UnscopedEnum.EOne) == "UnscopedEnum.EOne"
     assert str(m.UnscopedEnum.ETwo) == "UnscopedEnum.ETwo"

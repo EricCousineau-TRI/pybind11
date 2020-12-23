@@ -1574,22 +1574,24 @@ struct enum_meta_info {
     pybind11::object enum_base_cls;
 
     enum_meta_info() {
-        pybind11::dict d;
-        d["builtins_dict"] = PyEval_GetBuiltins();
-        d["pybind11_meta_cls"] = reinterpret_borrow<object>(
+        auto locals = dict();
+        locals["pybind11_meta_cls"] = reinterpret_borrow<object>(
             reinterpret_cast<PyObject*>(get_internals().default_metaclass));
-        d["pybind11_base_cls"] = reinterpret_borrow<object>(
+        locals["pybind11_base_cls"] = reinterpret_borrow<object>(
             get_internals().instance_base);
         PyObject *result = PyRun_String(R"""(
 pybind11_enum_base_cls = pybind11_base_cls
 pybind11_enum_meta_cls = pybind11_meta_cls
-builtins_dict['print'](pybind11_base_cls)
-)""", Py_file_input, d.ptr(), d.ptr());
+
+class pybind11_enum_meta_cls(pybind11_meta_cls):
+    def stuff(self):
+        return "yuhhhh"
+)""", Py_file_input, globals().ptr(), locals.ptr());
         if (result == nullptr) {
             throw error_already_set();
         }
-        enum_meta_cls = d["pybind11_enum_meta_cls"];
-        enum_base_cls = d["pybind11_enum_base_cls"];
+        enum_meta_cls = locals["pybind11_enum_meta_cls"];
+        enum_base_cls = locals["pybind11_enum_base_cls"];
     }
 
     static const enum_meta_info& get() {
@@ -1757,6 +1759,7 @@ public:
     enum_(const handle &scope, const char *name, const Extra&... extra)
       : class_<Type>(
             scope, name,
+            // Can't re-declare base type???
             // detail::enum_meta_info::get().enum_base_cls,
             pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
             extra...),
