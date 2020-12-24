@@ -1572,15 +1572,11 @@ inline str enum_name(handle arg) {
 struct enum_meta_info {
     pybind11::object enum_meta_cls;
     pybind11::object enum_base_cls;
-    pybind11::dict globals;
     pybind11::dict locals;
 
     enum_meta_info() {
-        pybind11::dict actual_globals = pybind11::globals();
-        globals = pybind11::dict();
-        for (auto pair : actual_globals) {
-            globals[pair.first] = pair.second;
-        }
+        handle copy = pybind11::module::import("copy").attr("copy");
+        locals = copy(pybind11::globals());
         locals["pybind11_meta_cls"] = reinterpret_borrow<object>(
             reinterpret_cast<PyObject*>(get_internals().default_metaclass));
         locals["pybind11_base_cls"] = reinterpret_borrow<object>(
@@ -1590,7 +1586,7 @@ struct enum_meta_info {
         int closeit = 1;
         int start = Py_file_input;
         PyObject *result = PyRun_FileEx(
-            fd, filename, start, globals.ptr(), locals.ptr(), closeit);
+            fd, filename, start, locals.ptr(), locals.ptr(), closeit);
         if (result == nullptr) {
             throw error_already_set();
         }
