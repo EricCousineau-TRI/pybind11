@@ -1,15 +1,18 @@
-try:
-    import enum
-except ModuleNotFoundError:
-    enum = None
+# try:
+#     import enum
+# except ModuleNotFoundError:
+#     enum = None
 
-if enum is not None:
+# if enum is not None:
+if False:
 
     def _instancecheck(cls, instance):
+        print(("instance", cls, instance))
         subclass = type(instance)
         return issubclass(subclass, cls)
 
     def _subclasscheck(cls, subclass):
+        print(("subclass", cls, subclass))
         if type.__subclasscheck__(enum.Enum, cls) and type.__subclasscheck__(cls, subclass):
             return True
         elif type.__subclasscheck__(pybind11_base_cls, cls):
