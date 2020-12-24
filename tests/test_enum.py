@@ -29,10 +29,12 @@ def test_pep435():
     assert len(cls) == len(names)
     assert list(cls) == list(values)
     assert is_enum(cls)
-    # assert issubclass(cls, enum.Enum)
+    if enum:
+        assert not issubclass(cls, enum.Enum)
     for name, value, raw_value in zip(names, values, raw_values):
         assert isinstance(value, cls)
-        # assert isinstance(value, enum.Enum)
+        if enum:
+            assert not isinstance(value, enum.Enum)
         assert value.name == name
         assert value.value == raw_value
 
