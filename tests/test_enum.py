@@ -1,10 +1,23 @@
 # -*- coding: utf-8 -*-
+import enum
+
 import pytest
 from pybind11_tests import enums as m
 
 
 def test_meta():
-    print(m.UnscopedEnum.stuff())
+    cls = m.UnscopedEnum
+    names = ("EOne", "ETwo", "EThree")
+    values = (cls.EOne, cls.ETwo, cls.EThree)
+    raw_values = (1, 2, 3)
+    assert len(cls) == len(names)
+    assert list(cls) == list(values)
+    assert issubclass(cls, enum.Enum)
+    for name, value, raw_value in zip(names, values, raw_values):
+        assert isinstance(value, cls)
+        assert isinstance(value, enum.Enum)
+        assert value.name == name
+        assert value.value == raw_value
 
 
 def test_unscoped_enum():
