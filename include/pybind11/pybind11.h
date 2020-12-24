@@ -1571,11 +1571,6 @@ inline str enum_name(handle arg) {
 
 class enum_meta_info {
 public:
-    static const enum_meta_info& get() {
-        return pybind11::get_or_create_shared_data<enum_meta_info>(
-            "_pybind11_enum_meta_info");
-    }
-
     static pybind11::object enum_meta_cls() {
         return get().enum_meta_cls_;
     }
@@ -1587,6 +1582,11 @@ public:
 private:
     template <typename T>
     friend T& pybind11::get_or_create_shared_data(const std::string&);
+
+    static const enum_meta_info& get() {
+        return pybind11::get_or_create_shared_data<enum_meta_info>(
+            "_pybind11_enum_meta_info");
+    }
 
     enum_meta_info() {
         handle copy = pybind11::module::import("copy").attr("copy");
