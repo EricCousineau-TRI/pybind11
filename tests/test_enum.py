@@ -12,6 +12,7 @@ else:
 
 
 def is_enum(cls):
+    """Example showing how to recognize a class as pybind11 enum or a Python 3.5+ enum."""
     if enum is not None:
         if issubclass(cls, enum.Enum):
             return True

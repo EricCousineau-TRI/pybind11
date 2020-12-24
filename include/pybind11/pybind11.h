@@ -1569,35 +1569,57 @@ inline str enum_name(handle arg) {
     return "???";
 }
 
-struct enum_meta_info {
-    pybind11::object enum_meta_cls;
-    pybind11::object enum_base_cls;
-    pybind11::dict locals;
+class enum_meta_info {
+public:
+    static const enum_meta_info& get() {
+        return pybind11::get_or_create_shared_data<enum_meta_info>(
+            "_pybind11_enum_meta_info");
+    }
+
+    static pybind11::object enum_meta_cls() {
+        return get().enum_meta_cls_;
+    }
+
+    static pybind11::object enum_base_cls() {
+        return get().enum_base_cls_;
+    }
+
+private:
+    template <typename T>
+    friend T& pybind11::get_or_create_shared_data(const std::string&);
 
     enum_meta_info() {
         handle copy = pybind11::module::import("copy").attr("copy");
-        locals = copy(pybind11::globals());
-        locals["pybind11_meta_cls"] = reinterpret_borrow<object>(
+        locals_ = copy(pybind11::globals());
+        locals_["pybind11_meta_cls"] = reinterpret_borrow<object>(
             reinterpret_cast<PyObject*>(get_internals().default_metaclass));
-        locals["pybind11_base_cls"] = reinterpret_borrow<object>(
+        locals_["pybind11_base_cls"] = reinterpret_borrow<object>(
             get_internals().instance_base);
-        const char* filename = "/home/eacousineau/proj/tri/repo/externals/pybind11/include/pybind11/pybind11_internals.py";
-        FILE* fd = fopen(filename, "r");
-        int closeit = 1;
-        int start = Py_file_input;
-        PyObject *result = PyRun_FileEx(
-            fd, filename, start, locals.ptr(), locals.ptr(), closeit);
+        // TODO: Make the base class work.
+        const char code[] = R"""(
+pybind11_enum_base_cls = None
+
+class pybind11_enum_meta_cls(pybind11_meta_cls):
+    is_pybind11_enum = True
+
+    def __iter__(cls):
+        return iter(cls.__members__.values())
+
+    def __len__(cls):
+        return len(cls.__members__)
+)""";
+        PyObject *result = PyRun_String(
+            code, Py_file_input, locals_.ptr(), locals_.ptr());
         if (result == nullptr) {
             throw error_already_set();
         }
-        enum_meta_cls = locals["pybind11_enum_meta_cls"];
-        enum_base_cls = locals["pybind11_enum_base_cls"];
+        enum_meta_cls_ = locals_["pybind11_enum_meta_cls"];
+        enum_base_cls_ = locals_["pybind11_enum_base_cls"];
     }
 
-    static const enum_meta_info& get() {
-        return pybind11::get_or_create_shared_data<enum_meta_info>(
-            "_pybind11_enum");
-    }
+    pybind11::object enum_meta_cls_;
+    pybind11::object enum_base_cls_;
+    pybind11::dict locals_;
 };
 
 struct enum_base {
@@ -1761,8 +1783,8 @@ public:
       : class_<Type>(
             scope, name,
             // Can't re-declare base type???
-            // detail::enum_meta_info::get().enum_base_cls,
-            pybind11::metaclass(detail::enum_meta_info::get().enum_meta_cls),
+            // detail::enum_meta_info::enum_base_cls(),
+            pybind11::metaclass(detail::enum_meta_info::enum_meta_cls()),
             extra...),
         m_base(*this, scope) {
         constexpr bool is_arithmetic = detail::any_of<std::is_same<arithmetic, Extra>...>::value;
