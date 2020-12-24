@@ -1,17 +1,33 @@
 # -*- coding: utf-8 -*-
-import enum
-
 import pytest
+
+import env  # noqa: F401
+
 from pybind11_tests import enums as m
 
+if env.PY2:
+    enum = None
+else:
+    import enum
 
-def test_meta():
+
+def is_enum(cls):
+    if enum is not None:
+        if issubclass(cls, enum.Enum):
+            return True
+    return getattr(cls, "is_pybind11_enum", False)
+
+
+def test_pep435():
+    # See #2332.
     cls = m.UnscopedEnum
     names = ("EOne", "ETwo", "EThree")
     values = (cls.EOne, cls.ETwo, cls.EThree)
     raw_values = (1, 2, 3)
+
     assert len(cls) == len(names)
     assert list(cls) == list(values)
+    assert is_enum(cls)
     # assert issubclass(cls, enum.Enum)
     for name, value, raw_value in zip(names, values, raw_values):
         assert isinstance(value, cls)
