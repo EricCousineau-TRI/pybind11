@@ -8,16 +8,12 @@ class Dispatcher;
 class Client
 {
 public:
-    Client(Dispatcher* disp): PtrD(disp)
+    Client()
     {
         std::cout << "In Client::Client\n";
     }
     virtual ~Client(){};
-    virtual void ProcessEvent()
-    {
-        std::cout << "THIS SHOULDN'T HAPPEN --In Client::ProcessEvent\n";
-    }
-    Dispatcher* PtrD;
+    virtual void ProcessEvent() = 0;
 };
 
 class Dispatcher
@@ -27,19 +23,12 @@ public:
     {
         std::cout << "In Dispatcher::Dispatcher\n";
     }
-    virtual ~Dispatcher(){};
 
     void Dispatch(Client* client)
     {
         std::cout << "Dispatcher::Dispatch called by " << client << std::endl;
         client->ProcessEvent();
     }
-};
-
-class DispatcherTrampoline : public Dispatcher
-{
-public:
-    using Dispatcher::Dispatcher;
 };
 
 class ClientTrampoline : public Client
@@ -49,18 +38,17 @@ public:
 
     void ProcessEvent() override
     {
-        PYBIND11_OVERLOAD(void,Client,ProcessEvent,);
+        PYBIND11_OVERLOAD_PURE(void,Client,ProcessEvent,);
     }
 };
 
 TEST_SUBMODULE(issue1552, m)
 {
     py::class_<Client,ClientTrampoline> cli(m,"Client");
-    cli.def(py::init<Dispatcher* >());
+    cli.def(py::init());
     cli.def("ProcessEvent",&Client::ProcessEvent);
-    cli.def_readwrite("PtrD",&Client::PtrD);
 
-    py::class_<Dispatcher,DispatcherTrampoline> dsp(m,"Dispatcher");
+    py::class_<Dispatcher> dsp(m,"Dispatcher");
     dsp.def(py::init< >());
     dsp.def("Dispatch",&Dispatcher::Dispatch);
 }
