@@ -558,7 +558,7 @@ struct instance {
     bool has_patients : 1;
 
     typedef void (*release_to_cpp_t)(instance* inst, holder_erased external_holder, object&& obj);
-    typedef object (*reclaim_from_cpp_t)(instance* inst, holder_erased external_holder);
+    using reclaim_from_cpp_t = object (*)(instance *, holder_erased);
 
     struct type_release_info_t {
       // Release an instance to C++ for pure C++ instances or Python-derived classes.

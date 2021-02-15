@@ -481,7 +481,7 @@ TEST_SUBMODULE(class_, m) {
     // Test #1922 (drake#11424).
     class ExampleVirt2 {
         public:
-            virtual ~ExampleVirt2() {}
+            virtual ~ExampleVirt2() = default;
             virtual std::string get_name() const { return "ExampleVirt2"; }
         };
     class PyExampleVirt2 : public ExampleVirt2 {

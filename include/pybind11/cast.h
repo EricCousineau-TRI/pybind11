@@ -565,7 +565,7 @@ enum class LoadType {
 };
 
 typedef type_info* base_ptr_t;
-typedef const std::vector<base_ptr_t> bases_t;
+using bases_t = const std::vector<base_ptr_t>;
 
 inline LoadType determine_load_type(handle src, const type_info* typeinfo,
                              const bases_t** out_bases = nullptr,

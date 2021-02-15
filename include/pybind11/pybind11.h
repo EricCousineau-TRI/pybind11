@@ -1487,7 +1487,7 @@ public:
     static void del_wrapped(handle self, object del_orig) {
         // This should be called when the item is *actually* being deleted
         // TODO(eric.cousineau): Do we care about use cases where the user manually calls this?
-        detail::instance* inst = (detail::instance*)self.ptr();
+        auto *inst = (detail::instance *) self.ptr();
         const detail::type_info *lowest_type = detail::get_lowest_type(self);
         auto& release_info = lowest_type->release_info;
         // The references are as follows:
@@ -1561,7 +1561,7 @@ public:
             }
         }
         bool transfer_holder = true;
-        holder_type& holder = v_h.holder<holder_type>();
+        auto &holder = v_h.holder<holder_type>();
         if (!external_holder_raw.ptr()) {
             if (holder_check::allow_null_external_holder(holder))
                 transfer_holder = false;
@@ -1570,7 +1570,7 @@ public:
         }
         if (transfer_holder) {
             if (external_holder_raw.type_id() == holder_type_id) {
-                holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
+                auto &external_holder = external_holder_raw.mutable_cast<holder_type>();
                 external_holder = std::move(holder);
             } else {
                 // Only allow unique_ptr<> -> shared_ptr<>
@@ -1608,8 +1608,8 @@ public:
         {
             // TODO(eric.cousineau): Consider releasing a raw pointer, to make it easier for
             // interop with purely raw pointers? Nah, just rely on release.
-            holder_type& holder = v_h.holder<holder_type>();
-            holder_type& external_holder = external_holder_raw.mutable_cast<holder_type>();
+            auto &holder = v_h.holder<holder_type>();
+            auto &external_holder = external_holder_raw.mutable_cast<holder_type>();
             new (&holder) holder_type(std::move(external_holder));
             v_h.set_holder_constructed(true);
 
