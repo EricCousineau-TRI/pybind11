@@ -1638,7 +1638,7 @@ class wrapper : public Base {
  public:
   using Base::Base;
 
-  virtual ~wrapper() {
+  virtual ~wrapper() {  // NOLINT(modernize-use-override)
       delete_py_if_in_cpp();
   }
 

@@ -1328,7 +1328,7 @@ template <>
 struct holder_check_impl<detail::HolderTypeId::SharedPtr> : public holder_check_impl<detail::HolderTypeId::Unknown> {
     template <typename holder_type>
     static bool check_destruct(detail::instance* inst, detail::holder_erased holder_raw) {
-        const holder_type& h = holder_raw.cast<holder_type>();
+        const auto& h = holder_raw.cast<holder_type>();
         handle src((PyObject*)inst);
         const detail::type_info *lowest_type = get_lowest_type(src, false);
         if (!lowest_type)
