@@ -371,7 +371,6 @@ def test_unique_ptr_overload_fail():
 
 
 def test_unique_ptr_held_container_from_cpp():
-
     def check_reset(obj_new):
         c = m.UniquePtrHeldContainer()
         obj = c.get()

@@ -190,26 +190,26 @@ def check_array(a, b):
 
 
 def test_eigen_passing_adscalar():
-    assert m.equal_to(1., 1.)
-    assert not m.equal_to(1., 1.1)
-    assert m.equal_to(m.AutoDiffXd(0, [1.]), m.AutoDiffXd(0, [1.]))
-    assert not m.equal_to(m.AutoDiffXd(0, [1.]), m.AutoDiffXd(0, [1.1]))
+    assert m.equal_to(1.0, 1.0)
+    assert not m.equal_to(1.0, 1.1)
+    assert m.equal_to(m.AutoDiffXd(0, [1.0]), m.AutoDiffXd(0, [1.0]))
+    assert not m.equal_to(m.AutoDiffXd(0, [1.0]), m.AutoDiffXd(0, [1.1]))
 
-    adscalar_mat = float_to_adscalar(ref, deriv=[1.])
+    adscalar_mat = float_to_adscalar(ref, deriv=[1.0])
     adscalar_vec_col = adscalar_mat[:, 0]
     adscalar_vec_row = adscalar_mat[0, :]
 
     # Checking if a Python vector is getting doubled, when passed into a dynamic or fixed
     # row or col vector in Eigen.
-    double_adscalar_mat = float_to_adscalar(2 * ref, deriv=[2.])
+    double_adscalar_mat = float_to_adscalar(2 * ref, deriv=[2.0])
     check_array(m.double_adscalar_col(adscalar_vec_col), double_adscalar_mat[:, 0])
     check_array(m.double_adscalar_col5(adscalar_vec_col), double_adscalar_mat[:, 0])
     check_array(m.double_adscalar_row(adscalar_vec_row), double_adscalar_mat[0, :])
     check_array(m.double_adscalar_row6(adscalar_vec_row), double_adscalar_mat[0, :])
 
     # Adding 7 to the a dynamic matrix using reference.
-    incr_adscalar_mat = float_to_adscalar(ref + 7, deriv=[1.])
-    check_array(m.incr_adscalar_matrix(adscalar_mat, 7.), incr_adscalar_mat)
+    incr_adscalar_mat = float_to_adscalar(ref + 7, deriv=[1.0])
+    check_array(m.incr_adscalar_matrix(adscalar_mat, 7.0), incr_adscalar_mat)
     # The original adscalar_mat remains unchanged in spite of passing by reference, since
     # `Eigen::Ref<const CType>` permits copying, and copying is the only valid operation for
     # `dtype=object`.

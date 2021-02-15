@@ -34,13 +34,11 @@ def define_child(name, base_type, stats_type):
     return ChildT
 
 
-ChildBad = define_child('ChildBad', m.BaseBad, m.ChildBadStats)
-Child = define_child('Child', m.Base, m.ChildStats)
+ChildBad = define_child("ChildBad", m.BaseBad, m.ChildBadStats)
+Child = define_child("Child", m.Base, m.ChildStats)
 
-ChildBadUnique = define_child(
-    'ChildBadUnique', m.BaseBadUnique, m.ChildBadUniqueStats)
-ChildUnique = define_child(
-    'ChildUnique', m.BaseUnique, m.ChildUniqueStats)
+ChildBadUnique = define_child("ChildBadUnique", m.BaseBadUnique, m.ChildBadUniqueStats)
+ChildUnique = define_child("ChildUnique", m.BaseUnique, m.ChildUniqueStats)
 
 
 # TODO(eric.cousineau): See if this is at all possibly on PyPy.

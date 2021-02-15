@@ -479,7 +479,8 @@ def test_register_duplicate_class():
 
 @pytest.mark.skip(
     reason="Generally reproducible in CPython, Python 3, non-debug, on Linux. "
-           "However, hard to pin this down for CI.")
+    "However, hard to pin this down for CI."
+)
 def test_1922():
     # Test #1922 (drake#11424).
     # Define a derived class which *does not* overload the method.
