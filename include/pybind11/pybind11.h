@@ -29,6 +29,7 @@
 #  pragma warning(disable: 4996) // warning C4996: The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name
 #  pragma warning(disable: 4702) // warning C4702: unreachable code
 #  pragma warning(disable: 4522) // warning C4522: multiple assignment operators specified
+#  pragma warning(disable: 4505) // warning C4505: 'PySlice_GetIndicesEx': unreferenced local function has been removed (PyPy only)
 #elif defined(__GNUG__) && !defined(__clang__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wunused-but-set-parameter"
@@ -116,9 +117,16 @@ public:
     object name() const { return attr("__name__"); }
 
 protected:
+    struct InitializingFunctionRecordDeleter {
+        // `destruct(function_record, false)`: `initialize_generic` copies strings and
+        // takes care of cleaning up in case of exceptions. So pass `false` to `free_strings`.
+        void operator()(detail::function_record * rec) { destruct(rec, false); }
+    };
+    using unique_function_record = std::unique_ptr<detail::function_record, InitializingFunctionRecordDeleter>;
+
     /// Space optimization: don't inline this frequently instantiated fragment
-    PYBIND11_NOINLINE detail::function_record *make_function_record() {
-        return new detail::function_record();
+    PYBIND11_NOINLINE unique_function_record make_function_record() {
+        return unique_function_record(new detail::function_record());
     }
 
     /// Special internal constructor for functors, lambda functions, etc.
@@ -128,7 +136,9 @@ protected:
         struct capture { remove_reference_t<Func> f; };
 
         /* Store the function including any extra state it might have (e.g. a lambda capture object) */
-        auto rec = make_function_record();
+        // The unique_ptr makes sure nothing is leaked in case of an exception.
+        auto unique_rec = make_function_record();
+        auto rec = unique_rec.get();
 
         /* Store the capture object directly in the function record if there is enough space */
         if (sizeof(capture) <= sizeof(rec->data)) {
@@ -209,7 +219,8 @@ protected:
         PYBIND11_DESCR_CONSTEXPR auto types = decltype(signature)::types();
 
         /* Register the function with Python from generic (non-templated) code */
-        initialize_generic(rec, signature.text, types.data(), sizeof...(Args));
+        // Pass on the ownership over the `unique_rec` to `initialize_generic`. `rec` stays valid.
+        initialize_generic(std::move(unique_rec), signature.text, types.data(), sizeof...(Args));
 
         if (cast_in::has_args) rec->has_args = true;
         if (cast_in::has_kwargs) rec->has_kwargs = true;
@@ -225,20 +236,51 @@ protected:
         }
     }
 
+    // Utility class that keeps track of all duplicated strings, and cleans them up in its destructor,
+    // unless they are released. Basically a RAII-solution to deal with exceptions along the way.
+    class strdup_guard {
+    public:
+        ~strdup_guard() {
+            for (auto s : strings)
+                std::free(s);
+        }
+        char *operator()(const char *s) {
+            auto t = strdup(s);
+            strings.push_back(t);
+            return t;
+        }
+        void release() {
+            strings.clear();
+        }
+    private:
+        std::vector<char *> strings;
+    };
+
     /// Register a function call with Python (generic non-templated code goes here)
-    void initialize_generic(detail::function_record *rec, const char *text,
+    void initialize_generic(unique_function_record &&unique_rec, const char *text,
                             const std::type_info *const *types, size_t args) {
+        // Do NOT receive `unique_rec` by value. If this function fails to move out the unique_ptr,
+        // we do not want this to destuct the pointer. `initialize` (the caller) still relies on the
+        // pointee being alive after this call. Only move out if a `capsule` is going to keep it alive.
+        auto rec = unique_rec.get();
+
+        // Keep track of strdup'ed strings, and clean them up as long as the function's capsule
+        // has not taken ownership yet (when `unique_rec.release()` is called).
+        // Note: This cannot easily be fixed by a `unique_ptr` with custom deleter, because the strings
+        // are only referenced before strdup'ing. So only *after* the following block could `destruct`
+        // safely be called, but even then, `repr` could still throw in the middle of copying all strings.
+        strdup_guard guarded_strdup;
 
         /* Create copies of all referenced C-style strings */
-        rec->name = strdup(rec->name ? rec->name : "");
-        if (rec->doc) rec->doc = strdup(rec->doc);
+        rec->name = guarded_strdup(rec->name ? rec->name : "");
+        if (rec->doc) rec->doc = guarded_strdup(rec->doc);
         for (auto &a: rec->args) {
             if (a.name)
-                a.name = strdup(a.name);
+                a.name = guarded_strdup(a.name);
             if (a.descr)
-                a.descr = strdup(a.descr);
+                a.descr = guarded_strdup(a.descr);
             else if (a.value)
-                a.descr = strdup(repr(a.value).cast<std::string>().c_str());
+                a.descr = guarded_strdup(repr(a.value).cast<std::string>().c_str());
         }
 
         rec->is_constructor = !strcmp(rec->name, "__init__") || !strcmp(rec->name, "__setstate__");
@@ -321,13 +363,13 @@ protected:
 #if PY_MAJOR_VERSION < 3
         if (strcmp(rec->name, "__next__") == 0) {
             std::free(rec->name);
-            rec->name = strdup("next");
+            rec->name = guarded_strdup("next");
         } else if (strcmp(rec->name, "__bool__") == 0) {
             std::free(rec->name);
-            rec->name = strdup("__nonzero__");
+            rec->name = guarded_strdup("__nonzero__");
         }
 #endif
-        rec->signature = strdup(signature.c_str());
+        rec->signature = guarded_strdup(signature.c_str());
         rec->args.shrink_to_fit();
         rec->nargs = (std::uint16_t) args;
 
@@ -358,9 +400,10 @@ protected:
             rec->def->ml_meth = reinterpret_cast<PyCFunction>(reinterpret_cast<void (*) (void)>(*dispatcher));
             rec->def->ml_flags = METH_VARARGS | METH_KEYWORDS;
 
-            capsule rec_capsule(rec, [](void *ptr) {
+            capsule rec_capsule(unique_rec.release(), [](void *ptr) {
                 destruct((detail::function_record *) ptr);
             });
+            guarded_strdup.release();
 
             object scope_module;
             if (rec->scope) {
@@ -395,13 +438,15 @@ protected:
                 chain_start = rec;
                 rec->next = chain;
                 auto rec_capsule = reinterpret_borrow<capsule>(((PyCFunctionObject *) m_ptr)->m_self);
-                rec_capsule.set_pointer(rec);
+                rec_capsule.set_pointer(unique_rec.release());
+                guarded_strdup.release();
             } else {
                 // Or end of chain (normal behavior)
                 chain_start = chain;
                 while (chain->next)
                     chain = chain->next;
-                chain->next = rec;
+                chain->next = unique_rec.release();
+                guarded_strdup.release();
             }
         }
 
@@ -441,9 +486,9 @@ protected:
 
         /* Install docstring */
         auto *func = (PyCFunctionObject *) m_ptr;
-        if (func->m_ml->ml_doc)
-            std::free(const_cast<char *>(func->m_ml->ml_doc));
-        func->m_ml->ml_doc = strdup(signatures.c_str());
+        std::free(const_cast<char *>(func->m_ml->ml_doc));
+        // Install docstring if it's non-empty (when at least one option is enabled)
+        func->m_ml->ml_doc = signatures.empty() ? nullptr : strdup(signatures.c_str());
 
         if (rec->is_method) {
             m_ptr = PYBIND11_INSTANCE_METHOD_NEW(m_ptr, rec->scope.ptr());
@@ -454,7 +499,7 @@ protected:
     }
 
     /// When a cpp_function is GCed, release any memory allocated by pybind11
-    static void destruct(detail::function_record *rec) {
+    static void destruct(detail::function_record *rec, bool free_strings = true) {
         // If on Python 3.9, check the interpreter "MICRO" (patch) version.
         // If this is running on 3.9.0, we have to work around a bug.
         #if !defined(PYPY_VERSION) && PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 9
@@ -465,14 +510,20 @@ protected:
             detail::function_record *next = rec->next;
             if (rec->free_data)
                 rec->free_data(rec);
-            std::free((char *) rec->name);
-            std::free((char *) rec->doc);
-            std::free((char *) rec->signature);
-            for (auto &arg: rec->args) {
-                std::free(const_cast<char *>(arg.name));
-                std::free(const_cast<char *>(arg.descr));
-                arg.value.dec_ref();
+            // During initialization, these strings might not have been copied yet,
+            // so they cannot be freed. Once the function has been created, they can.
+            // Check `make_function_record` for more details.
+            if (free_strings) {
+                std::free((char *) rec->name);
+                std::free((char *) rec->doc);
+                std::free((char *) rec->signature);
+                for (auto &arg: rec->args) {
+                    std::free(const_cast<char *>(arg.name));
+                    std::free(const_cast<char *>(arg.descr));
+                }
             }
+            for (auto &arg: rec->args)
+                arg.value.dec_ref();
             if (rec->def) {
                 std::free(const_cast<char *>(rec->def->ml_doc));
                 // Python 3.9.0 decref's these in the wrong order; rec->def
@@ -506,14 +557,14 @@ protected:
 
         auto self_value_and_holder = value_and_holder();
         if (overloads->is_constructor) {
-            const auto tinfo = get_type_info((PyTypeObject *) overloads->scope.ptr());
-            const auto pi = reinterpret_cast<instance *>(parent.ptr());
-            self_value_and_holder = pi->get_value_and_holder(tinfo, false);
-
-            if (!self_value_and_holder.type || !self_value_and_holder.inst) {
+            if (!PyObject_TypeCheck(parent.ptr(), (PyTypeObject *) overloads->scope.ptr())) {
                 PyErr_SetString(PyExc_TypeError, "__init__(self, ...) called with invalid `self` argument");
                 return nullptr;
             }
+
+            const auto tinfo = get_type_info((PyTypeObject *) overloads->scope.ptr());
+            const auto pi = reinterpret_cast<instance *>(parent.ptr());
+            self_value_and_holder = pi->get_value_and_holder(tinfo, true);
 
             // If this value is already registered it must mean __init__ is invoked multiple times;
             // we really can't support that in C++, so just ignore the second __init__.
@@ -608,15 +659,15 @@ protected:
                 // 1.5. Fill in any missing pos_only args from defaults if they exist
                 if (args_copied < func.nargs_pos_only) {
                     for (; args_copied < func.nargs_pos_only; ++args_copied) {
-                        const auto &arg = func.args[args_copied];
+                        const auto &arg_rec = func.args[args_copied];
                         handle value;
 
-                        if (arg.value) {
-                            value = arg.value;
+                        if (arg_rec.value) {
+                            value = arg_rec.value;
                         }
                         if (value) {
                             call.args.push_back(value);
-                            call.args_convert.push_back(arg.convert);
+                            call.args_convert.push_back(arg_rec.convert);
                         } else
                             break;
                     }
@@ -630,11 +681,11 @@ protected:
                     bool copied_kwargs = false;
 
                     for (; args_copied < num_args; ++args_copied) {
-                        const auto &arg = func.args[args_copied];
+                        const auto &arg_rec = func.args[args_copied];
 
                         handle value;
-                        if (kwargs_in && arg.name)
-                            value = PyDict_GetItemString(kwargs.ptr(), arg.name);
+                        if (kwargs_in && arg_rec.name)
+                            value = PyDict_GetItemString(kwargs.ptr(), arg_rec.name);
 
                         if (value) {
                             // Consume a kwargs value
@@ -642,14 +693,18 @@ protected:
                                 kwargs = reinterpret_steal<dict>(PyDict_Copy(kwargs.ptr()));
                                 copied_kwargs = true;
                             }
-                            PyDict_DelItemString(kwargs.ptr(), arg.name);
-                        } else if (arg.value) {
-                            value = arg.value;
+                            PyDict_DelItemString(kwargs.ptr(), arg_rec.name);
+                        } else if (arg_rec.value) {
+                            value = arg_rec.value;
+                        }
+
+                        if (!arg_rec.none && value.is_none()) {
+                            break;
                         }
 
                         if (value) {
                             call.args.push_back(value);
-                            call.args_convert.push_back(arg.convert);
+                            call.args_convert.push_back(arg_rec.convert);
                         }
                         else
                             break;
@@ -975,7 +1030,7 @@ public:
     /** \rst
         Create a new top-level module that can be used as the main module of a C extension.
 
-        For Python 3, ``def`` should point to a staticly allocated module_def.
+        For Python 3, ``def`` should point to a statically allocated module_def.
         For Python 2, ``def`` can be a nullptr and is completely ignored.
     \endrst */
     static module_ create_extension_module(const char *name, const char *doc, module_def *def) {
@@ -1003,7 +1058,7 @@ public:
                 throw error_already_set();
             pybind11_fail("Internal error in module_::create_extension_module()");
         }
-        // TODO: Sould be reinterpret_steal for Python 3, but Python also steals it again when returned from PyInit_...
+        // TODO: Should be reinterpret_steal for Python 3, but Python also steals it again when returned from PyInit_...
         //       For Python 2, reinterpret_borrow is correct.
         return reinterpret_borrow<module_>(m);
     }
@@ -1025,7 +1080,6 @@ inline dict globals() {
 PYBIND11_NAMESPACE_BEGIN(detail)
 /// Generic support for creating new Python heap types
 class generic_type : public object {
-    template <typename...> friend class class_;
 public:
     PYBIND11_OBJECT_DEFAULT(generic_type, object, PyType_Check)
 protected:
@@ -1646,7 +1700,8 @@ public:
         return *this;
     }
 
-    template <typename Func> class_& def_buffer(Func &&func) {
+    template <typename Func>
+    class_& def_buffer(Func &&func) {
         struct capture { Func func; };
         auto *ptr = new capture { std::forward<Func>(func) };
         install_buffer_funcs([](PyObject *obj, void *ptr) -> buffer_info* {
@@ -1655,6 +1710,10 @@ public:
                 return nullptr;
             return new buffer_info(((capture *) ptr)->func(caster));
         }, ptr);
+        weakref(m_ptr, cpp_function([ptr](handle wr) {
+            delete ptr;
+            wr.dec_ref();
+        })).release();
         return *this;
     }
 
@@ -1781,14 +1840,13 @@ private:
     template <typename T>
     static void init_holder(detail::instance *inst, detail::value_and_holder &v_h,
             const holder_type * /* unused */, const std::enable_shared_from_this<T> * /* dummy */) {
-        try {
-            auto sh = std::dynamic_pointer_cast<typename holder_type::element_type>(
-                    v_h.value_ptr<type>()->shared_from_this());
-            if (sh) {
-                new (std::addressof(v_h.holder<holder_type>())) holder_type(std::move(sh));
-                v_h.set_holder_constructed();
-            }
-        } catch (const std::bad_weak_ptr &) {}
+
+        auto sh = std::dynamic_pointer_cast<typename holder_type::element_type>(
+                detail::try_get_shared_from_this(v_h.value_ptr<type>()));
+        if (sh) {
+            new (std::addressof(v_h.holder<holder_type>())) holder_type(std::move(sh));
+            v_h.set_holder_constructed();
+        }
 
         if (!v_h.holder_constructed() && inst->owned) {
             new (std::addressof(v_h.holder<holder_type>())) holder_type(v_h.value_ptr<type>());
@@ -2021,7 +2079,7 @@ struct enum_base {
                         strict_behavior;                                               \
                     return expr;                                                       \
                 },                                                                     \
-                name(op), is_method(m_base))
+                name(op), is_method(m_base), arg("other"))
 
         #define PYBIND11_ENUM_OP_CONV(op, expr)                                        \
             m_base.attr(op) = cpp_function(                                            \
@@ -2029,7 +2087,7 @@ struct enum_base {
                     int_ a(a_), b(b_);                                                 \
                     return expr;                                                       \
                 },                                                                     \
-                name(op), is_method(m_base))
+                name(op), is_method(m_base), arg("other"))
 
         #define PYBIND11_ENUM_OP_CONV_LHS(op, expr)                                    \
             m_base.attr(op) = cpp_function(                                            \
@@ -2037,7 +2095,7 @@ struct enum_base {
                     int_ a(a_);                                                        \
                     return expr;                                                       \
                 },                                                                     \
-                name(op), is_method(m_base))
+                name(op), is_method(m_base), arg("other"))
 
         if (is_convertible) {
             PYBIND11_ENUM_OP_CONV_LHS("__eq__", !b.is_none() &&  a.equal(b));
@@ -2123,7 +2181,8 @@ public:
         constexpr bool is_convertible = std::is_convertible<Type, Scalar>::value;
         m_base.init(is_arithmetic, is_convertible);
 
-        def(init([](Scalar i) { return static_cast<Type>(i); }));
+        def(init([](Scalar i) { return static_cast<Type>(i); }), arg("value"));
+        def_property_readonly("value", [](Type value) { return (Scalar) value; });
         def("__int__", [](Type value) { return (Scalar) value; });
         #if PY_MAJOR_VERSION < 3
             def("__long__", [](Type value) { return (Scalar) value; });
@@ -2137,7 +2196,7 @@ public:
                 detail::initimpl::setstate<Base>(v_h, static_cast<Type>(arg),
                         Py_TYPE(v_h.inst) != v_h.type->type); },
             detail::is_new_style_constructor(),
-            pybind11::name("__setstate__"), is_method(*this));
+            pybind11::name("__setstate__"), is_method(*this), arg("state"));
     }
 
     /// Export enumeration entries into the parent scope
@@ -2232,10 +2291,12 @@ PYBIND11_NAMESPACE_END(detail)
 template <return_value_policy Policy = return_value_policy::reference_internal,
           typename Iterator,
           typename Sentinel,
+#ifndef DOXYGEN_SHOULD_SKIP_THIS  // Issue in breathe 4.26.1
           typename ValueType = decltype(*std::declval<Iterator>()),
+#endif
           typename... Extra>
 iterator make_iterator(Iterator first, Sentinel last, Extra &&... extra) {
-    typedef detail::iterator_state<Iterator, Sentinel, false, Policy> state;
+    using state = detail::iterator_state<Iterator, Sentinel, false, Policy>;
 
     if (!detail::get_type_info(typeid(state), false)) {
         class_<state>(handle(), "iterator", pybind11::module_local())
@@ -2261,7 +2322,9 @@ iterator make_iterator(Iterator first, Sentinel last, Extra &&... extra) {
 template <return_value_policy Policy = return_value_policy::reference_internal,
           typename Iterator,
           typename Sentinel,
+#ifndef DOXYGEN_SHOULD_SKIP_THIS  // Issue in breathe 4.26.1
           typename KeyType = decltype((*std::declval<Iterator>()).first),
+#endif
           typename... Extra>
 iterator make_key_iterator(Iterator first, Sentinel last, Extra &&... extra) {
     using state = detail::iterator_state<Iterator, Sentinel, true, Policy>;
@@ -2302,7 +2365,7 @@ template <return_value_policy Policy = return_value_policy::reference_internal,
 template <typename InputType, typename OutputType> void implicitly_convertible() {
     struct set_flag {
         bool &flag;
-        set_flag(bool &flag) : flag(flag) { flag = true; }
+        set_flag(bool &flag_) : flag(flag_) { flag_ = true; }
         ~set_flag() { flag = false; }
     };
     auto implicit_caster = [](PyObject *obj, PyTypeObject *type) -> PyObject * {
@@ -2482,15 +2545,7 @@ public:
         }
 
         if (release) {
-            /* Work around an annoying assertion in PyThreadState_Swap */
-            #if defined(Py_DEBUG)
-                PyInterpreterState *interp = tstate->interp;
-                tstate->interp = nullptr;
-            #endif
             PyEval_AcquireThread(tstate);
-            #if defined(Py_DEBUG)
-                tstate->interp = interp;
-            #endif
         }
 
         inc_ref();
@@ -2514,10 +2569,20 @@ public:
                     pybind11_fail("scoped_acquire::dec_ref(): internal error!");
             #endif
             PyThreadState_Clear(tstate);
-            PyThreadState_DeleteCurrent();
+            if (active)
+                PyThreadState_DeleteCurrent();
             PYBIND11_TLS_DELETE_VALUE(detail::get_internals().tstate);
             release = false;
         }
+    }
+
+    /// This method will disable the PyThreadState_DeleteCurrent call and the
+    /// GIL won't be acquired. This method should be used if the interpreter
+    /// could be shutting down when this is called, as thread deletion is not
+    /// allowed during shutdown. Check _Py_IsFinalizing() on Python 3.7+, and
+    /// protect subsequent code.
+    PYBIND11_NOINLINE void disarm() {
+        active = false;
     }
 
     PYBIND11_NOINLINE ~gil_scoped_acquire() {
@@ -2528,6 +2593,7 @@ public:
 private:
     PyThreadState *tstate = nullptr;
     bool release = true;
+    bool active = true;
 };
 
 class gil_scoped_release {
@@ -2543,10 +2609,22 @@ public:
             PYBIND11_TLS_DELETE_VALUE(key);
         }
     }
+
+    /// This method will disable the PyThreadState_DeleteCurrent call and the
+    /// GIL won't be acquired. This method should be used if the interpreter
+    /// could be shutting down when this is called, as thread deletion is not
+    /// allowed during shutdown. Check _Py_IsFinalizing() on Python 3.7+, and
+    /// protect subsequent code.
+    PYBIND11_NOINLINE void disarm() {
+        active = false;
+    }
+
     ~gil_scoped_release() {
         if (!tstate)
             return;
-        PyEval_RestoreThread(tstate);
+        // `PyEval_RestoreThread()` should not be called if runtime is finalizing
+        if (active)
+            PyEval_RestoreThread(tstate);
         if (disassoc) {
             auto key = detail::get_internals().tstate;
             PYBIND11_TLS_REPLACE_VALUE(key, tstate);
@@ -2555,6 +2633,7 @@ public:
 private:
     PyThreadState *tstate;
     bool disassoc;
+    bool active = true;
 };
 #elif defined(PYPY_VERSION)
 class gil_scoped_acquire {
@@ -2562,6 +2641,7 @@ class gil_scoped_acquire {
 public:
     gil_scoped_acquire() { state = PyGILState_Ensure(); }
     ~gil_scoped_acquire() { PyGILState_Release(state); }
+    void disarm() {}
 };
 
 class gil_scoped_release {
@@ -2569,10 +2649,15 @@ class gil_scoped_release {
 public:
     gil_scoped_release() { state = PyEval_SaveThread(); }
     ~gil_scoped_release() { PyEval_RestoreThread(state); }
+    void disarm() {}
 };
 #else
-class gil_scoped_acquire { };
-class gil_scoped_release { };
+class gil_scoped_acquire {
+    void disarm() {}
+};
+class gil_scoped_release {
+    void disarm() {}
+};
 #endif
 
 error_already_set::~error_already_set() {
@@ -2650,7 +2735,7 @@ PYBIND11_NAMESPACE_END(detail)
 /** \rst
   Try to retrieve a python method by the provided name from the instance pointed to by the this_ptr.
 
-  :this_ptr: The pointer to the object the overriden method should be retrieved for. This should be
+  :this_ptr: The pointer to the object the overridden method should be retrieved for. This should be
              the first non-trampoline class encountered in the inheritance chain.
   :name: The name of the overridden Python method to retrieve.
   :return: The Python method by this name from the object or an empty function wrapper.

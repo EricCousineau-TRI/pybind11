@@ -7,6 +7,13 @@
     BSD-style license that can be found in the LICENSE file.
 */
 
+#if defined(__INTEL_COMPILER) && __cplusplus >= 201703L
+// Intel compiler requires a separate header file to support aligned new operators
+// and does not set the __cpp_aligned_new feature macro.
+// This header needs to be included before pybind11.
+#include <aligned_new>
+#endif
+
 #include "pybind11_tests.h"
 #include "constructor_stats.h"
 #include "local_bindings.h"
@@ -231,7 +238,8 @@ TEST_SUBMODULE(class_, m) {
         };
 
         auto def = new PyMethodDef{"f", f, METH_VARARGS, nullptr};
-        return py::reinterpret_steal<py::object>(PyCFunction_NewEx(def, nullptr, m.ptr()));
+        py::capsule def_capsule(def, [](void *ptr) { delete reinterpret_cast<PyMethodDef *>(ptr); });
+        return py::reinterpret_steal<py::object>(PyCFunction_NewEx(def, def_capsule.ptr(), m.ptr()));
     }());
 
     // test_operator_new_delete
@@ -322,6 +330,10 @@ TEST_SUBMODULE(class_, m) {
 
     class PublicistB : public ProtectedB {
     public:
+        // [workaround(intel)] = default does not work here
+        // Removing or defaulting this destructor results in linking errors with the Intel compiler
+        // (in Debug builds only, tested with icpc (ICC) 2021.1 Beta 20200827)
+        ~PublicistB() override {};  // NOLINT(modernize-use-equals-default)
         using ProtectedB::foo;
     };
 
@@ -422,8 +434,7 @@ TEST_SUBMODULE(class_, m) {
     struct SamePointer {};
     static SamePointer samePointer;
     py::class_<SamePointer, std::unique_ptr<SamePointer, py::nodelete>>(m, "SamePointer")
-        .def(py::init([]() { return &samePointer; }))
-        .def("__del__", [](SamePointer&) { py::print("__del__ called"); });
+        .def(py::init([]() { return &samePointer; }));
 
     struct Empty {};
     py::class_<Empty>(m, "Empty")

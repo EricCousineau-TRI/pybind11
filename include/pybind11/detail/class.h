@@ -129,7 +129,7 @@ extern "C" inline int pybind11_meta_setattro(PyObject* obj, PyObject* name, PyOb
     //   2. `Type.static_prop = other_static_prop` --> setattro:  replace existing `static_prop`
     //   3. `Type.regular_attribute = value`       --> setattro:  regular attribute assignment
     const auto static_prop = (PyObject *) get_internals().static_property_type;
-    const auto call_descr_set = descr && PyObject_IsInstance(descr, static_prop)
+    const auto call_descr_set = descr && value && PyObject_IsInstance(descr, static_prop)
                                 && !PyObject_IsInstance(value, static_prop);
     if (call_descr_set) {
         // Call `static_property.__set__()` instead of replacing the `static_property`.
@@ -193,6 +193,44 @@ extern "C" inline PyObject *pybind11_meta_call(PyObject *type, PyObject *args, P
     return self;
 }
 
+/// Cleanup the type-info for a pybind11-registered type.
+extern "C" inline void pybind11_meta_dealloc(PyObject *obj) {
+    auto *type = (PyTypeObject *) obj;
+    auto &internals = get_internals();
+
+    // A pybind11-registered type will:
+    // 1) be found in internals.registered_types_py
+    // 2) have exactly one associated `detail::type_info`
+    auto found_type = internals.registered_types_py.find(type);
+    if (found_type != internals.registered_types_py.end() &&
+        found_type->second.size() == 1 &&
+        found_type->second[0]->type == type) {
+
+        auto *tinfo = found_type->second[0];
+        auto tindex = std::type_index(*tinfo->cpptype);
+        internals.direct_conversions.erase(tindex);
+
+        if (tinfo->module_local)
+            registered_local_types_cpp().erase(tindex);
+        else
+            internals.registered_types_cpp.erase(tindex);
+        internals.registered_types_py.erase(tinfo->type);
+
+        // Actually just `std::erase_if`, but that's only available in C++20
+        auto &cache = internals.inactive_override_cache;
+        for (auto it = cache.begin(), last = cache.end(); it != last; ) {
+            if (it->first == (PyObject *) tinfo->type)
+                it = cache.erase(it);
+            else
+                ++it;
+        }
+
+        delete tinfo;
+    }
+
+    PyType_Type.tp_dealloc(obj);
+}
+
 /** This metaclass is assigned by default to all pybind11 types and is required in order
     for static properties to function correctly. Users may override this using `py::metaclass`.
     Return value: New reference. */
@@ -224,6 +262,8 @@ inline PyTypeObject* make_default_metaclass() {
 #if PY_MAJOR_VERSION >= 3
     type->tp_getattro = pybind11_meta_getattro;
 #endif
+
+    type->tp_dealloc = pybind11_meta_dealloc;
 
     if (PyType_Ready(type) < 0)
         pybind11_fail("make_default_metaclass(): failure in PyType_Ready()!");
@@ -299,8 +339,6 @@ inline PyObject *make_new_instance(PyTypeObject *type) {
     auto inst = reinterpret_cast<instance *>(self);
     // Allocate the value/holder internals:
     inst->allocate_layout();
-
-    inst->owned = true;
 
     return self;
 }
@@ -512,6 +550,12 @@ extern "C" inline int pybind11_getbuffer(PyObject *obj, Py_buffer *view, int fla
     }
     std::memset(view, 0, sizeof(Py_buffer));
     buffer_info *info = tinfo->get_buffer(obj, tinfo->get_buffer_data);
+    if ((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE && info->readonly) {
+        delete info;
+        // view->obj = nullptr;  // Was just memset to 0, so not necessary
+        PyErr_SetString(PyExc_BufferError, "Writable buffer requested for readonly storage");
+        return -1;
+    }
     view->obj = obj;
     view->ndim = 1;
     view->internal = info;
@@ -521,12 +565,6 @@ extern "C" inline int pybind11_getbuffer(PyObject *obj, Py_buffer *view, int fla
     for (auto s : info->shape)
         view->len *= s;
     view->readonly = info->readonly;
-    if ((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE && info->readonly) {
-        if (view)
-            view->obj = nullptr;
-        PyErr_SetString(PyExc_BufferError, "Writable buffer requested for readonly storage");
-        return -1;
-    }
     if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT)
         view->format = const_cast<char *>(info->format.c_str());
     if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES) {

@@ -92,6 +92,10 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("bytes_from_string", []() { return py::bytes(std::string("foo")); });
     m.def("bytes_from_str", []() { return py::bytes(py::str("bar", 3)); });
 
+    // test bytearray
+    m.def("bytearray_from_string", []() { return py::bytearray(std::string("foo")); });
+    m.def("bytearray_size", []() { return py::bytearray("foo").size(); });
+
     // test_capsule
     m.def("return_capsule_with_destructor", []() {
         py::print("creating capsule");
@@ -210,6 +214,7 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("default_constructors", []() {
         return py::dict(
             "bytes"_a=py::bytes(),
+            "bytearray"_a=py::bytearray(),
             "str"_a=py::str(),
             "bool"_a=py::bool_(),
             "int"_a=py::int_(),
@@ -224,6 +229,7 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("converting_constructors", [](py::dict d) {
         return py::dict(
             "bytes"_a=py::bytes(d["bytes"]),
+            "bytearray"_a=py::bytearray(d["bytearray"]),
             "str"_a=py::str(d["str"]),
             "bool"_a=py::bool_(d["bool"]),
             "int"_a=py::int_(d["int"]),
@@ -240,6 +246,7 @@ TEST_SUBMODULE(pytypes, m) {
         // When converting between Python types, obj.cast<T>() should be the same as T(obj)
         return py::dict(
             "bytes"_a=d["bytes"].cast<py::bytes>(),
+            "bytearray"_a=d["bytearray"].cast<py::bytearray>(),
             "str"_a=d["str"].cast<py::str>(),
             "bool"_a=d["bool"].cast<py::bool_>(),
             "int"_a=d["int"].cast<py::int_>(),
@@ -254,15 +261,18 @@ TEST_SUBMODULE(pytypes, m) {
 
     m.def("convert_to_pybind11_str", [](py::object o) { return py::str(o); });
 
-    m.def("nonconverting_constructor", [](std::string type, py::object value) -> py::object {
+    m.def("nonconverting_constructor", [](std::string type, py::object value, bool move) -> py::object {
         if (type == "bytes") {
-            return py::bytes(value);
+            return move ? py::bytes(std::move(value)) : py::bytes(value);
         }
         else if (type == "none") {
-            return py::none(value);
+            return move ? py::none(std::move(value)) : py::none(value);
         }
         else if (type == "ellipsis") {
-            return py::ellipsis(value);
+            return move ? py::ellipsis(std::move(value)) : py::ellipsis(value);
+        }
+        else if (type == "type") {
+            return move ? py::type(std::move(value)) : py::type(value);
         }
         throw std::runtime_error("Invalid type");
     });
@@ -404,10 +414,31 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("test_memoryview_from_memory", []() {
         const char* buf = "\xff\xe1\xab\x37";
         return py::memoryview::from_memory(
-            buf, static_cast<ssize_t>(strlen(buf)));
+            buf, static_cast<py::ssize_t>(strlen(buf)));
     });
 #endif
 
     // test_builtin_functions
     m.def("get_len", [](py::handle h) { return py::len(h); });
+
+#ifdef PYBIND11_STR_LEGACY_PERMISSIVE
+    m.attr("PYBIND11_STR_LEGACY_PERMISSIVE") = true;
+#endif
+
+    m.def("isinstance_pybind11_bytes", [](py::object o) { return py::isinstance<py::bytes>(o); });
+    m.def("isinstance_pybind11_str", [](py::object o) { return py::isinstance<py::str>(o); });
+
+    m.def("pass_to_pybind11_bytes", [](py::bytes b) { return py::len(b); });
+    m.def("pass_to_pybind11_str", [](py::str s) { return py::len(s); });
+    m.def("pass_to_std_string", [](std::string s) { return s.size(); });
+
+    // test_weakref
+    m.def("weakref_from_handle",
+          [](py::handle h) { return py::weakref(h); });
+    m.def("weakref_from_handle_and_function",
+          [](py::handle h, py::function f) { return py::weakref(h, f); });
+    m.def("weakref_from_object",
+          [](py::object o) { return py::weakref(o); });
+    m.def("weakref_from_object_and_function",
+          [](py::object o, py::function f) { return py::weakref(o, f); });
 }

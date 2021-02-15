@@ -211,6 +211,19 @@ PYBIND11_NOINLINE inline handle get_type_handle(const std::type_info &tp, bool t
     return handle(type_info ? ((PyObject *) type_info->type) : nullptr);
 }
 
+// Searches the inheritance graph for a registered Python instance, using all_type_info().
+PYBIND11_NOINLINE inline handle find_registered_python_instance(void *src,
+                                                                const detail::type_info *tinfo) {
+    auto it_instances = get_internals().registered_instances.equal_range(src);
+    for (auto it_i = it_instances.first; it_i != it_instances.second; ++it_i) {
+        for (auto instance_type : detail::all_type_info(Py_TYPE(it_i->second))) {
+            if (instance_type && same_type(*instance_type->cpptype, *tinfo->cpptype))
+                return handle((PyObject *) it_i->second).inc_ref();
+        }
+    }
+    return handle();
+}
+
 struct value_and_holder {
     instance *inst = nullptr;
     size_t index = 0u;
@@ -582,6 +595,9 @@ public:
         if (src == nullptr)
             return none().release();
 
+        if (handle registered_inst = find_registered_python_instance(src, tinfo))
+            return registered_inst;
+
         const bool take_ownership = policy == return_value_policy::automatic || policy == return_value_policy::take_ownership;
         // We only come across `!existing_holder` if we are coming from `cast` and not `cast_holder`.
         const bool is_bare_ptr = !existing_holder.ptr() && existing_holder.type_id() == HolderTypeId::Unknown;
@@ -710,6 +726,7 @@ public:
 
         // TODO(eric.cousineau): Propagate `holder_erased` through this chain.
         tinfo->init_instance(wrapper, existing_holder);
+
         return inst.release();
     }
 
@@ -1076,9 +1093,14 @@ template <typename type> class type_caster<std::reference_wrapper<type>> {
 private:
     using caster_t = make_caster<type>;
     caster_t subcaster;
-    using subcaster_cast_op_type = typename caster_t::template cast_op_type<type>;
-    static_assert(std::is_same<typename std::remove_const<type>::type &, subcaster_cast_op_type>::value,
-            "std::reference_wrapper<T> caster requires T to have a caster with an `T &` operator");
+    using reference_t = type&;
+    using subcaster_cast_op_type =
+        typename caster_t::template cast_op_type<reference_t>;
+
+    static_assert(std::is_same<typename std::remove_const<type>::type &, subcaster_cast_op_type>::value ||
+                  std::is_same<reference_t, subcaster_cast_op_type>::value,
+                  "std::reference_wrapper<T> caster requires T to have a caster with an "
+                  "`operator T &()` or `operator const T &()`");
 public:
     bool load(handle src, bool convert) { return subcaster.load(src, convert); }
     static constexpr auto name = caster_t::name;
@@ -1089,7 +1111,7 @@ public:
         return caster_t::cast(&src.get(), policy, parent);
     }
     template <typename T> using cast_op_type = std::reference_wrapper<type>;
-    operator std::reference_wrapper<type>() { return subcaster.operator subcaster_cast_op_type&(); }
+    operator std::reference_wrapper<type>() { return cast_op<type &>(subcaster); }
 };
 
 #define PYBIND11_TYPE_CASTER(type, py_name) \
@@ -1136,6 +1158,14 @@ public:
         if (!src)
             return false;
 
+#if !defined(PYPY_VERSION)
+        auto index_check = [](PyObject *o) { return PyIndex_Check(o); };
+#else
+        // In PyPy 7.3.3, `PyIndex_Check` is implemented by calling `__index__`,
+        // while CPython only considers the existence of `nb_index`/`__index__`.
+        auto index_check = [](PyObject *o) { return hasattr(o, "__index__"); };
+#endif
+
         if (std::is_floating_point<T>::value) {
             if (convert || PyFloat_Check(src.ptr()))
                 py_value = (py_type) PyFloat_AsDouble(src.ptr());
@@ -1143,12 +1173,31 @@ public:
                 return false;
         } else if (PyFloat_Check(src.ptr())) {
             return false;
-        } else if (std::is_unsigned<py_type>::value) {
-            py_value = as_unsigned<py_type>(src.ptr());
-        } else { // signed integer:
-            py_value = sizeof(T) <= sizeof(long)
-                ? (py_type) PyLong_AsLong(src.ptr())
-                : (py_type) PYBIND11_LONG_AS_LONGLONG(src.ptr());
+        } else if (!convert && !PYBIND11_LONG_CHECK(src.ptr()) && !index_check(src.ptr())) {
+            return false;
+        } else {
+            handle src_or_index = src;
+#if PY_VERSION_HEX < 0x03080000
+            object index;
+            if (!PYBIND11_LONG_CHECK(src.ptr())) {  // So: index_check(src.ptr())
+                index = reinterpret_steal<object>(PyNumber_Index(src.ptr()));
+                if (!index) {
+                    PyErr_Clear();
+                    if (!convert)
+                        return false;
+                }
+                else {
+                    src_or_index = index;
+                }
+            }
+#endif
+            if (std::is_unsigned<py_type>::value) {
+                py_value = as_unsigned<py_type>(src_or_index.ptr());
+            } else { // signed integer:
+                py_value = sizeof(T) <= sizeof(long)
+                    ? (py_type) PyLong_AsLong(src_or_index.ptr())
+                    : (py_type) PYBIND11_LONG_AS_LONGLONG(src_or_index.ptr());
+            }
         }
 
         // Python API reported an error
@@ -1157,15 +1206,8 @@ public:
         // Check to see if the conversion is valid (integers should match exactly)
         // Signed/unsigned checks happen elsewhere
         if (py_err || (std::is_integral<T>::value && sizeof(py_type) != sizeof(T) && py_value != (py_type) (T) py_value)) {
-            bool type_error = py_err && PyErr_ExceptionMatches(
-#if PY_VERSION_HEX < 0x03000000 && !defined(PYPY_VERSION)
-                PyExc_SystemError
-#else
-                PyExc_TypeError
-#endif
-            );
             PyErr_Clear();
-            if (type_error && convert && PyNumber_Check(src.ptr())) {
+            if (py_err && convert && PyNumber_Check(src.ptr())) {
                 auto tmp = reinterpret_steal<object>(std::is_floating_point<T>::value
                                                      ? PyNumber_Float(src.ptr())
                                                      : PyNumber_Long(src.ptr()));
@@ -1356,7 +1398,7 @@ template <typename StringType, bool IsView = false> struct string_caster {
 #endif
         }
 
-        object utfNbytes = reinterpret_steal<object>(PyUnicode_AsEncodedString(
+        auto utfNbytes = reinterpret_steal<object>(PyUnicode_AsEncodedString(
             load_src.ptr(), UTF_N == 8 ? "utf-8" : UTF_N == 16 ? "utf-16" : "utf-32", nullptr));
         if (!utfNbytes) { PyErr_Clear(); return false; }
 
@@ -1614,7 +1656,11 @@ inline const detail::type_info* get_lowest_type(handle src, bool do_throw = true
 
 
 /// Type caster for holder types like std::shared_ptr, etc.
-template <typename type, typename holder_type>
+/// The SFINAE hook is provided to help work around the current lack of support
+/// for smart-pointer interoperability. Please consider it an implementation
+/// detail that may change in the future, as formal support for smart-pointer
+/// interoperability is added into pybind11.
+template <typename type, typename holder_type, typename SFINAE = void>
 struct copyable_holder_caster : public type_caster_base<type> {
 public:
     using base = type_caster_base<type>;
@@ -1733,7 +1779,10 @@ protected:
 template <typename T>
 class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::shared_ptr<T>> { };
 
-template <typename type, typename holder_type>
+/// Type caster for holder types like std::unique_ptr.
+/// Please consider the SFINAE hook an implementation detail, as explained
+/// in the comment for the copyable_holder_caster.
+template <typename type, typename holder_type, typename SFINAE = void>
 struct move_only_holder_caster : type_caster_base<type> {
         using base = type_caster_base<type>;
     static_assert(std::is_base_of<base, type_caster<type>>::value,
@@ -1896,6 +1945,17 @@ struct pyobject_caster {
 
     template <typename T = type, enable_if_t<std::is_base_of<object, T>::value, int> = 0>
     bool load(handle src, bool /* convert */) {
+#if PY_MAJOR_VERSION < 3 && !defined(PYBIND11_STR_LEGACY_PERMISSIVE)
+        // For Python 2, without this implicit conversion, Python code would
+        // need to be cluttered with six.ensure_text() or similar, only to be
+        // un-cluttered later after Python 2 support is dropped.
+        if (std::is_same<T, str>::value && isinstance<bytes>(src)) {
+            PyObject *str_from_bytes = PyUnicode_FromEncodedObject(src.ptr(), "utf-8", nullptr);
+            if (!str_from_bytes) throw error_already_set();
+            value = reinterpret_steal<type>(str_from_bytes);
+            return true;
+        }
+#endif
         if (!isinstance<type>(src))
             return false;
         value = reinterpret_borrow<type>(src);
@@ -2159,7 +2219,14 @@ private:
 #if !defined(NDEBUG)
         , type(type_id<T>())
 #endif
-    { }
+    {
+        // Workaround! See:
+        // https://github.com/pybind/pybind11/issues/2336
+        // https://github.com/pybind/pybind11/pull/2685#issuecomment-731286700
+        if (PyErr_Occurred()) {
+            PyErr_Clear();
+        }
+    }
 
 public:
     /// Direct construction with name, default, and description
@@ -2449,16 +2516,26 @@ private:
     dict m_kwargs;
 };
 
+// [workaround(intel)] Separate function required here
+// We need to put this into a separate function because the Intel compiler
+// fails to compile enable_if_t<!all_of<is_positional<Args>...>::value>
+// (tested with ICC 2021.1 Beta 20200827).
+template <typename... Args>
+constexpr bool args_are_all_positional()
+{
+  return all_of<is_positional<Args>...>::value;
+}
+
 /// Collect only positional arguments for a Python function call
 template <return_value_policy policy, typename... Args,
-          typename = enable_if_t<all_of<is_positional<Args>...>::value>>
+          typename = enable_if_t<args_are_all_positional<Args...>()>>
 simple_collector<policy> collect_arguments(Args &&...args) {
     return simple_collector<policy>(std::forward<Args>(args)...);
 }
 
 /// Collect all arguments, including keywords and unpacking (only instantiated when needed)
 template <return_value_policy policy, typename... Args,
-          typename = enable_if_t<!all_of<is_positional<Args>...>::value>>
+          typename = enable_if_t<!args_are_all_positional<Args...>()>>
 unpacking_collector<policy> collect_arguments(Args &&...args) {
     // Following argument order rules for generalized unpacking according to PEP 448
     static_assert(
