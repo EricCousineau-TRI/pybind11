@@ -20,6 +20,8 @@ jobs:
         # - 2.7
         # - 3.5
         - 3.6
+        - 3.7
+        - 3.8
         - 3.9
         - 3.10-dev
         # - pypy2
@@ -37,10 +39,10 @@ jobs:
             python: 3.6
             args: >
               -DPYBIND11_FINDPYTHON=ON
-          - runs-on: windows-latest
-            python: 3.6
-            args: >
-              -DPYBIND11_FINDPYTHON=ON
+          # - runs-on: windows-latest
+          #   python: 3.6
+          #   args: >
+          #     -DPYBIND11_FINDPYTHON=ON
 
         # # These items will be removed from the build matrix, keys must match.
         # exclude:
