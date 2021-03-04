@@ -9,5 +9,8 @@ pip install -U pip wheel
 pip install pytest
 
 mkdir build && cd build
-cmake .. -DPYTHON_EXECUTABLE=$(which python) -GNinja
+cmake .. -GNinja \
+    -DPYTHON_EXECUTABLE=$(which python) \
+    -DPYBIND11_TEST_OVERRIDE=test_multiple_inheritance.cpp
+
 env PYTHONUNBUFFERED=1 PYTEST_ADDOPTS="-s -x" ninja pytest
