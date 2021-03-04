@@ -105,6 +105,7 @@ set(PYBIND11_HEADERS
     include/pybind11/detail/descr.h
     include/pybind11/detail/init.h
     include/pybind11/detail/internals.h
+    include/pybind11/detail/type_caster_base.h
     include/pybind11/detail/typeid.h
     include/pybind11/attr.h
     include/pybind11/buffer_info.h
@@ -116,6 +117,7 @@ set(PYBIND11_HEADERS
     include/pybind11/eigen.h
     include/pybind11/embed.h
     include/pybind11/eval.h
+    include/pybind11/gil.h
     include/pybind11/iostream.h
     include/pybind11/functional.h
     include/pybind11/numpy.h

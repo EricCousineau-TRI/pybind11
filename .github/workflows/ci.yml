@@ -70,7 +70,7 @@ jobs:
       run: echo "BOOST_ROOT=$BOOST_ROOT_1_72_0" >> $GITHUB_ENV
 
     - name: Update CMake
-      uses: jwlawson/actions-setup-cmake@v1.7
+      uses: jwlawson/actions-setup-cmake@v1.8
 
     - name: Cache wheels
       if: runner.os == 'macOS'
@@ -440,7 +440,7 @@ jobs:
       run: python3 -m pip install --upgrade pip
 
     - name: Update CMake
-      uses: jwlawson/actions-setup-cmake@v1.7
+      uses: jwlawson/actions-setup-cmake@v1.8
 
     - name: Configure
       shell: bash
