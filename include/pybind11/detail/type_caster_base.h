@@ -155,11 +155,8 @@ PYBIND11_NOINLINE inline detail::type_info* get_type_info(PyTypeObject *type, bo
     if (bases.empty())
         return nullptr;
     if (bases.size() > 1) {
-        if (do_throw) {
-            int* value{};
-            *value = 0xbadf00d;
+        if (do_throw)
             pybind11_fail("pybind11::detail::get_type_info: type has multiple pybind11-registered bases");
-        }
         else
             return nullptr;
     }
