@@ -16,23 +16,6 @@
 #include "object.h"
 
 namespace {
-// Make pybind aware of the ref-counted wrapper type (s):
-
-// ref<T> is a wrapper for 'Object' which uses intrusive reference counting
-// It is always possible to construct a ref<T> from an Object* pointer without
-// possible inconsistencies, hence the 'true' argument at the end.
-PYBIND11_DECLARE_HOLDER_TYPE(T, ref<T>, true);
-// Make pybind11 aware of the non-standard getter member function
-namespace pybind11 { namespace detail {
-    template <typename T>
-    struct holder_helper<ref<T>> {
-        static const T* get(const ref<T> &p) { return p.get_ptr(); }
-    };
-} // namespace detail
-} // namespace pybind11
-
-// The following is not required anymore for std::shared_ptr, but it should compile without error:
-PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
 
 // This is just a wrapper around unique_ptr, but with extra fields to deliberately bloat up the
 // holder size to trigger the non-simple-layout internal instance layout for single inheritance with
@@ -42,8 +25,7 @@ template <typename T> class huge_unique_ptr {
     uint64_t padding[10];
 public:
     huge_unique_ptr(T *p) : ptr(p) {};
-    T* get() const { return ptr.get(); }
-    T* release() { return ptr.release(); }
+    T *get() { return ptr.get(); }
 };
 
 // Simple custom holder that works like unique_ptr
@@ -53,7 +35,7 @@ class custom_unique_ptr {
 public:
     custom_unique_ptr(T* p) : impl(p) { }
     T* get() const { return impl.get(); }
-    T* release() { return impl.release(); }
+    T* release_ptr() { return impl.release(); }
 };
 
 // Simple custom holder that works like shared_ptr and has operator& overload
