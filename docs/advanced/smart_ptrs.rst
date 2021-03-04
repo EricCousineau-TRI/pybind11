@@ -119,8 +119,15 @@ object that is passed to this function. There are two ways to do this:
 std::shared_ptr
 ===============
 
-If you have an existing code base with ``std::shared_ptr``, or you wish to enable reference counting in C++ as well, then you may use this type as a holder.
-As an example, the following snippet causes ``std::shared_ptr`` to be used instead.
+The binding generator for classes, :class:`class_`, can be passed a template
+type that denotes a special *holder* type that is used to manage references to
+the object.  If no such holder type template argument is given, the default for
+a type named ``Type`` is ``std::unique_ptr<Type>``, which means that the object
+is deallocated when Python's reference count goes to zero.
+
+It is possible to switch to other types of reference counting wrappers or smart
+pointers, which is useful in codebases that rely on them. For instance, the
+following snippet causes ``std::shared_ptr`` to be used instead.
 
 .. code-block:: cpp
 
@@ -191,12 +198,6 @@ There are two ways to resolve this issue:
 .. code-block:: cpp
 
     class Child : public std::enable_shared_from_this<Child> { };
-
-.. seealso::
-
-    While ownership transfer is generally not an issue with ``std::shared_ptr<Type>``, it becomes an issue when an instance of a Python subclass of a pybind11 class is effectively managed by C++ (e.g. all live references to the object are from C++, and all reference in Python have "died").
-
-    See :ref:`virtual_inheritance_lifetime` for more information.
 
 .. _smart_pointers:
 

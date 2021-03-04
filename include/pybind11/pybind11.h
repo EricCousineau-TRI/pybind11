@@ -2509,11 +2509,8 @@ inline function get_type_override(const void *this_ptr, const type_info *this_ty
     handle self = get_object_handle(this_ptr, this_type);
     if (!self)
         return function();
-    handle type = self.get_type();
-    /* N.B. This uses `__qualname__.name` instead of `name`
-       to resolve pybind11#1922. */
-    std::string full_name = type.attr("__qualname__").cast<std::string>() + "." + name;
-    auto key = std::make_pair(type.ptr(), full_name);
+    handle type = type::handle_of(self);
+    auto key = std::make_pair(type.ptr(), name);
 
     /* Cache functions that aren't overridden in Python to avoid
        many costly Python dictionary lookups below */
