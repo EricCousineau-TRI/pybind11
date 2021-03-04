@@ -14,7 +14,7 @@ def test_failure_min():
     class MI1(m.Base1, m.Base2):
         def __init__(self, i, j):
             m.Base1.__init__(self, i)
-            # m.Base2.__init__(self, j)
+            m.Base2.__init__(self, j)
 
     MI1(1, 2)
 
