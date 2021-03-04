@@ -15,6 +15,7 @@
 #include "pybind11_tests.h"
 #include "object.h"
 
+namespace {
 // Make pybind aware of the ref-counted wrapper type (s):
 
 // ref<T> is a wrapper for 'Object' which uses intrusive reference counting
