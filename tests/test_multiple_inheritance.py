@@ -6,6 +6,8 @@ import env  # noqa: F401
 from pybind11_tests import ConstructorStats
 from pybind11_tests import multiple_inheritance as m
 
+import debug
+
 
 def test_multiple_inheritance_cpp():
     mt = m.MIType(3, 4)
@@ -57,6 +59,10 @@ def test_multiple_inheritance_mix2():
 @pytest.mark.skipif("env.PYPY and env.PY2")
 @pytest.mark.xfail("env.PYPY and not env.PY2")
 def test_multiple_inheritance_python():
+    _mip()
+
+@debug.traced
+def _mip():
     class MI1(m.Base1, m.Base2):
         def __init__(self, i, j):
             m.Base1.__init__(self, i)
@@ -121,46 +127,47 @@ def test_multiple_inheritance_python():
             MI6.__init__(self, i)
 
     mi1 = MI1(1, 2)
-    assert mi1.foo() == 1
-    assert mi1.bar() == 2
+    # assert mi1.foo() == 1
+    # assert mi1.bar() == 2
 
-    mi2 = MI2(3, 4)
-    assert mi2.v() == 1
-    assert mi2.foo() == 3
-    assert mi2.bar() == 4
+    # mi2 = MI2(3, 4)
+    # assert mi2.v() == 1
+    # assert mi2.foo() == 3
+    # assert mi2.bar() == 4
 
-    mi3 = MI3(5, 6)
-    assert mi3.v() == 1
-    assert mi3.foo() == 5
-    assert mi3.bar() == 6
+    # mi3 = MI3(5, 6)
+    # assert mi3.v() == 1
+    # assert mi3.foo() == 5
+    # assert mi3.bar() == 6
 
-    mi4 = MI4(7, 8)
-    assert mi4.v() == 1
-    assert mi4.foo() == 7
-    assert mi4.bar() == 8
+    # mi4 = MI4(7, 8)
+    # assert mi4.v() == 1
+    # assert mi4.foo() == 7
+    # assert mi4.bar() == 8
 
-    mi5 = MI5(10, 11)
-    assert mi5.v() == 1
-    assert mi5.foo() == 10
-    assert mi5.bar() == 11
+    # mi5 = MI5(10, 11)
+    # assert mi5.v() == 1
+    # assert mi5.foo() == 10
+    # assert mi5.bar() == 11
 
-    mi6 = MI6(12)
-    assert mi6.v() == 1
-    assert mi6.bar() == 12
+    # mi6 = MI6(12)
+    # assert mi6.v() == 1
+    # assert mi6.bar() == 12
 
-    mi7 = MI7(13)
-    assert mi7.v() == 4
-    assert mi7.bar() == 13
+    # mi7 = MI7(13)
+    # assert mi7.v() == 4
+    # assert mi7.bar() == 13
 
-    mi8 = MI8(14)
-    assert mi8.v() == 1
-    assert mi8.bar() == 14
+    # mi8 = MI8(14)
+    # assert mi8.v() == 1
+    # assert mi8.bar() == 14
 
-    mi8b = MI8b(15)
-    assert mi8b.v() == 3
-    assert mi8b.bar() == 15
+    # mi8b = MI8b(15)
+    # assert mi8b.v() == 3
+    # assert mi8b.bar() == 15
 
 
+@debug.traced
 def test_multiple_inheritance_python_many_bases():
     class MIMany14(m.BaseN1, m.BaseN2, m.BaseN3, m.BaseN4):
         def __init__(self):
@@ -209,25 +216,25 @@ def test_multiple_inheritance_python_many_bases():
             MIMany916.__init__(self)
             m.BaseN17.__init__(self, 17)
 
-    # Inherits from 4 registered C++ classes: can fit in one pointer on any modern arch:
-    a = MIMany14()
-    for i in range(1, 4):
-        assert getattr(a, "f" + str(i))() == 2 * i
+    # # Inherits from 4 registered C++ classes: can fit in one pointer on any modern arch:
+    # a = MIMany14()
+    # for i in range(1, 4):
+    #     assert getattr(a, "f" + str(i))() == 2 * i
 
-    # Inherits from 8: requires 1/2 pointers worth of holder flags on 32/64-bit arch:
-    b = MIMany916()
-    for i in range(9, 16):
-        assert getattr(b, "f" + str(i))() == 2 * i
+    # # Inherits from 8: requires 1/2 pointers worth of holder flags on 32/64-bit arch:
+    # b = MIMany916()
+    # for i in range(9, 16):
+    #     assert getattr(b, "f" + str(i))() == 2 * i
 
-    # Inherits from 9: requires >= 2 pointers worth of holder flags
-    c = MIMany19()
-    for i in range(1, 9):
-        assert getattr(c, "f" + str(i))() == 2 * i
+    # # Inherits from 9: requires >= 2 pointers worth of holder flags
+    # c = MIMany19()
+    # for i in range(1, 9):
+    #     assert getattr(c, "f" + str(i))() == 2 * i
 
-    # Inherits from 17: requires >= 3 pointers worth of holder flags
-    d = MIMany117()
-    for i in range(1, 17):
-        assert getattr(d, "f" + str(i))() == 2 * i
+    # # Inherits from 17: requires >= 3 pointers worth of holder flags
+    # d = MIMany117()
+    # for i in range(1, 17):
+    #     assert getattr(d, "f" + str(i))() == 2 * i
 
 
 def test_multiple_inheritance_virtbase():
