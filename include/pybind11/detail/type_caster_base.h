@@ -293,6 +293,7 @@ struct value_and_holder {
     template <typename H> H &holder() const {
         return reinterpret_cast<H &>(vh[1]);
     }
+    void* holder_ptr() const { return &vh[1]; }
     bool holder_constructed() const {
         return inst->simple_layout
             ? inst->simple_holder_constructed
