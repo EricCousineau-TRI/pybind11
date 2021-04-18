@@ -97,6 +97,8 @@ TEST_SUBMODULE(callbacks, m) {
     // test_cpp_function_roundtrip
     /* Test if passing a function pointer from C++ -> Python -> C++ yields the original pointer */
     m.def("dummy_function", &dummy_function);
+    m.def("dummy_function_overloaded", [](int i, int j) { return i + j; });
+    m.def("dummy_function_overloaded", &dummy_function);
     m.def("dummy_function2", [](int i, int j) { return i + j; });
     m.def("roundtrip", [](std::function<int(int)> f, bool expect_none = false) {
         if (expect_none && f)
@@ -171,5 +173,11 @@ TEST_SUBMODULE(callbacks, m) {
         // spawn worker threads
         for (auto i : work)
             start_f(py::cast<int>(i));
+    });
+
+    m.def("callback_num_times", [](py::function f, std::size_t num) {
+        for (std::size_t i = 0; i < num; i++) {
+            f();
+        }
     });
 }
