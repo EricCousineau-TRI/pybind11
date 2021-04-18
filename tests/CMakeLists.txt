@@ -105,6 +105,8 @@ set(PYBIND11_TEST_FILES
     test_copy_move.cpp
     test_custom_type_casters.cpp
     test_docstring_options.cpp
+    test_drake_eigen.cpp
+    test_drake_smart_ptr.cpp
     test_eigen.cpp
     test_enum.cpp
     test_eval.cpp
@@ -122,7 +124,6 @@ set(PYBIND11_TEST_FILES
     test_numpy_vectorize.cpp
     test_opaque_types.cpp
     test_operator_overloading.cpp
-    test_ownership_transfer.cpp
     test_pickling.cpp
     test_pytypes.cpp
     test_sequences_and_iterators.cpp
@@ -174,7 +175,8 @@ set(PYBIND11_CROSS_MODULE_GIL_TESTS test_gil_scoped.py)
 # keep it in PYBIND11_PYTEST_FILES, so that we get the "eigen is not installed"
 # skip message).
 list(FIND PYBIND11_TEST_FILES test_eigen.cpp PYBIND11_TEST_FILES_EIGEN_I)
-if(PYBIND11_TEST_FILES_EIGEN_I GREATER -1)
+list(FIND PYBIND11_TEST_FILES test_drake_eigen.cpp PYBIND11_TEST_FILES_EIGEN_I2)
+if(PYBIND11_TEST_FILES_EIGEN_I GREATER -1 OR PYBIND11_TEST_FILES_EIGEN_I2 GREATER -1)
   # Try loading via newer Eigen's Eigen3Config first (bypassing tools/FindEigen3.cmake).
   # Eigen 3.3.1+ exports a cmake 3.0+ target for handling dependency requirements, but also
   # produces a fatal error if loaded from a pre-3.0 cmake.

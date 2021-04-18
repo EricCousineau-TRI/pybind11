@@ -17,20 +17,8 @@
 #endif
 
 #include <Eigen/Cholesky>
-#include <unsupported/Eigen/AutoDiff>
-#include "Eigen/src/Core/util/DisableStupidWarnings.h"
 
 using MatrixXdR = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-typedef Eigen::AutoDiffScalar<Eigen::VectorXd> ADScalar;
-
-template <typename Scalar>
-using MatrixX = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
-
-typedef Eigen::Matrix<ADScalar, Eigen::Dynamic, 1> VectorXADScalar;
-typedef Eigen::Matrix<ADScalar, 1, Eigen::Dynamic> VectorXADScalarR;
-typedef Eigen::Matrix<ADScalar, 5, 1> Vector5ADScalar;
-typedef Eigen::Matrix<ADScalar, 1, 6> Vector6ADScalarR;
-PYBIND11_NUMPY_OBJECT_DTYPE(ADScalar);
 
 // Sets/resets a testing reference matrix to have values of 10*r + c, where r and c are the
 // (1-based) row/column number.
@@ -63,16 +51,6 @@ void reset_refs() {
     reset_ref(get_rm());
 }
 
-VectorXADScalar& get_cm_adscalar() {
-    static VectorXADScalar value(1);
-    return value;
-};
-VectorXADScalarR& get_rm_adscalar() {
-    static VectorXADScalarR value(1);
-    return value;
-};
-
-
 // Returns element 2,1 from a matrix (used to test copy/nocopy)
 double get_elem(Eigen::Ref<const Eigen::MatrixXd> m) { return m(2, 1); };
 
@@ -100,9 +78,7 @@ TEST_SUBMODULE(eigen, m) {
     using FixedMatrixR = Eigen::Matrix<float, 5, 6, Eigen::RowMajor>;
     using FixedMatrixC = Eigen::Matrix<float, 5, 6>;
     using DenseMatrixR = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-    using DenseADScalarMatrixR = Eigen::Matrix<ADScalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
     using DenseMatrixC = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>;
-    using DenseADScalarMatrixC = Eigen::Matrix<ADScalar, Eigen::Dynamic, Eigen::Dynamic>;
     using FourRowMatrixC = Eigen::Matrix<float, 4, Eigen::Dynamic>;
     using FourColMatrixC = Eigen::Matrix<float, Eigen::Dynamic, 4>;
     using FourRowMatrixR = Eigen::Matrix<float, 4, Eigen::Dynamic>;
@@ -112,17 +88,12 @@ TEST_SUBMODULE(eigen, m) {
 
     // various tests
     m.def("double_col", [](const Eigen::VectorXf &x) -> Eigen::VectorXf { return 2.0f * x; });
-    m.def("double_adscalar_col", [](const VectorXADScalar &x) -> VectorXADScalar { return 2.0f * x; });
-    m.def("double_adscalar_col5", [](const Vector5ADScalar &x) -> Vector5ADScalar { return 2.0f * x; });
     m.def("double_row", [](const Eigen::RowVectorXf &x) -> Eigen::RowVectorXf { return 2.0f * x; });
-    m.def("double_adscalar_row", [](const VectorXADScalarR &x) -> VectorXADScalarR { return 2.0f * x; });
-    m.def("double_adscalar_row6", [](const Vector6ADScalarR &x) -> Vector6ADScalarR { return 2.0f * x; });
     m.def("double_complex", [](const Eigen::VectorXcf &x) -> Eigen::VectorXcf { return 2.0f * x; });
     m.def("double_threec", [](py::EigenDRef<Eigen::Vector3f> x) { x *= 2; });
     m.def("double_threer", [](py::EigenDRef<Eigen::RowVector3f> x) { x *= 2; });
     m.def("double_mat_cm", [](Eigen::MatrixXf x) -> Eigen::MatrixXf { return 2.0f * x; });
     m.def("double_mat_rm", [](DenseMatrixR x) -> DenseMatrixR { return 2.0f * x; });
-
 
     // test_eigen_ref_to_python
     // Different ways of passing via Eigen::Ref; the first and second are the Eigen-recommended
@@ -142,8 +113,6 @@ TEST_SUBMODULE(eigen, m) {
     // Mutators (Eigen maps into numpy variables):
     m.def("add_rm", add_rm); // Only takes row-contiguous
     m.def("add_cm", add_cm); // Only takes column-contiguous
-    m.def("add_rm_adscalar", [](py::EigenDRef<VectorXADScalarR> x) { x.array() += 2; });
-    m.def("add_cm_adscalar", [](py::EigenDRef<VectorXADScalar> x) { x.array() += 2; });
     // Overloaded versions that will accept either row or column contiguous:
     m.def("add1", add_rm);
     m.def("add1", add_cm);
@@ -155,17 +124,9 @@ TEST_SUBMODULE(eigen, m) {
     // Return mutable references (numpy maps into eigen variables)
     m.def("get_cm_ref", []() { return Eigen::Ref<Eigen::MatrixXd>(get_cm()); });
     m.def("get_rm_ref", []() { return Eigen::Ref<MatrixXdR>(get_rm()); });
-    m.def("get_cm_ref_adscalar", []() {
-        return py::EigenDRef<VectorXADScalar>(get_cm_adscalar());
-    });
-    m.def("get_rm_ref_adscalar", []() {
-        return py::EigenDRef<VectorXADScalarR>(get_rm_adscalar());
-    });
     // The same references, but non-mutable (numpy maps into eigen variables, but is !writeable)
     m.def("get_cm_const_ref", []() { return Eigen::Ref<const Eigen::MatrixXd>(get_cm()); });
     m.def("get_rm_const_ref", []() { return Eigen::Ref<const MatrixXdR>(get_rm()); });
-    m.def("get_cm_const_ref_adscalar", []() { return Eigen::Ref<const VectorXADScalar>(get_cm_adscalar()); });
-    m.def("get_rm_const_ref_adscalar", []() { return Eigen::Ref<const VectorXADScalarR>(get_rm_adscalar()); });
 
     m.def("reset_refs", reset_refs); // Restores get_{cm,rm}_ref to original values
 
@@ -174,13 +135,6 @@ TEST_SUBMODULE(eigen, m) {
         m += Eigen::MatrixXd::Constant(m.rows(), m.cols(), v);
         return m;
     }, py::return_value_policy::reference);
-
-    // Increments ADScalar Matrix, returns a copy.
-    m.def("incr_adscalar_matrix", [](const Eigen::Ref<const DenseADScalarMatrixC>& m, double v) {
-      DenseADScalarMatrixC out = m;
-      out.array() += v;
-      return out;
-    });
 
     // Same, but accepts a matrix of any strides
     m.def("incr_matrix_any", [](py::EigenDRef<Eigen::MatrixXd> m, double v) {
@@ -216,16 +170,12 @@ TEST_SUBMODULE(eigen, m) {
     // return value referencing/copying tests:
     class ReturnTester {
         Eigen::MatrixXd mat = create();
-        DenseADScalarMatrixR ad_mat = create_ADScalar_mat();
     public:
         ReturnTester() { print_created(this); }
         ~ReturnTester() { print_destroyed(this); }
         static Eigen::MatrixXd create() {  return Eigen::MatrixXd::Ones(10, 10); }
-        static DenseADScalarMatrixR create_ADScalar_mat() { DenseADScalarMatrixR ad_mat(2, 2);
-            ad_mat << 1, 2, 3, 7; return ad_mat; }
         static const Eigen::MatrixXd createConst() { return Eigen::MatrixXd::Ones(10, 10); }
         Eigen::MatrixXd &get() { return mat; }
-        DenseADScalarMatrixR& get_ADScalarMat() {return ad_mat;}
         Eigen::MatrixXd *getPtr() { return &mat; }
         const Eigen::MatrixXd &view() { return mat; }
         const Eigen::MatrixXd *viewPtr() { return &mat; }
@@ -244,7 +194,6 @@ TEST_SUBMODULE(eigen, m) {
         .def_static("create", &ReturnTester::create)
         .def_static("create_const", &ReturnTester::createConst)
         .def("get", &ReturnTester::get, rvp::reference_internal)
-        .def("get_ADScalarMat", &ReturnTester::get_ADScalarMat, rvp::reference_internal)
         .def("get_ptr", &ReturnTester::getPtr, rvp::reference_internal)
         .def("view", &ReturnTester::view, rvp::reference_internal)
         .def("view_ptr", &ReturnTester::view, rvp::reference_internal)
@@ -262,21 +211,6 @@ TEST_SUBMODULE(eigen, m) {
         .def("copy_block", &ReturnTester::block, rvp::copy)
         .def("corners", &ReturnTester::corners, rvp::reference_internal)
         .def("corners_const", &ReturnTester::cornersConst, rvp::reference_internal)
-        ;
-
-    py::class_<ADScalar>(m, "AutoDiffXd")
-        .def("__init__",
-             [](ADScalar & self,
-                double value,
-                const Eigen::VectorXd& derivatives) {
-               new (&self) ADScalar(value, derivatives);
-             })
-        .def("value", [](const ADScalar & self) {
-          return self.value();
-        })
-        .def("__repr__", [](const ADScalar& self) {
-          return py::str("<ADScalar {} deriv={}>").format(self.value(), self.derivatives());
-        })
         ;
 
     m.def("equal_to", [](double a, double b) { return a == b; });
@@ -375,17 +309,8 @@ TEST_SUBMODULE(eigen, m) {
     m.def("iss1105_col", [](Eigen::VectorXd) { return true; });
     m.def("iss1105_row", [](Eigen::RowVectorXd) { return true; });
 
-    m.def("iss1105_col_obj", [](VectorXADScalar) { return true; });
-    m.def("iss1105_row_obj", [](VectorXADScalarR) { return true; });
-
     // Test the shape of a matrix via `type_caster`s.
     m.def("cpp_matrix_shape", [](const MatrixX<double>& A) {
-        return py::make_tuple(A.rows(), A.cols());
-    });
-    m.def("cpp_matrix_shape", [](const MatrixX<ADScalar>& A) {
-        return py::make_tuple(A.rows(), A.cols());
-    });
-    m.def("cpp_matrix_shape_ref", [](const Eigen::Ref<const MatrixX<ADScalar>>& A) {
         return py::make_tuple(A.rows(), A.cols());
     });
 
