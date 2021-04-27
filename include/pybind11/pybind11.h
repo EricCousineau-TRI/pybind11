@@ -1814,12 +1814,18 @@ private:
     detail::enum_base m_base;
 };
 
-PYBIND11_NAMESPACE_BEGIN(detail)
+template <return_value_policy, typename... Args>
+void print(Args &&...args);
 
+PYBIND11_NAMESPACE_BEGIN(detail)
 
 inline void keep_alive_impl(handle nurse, handle patient) {
     if (!nurse || !patient)
         pybind11_fail("Could not activate keep_alive!");
+
+    // HACK
+    pybind11::print<return_value_policy::reference>(
+        "keep_alive_impl(", nurse, ",", patient, ")");
 
     if (patient.is_none() || nurse.is_none())
         return; /* Nothing to keep alive or nothing to be kept alive by */
