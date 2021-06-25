@@ -51,23 +51,28 @@ def test_enum_pickle():
 # exercise_trampoline
 #
 class SimplePyDerived(m.SimpleBase):
-    pass
+    def get_value_via_vtable(self):
+        return 100
+
 
 
 def test_roundtrip_simple_py_derived():
     p = SimplePyDerived()
     p.num = 202
     p.stored_in_dict = 303
+    assert m.get_value_via_vtable_cpp(p) == 100
     data = pickle.dumps(p, pickle.HIGHEST_PROTOCOL)
     p2 = pickle.loads(data)
     assert isinstance(p2, SimplePyDerived)
     assert p2.num == 202
     assert p2.stored_in_dict == 303
+    assert m.get_value_via_vtable_cpp(p2) == 100
 
 
 def test_roundtrip_simple_cpp_derived():
     p = m.make_SimpleCppDerivedAsBase()
     p.num = 404
+    assert m.get_value_via_vtable_cpp(p) == 10
     if not env.PYPY:
         # To ensure that this unit test is not accidentally invalidated.
         with pytest.raises(AttributeError):
@@ -77,3 +82,5 @@ def test_roundtrip_simple_cpp_derived():
     p2 = pickle.loads(data)
     assert isinstance(p2, m.SimpleBase)
     assert p2.num == 404
+    # ERROR: Fails due to object slicing.
+    assert m.get_value_via_vtable_cpp(p2) == 10

@@ -26,11 +26,19 @@ struct SimpleBase {
     // For compatibility with old clang versions:
     SimpleBase()                   = default;
     SimpleBase(const SimpleBase &) = default;
+
+    virtual int get_value_via_vtable() const { return 1; }
 };
 
-struct SimpleBaseTrampoline : SimpleBase {};
+struct SimpleBaseTrampoline : SimpleBase {
+    int get_value_via_vtable() const override {
+        PYBIND11_OVERRIDE(int, SimpleBase, get_value_via_vtable);
+    }
+};
 
-struct SimpleCppDerived : SimpleBase {};
+struct SimpleCppDerived : SimpleBase {
+    int get_value_via_vtable() const override { return 10; }
+};
 
 void wrap(py::module m) {
     py::class_<SimpleBase, SimpleBaseTrampoline>(m, "SimpleBase")
@@ -54,6 +62,9 @@ void wrap(py::module m) {
 
     m.def("make_SimpleCppDerivedAsBase",
           []() { return std::unique_ptr<SimpleBase>(new SimpleCppDerived); });
+
+    m.def("get_value_via_vtable_cpp",
+          [](const SimpleBase& obj) { return obj.get_value_via_vtable(); });
 }
 
 } // namespace exercise_trampoline
