@@ -252,6 +252,23 @@ struct ElementList {
     std::vector<std::shared_ptr<ElementBase>> l;
 };
 
+class CloneableBase {
+public:
+    virtual ~CloneableBase() = default;
+    virtual std::unique_ptr<CloneableBase> copy() const = 0;
+};
+
+class PyCloneableBase : public CloneableBase {
+public:
+    std::unique_ptr<CloneableBase> copy() const {
+        PYBIND11_OVERRIDE_PURE(
+            std::unique_ptr<CloneableBase>,
+            CloneableBase,
+            copy
+        );
+    }
+};
+
 } // namespace
 
 // ref<T> is a wrapper for 'Object' which uses intrusive reference counting
@@ -449,4 +466,8 @@ TEST_SUBMODULE(smart_ptr, m) {
                 list.append(py::cast(e));
             return list;
         });
+
+    py::class_<CloneableBase, PyCloneableBase>(m, "CloneableBase")
+        .def(py::init<>())
+        .def("copy", &CloneableBase::copy);
 }
