@@ -316,3 +316,68 @@ def test_shared_ptr_gc():
     pytest.gc_collect()
     for i, v in enumerate(el.get()):
         assert i == v.value()
+
+
+def test_unique_ptr_arg():
+    stats = ConstructorStats.get(m.UniquePtrHeld)
+
+    pass_through_list = [
+        m.unique_ptr_pass_through,
+        m.unique_ptr_pass_through_move_to_py,
+        m.unique_ptr_pass_through_cast_to_py,
+        # TODO(eric.cousineau): Fix these cases.
+        # m.unique_ptr_pass_through_cast_from_py,
+        # m.unique_ptr_pass_through_move_from_py,
+    ]
+    for pass_through in pass_through_list:
+        obj = m.UniquePtrHeld(1)
+        obj_ref = pass_through(obj)
+        assert stats.alive() == 1
+        assert obj.value() == 1
+        assert obj == obj_ref
+        del obj
+        del obj_ref
+        pytest.gc_collect()
+        assert stats.alive() == 0
+
+    obj = m.UniquePtrHeld(1)
+    m.unique_ptr_terminal(obj)
+    assert stats.alive() == 0
+
+    m.unique_ptr_terminal(m.UniquePtrHeld(2))
+    assert stats.alive() == 0
+
+    assert m.unique_ptr_pass_through(None) is None
+    m.unique_ptr_terminal(None)
+
+    with pytest.raises(TypeError):
+        m.unique_ptr_terminal(m.UniquePtrOther())
+
+
+def test_unique_ptr_to_shared_ptr():
+    obj = m.shared_ptr_held_in_unique_ptr()
+    assert m.shared_ptr_held_func(obj)
+
+
+def test_unique_ptr_overload_fail():
+    obj = m.UniquePtrHeld(1)
+    # These overloads pass ownership back to Python.
+    out = m.unique_ptr_overload(obj, m.FirstT())
+    assert out["obj"] is obj
+    assert out["overload"] == 1
+    out = m.unique_ptr_overload(obj, m.SecondT())
+    assert out["obj"] is obj
+    assert out["overload"] == 2
+
+
+def test_unique_ptr_held_container_from_cpp():
+    def check_reset(obj_new):
+        c = m.UniquePtrHeldContainer()
+        obj = c.get()
+        assert obj is not None
+        obj_ref = c.reset(obj_new)
+        assert obj is obj_ref
+        assert c.get() is obj_new
+
+    check_reset(obj_new=m.UniquePtrHeld(10))
+    check_reset(obj_new=None)

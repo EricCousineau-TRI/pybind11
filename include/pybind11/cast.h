@@ -658,6 +658,12 @@ struct holder_helper {
     static auto get(const T &p) -> decltype(p.get()) { return p.get(); }
 };
 
+inline const detail::type_info* get_lowest_type(handle src, bool do_throw = true) {
+    auto* py_type = (PyTypeObject*)src.get_type().ptr();
+    return detail::get_type_info(py_type, do_throw);
+}
+
+
 /// Type caster for holder types like std::shared_ptr, etc.
 /// The SFINAE hook is provided to help work around the current lack of support
 /// for smart-pointer interoperability. Please consider it an implementation
@@ -674,7 +680,10 @@ public:
     using base::typeinfo;
     using base::value;
 
-    bool load(handle src, bool convert) {
+    handle src;
+
+    bool load(handle src_in, bool convert) {
+        src = src_in;
         return base::template load_impl<copyable_holder_caster<type, holder_type>>(src, convert);
     }
 
@@ -685,10 +694,19 @@ public:
     explicit operator holder_type*() { return std::addressof(holder); }
     explicit operator holder_type&() { return holder; }
 
+    // Risk increasing the `shared_ptr` ref count temporarily to maintain writeable
+    // semantics without too much `const_cast<>` ooginess.
+    static handle cast(holder_type &&src, return_value_policy, handle) {
+        const auto *ptr = holder_helper<holder_type>::get(src);
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(std::addressof(src)));
+    }
+
     static handle cast(const holder_type &src, return_value_policy, handle) {
         const auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, &src);
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(std::addressof(src)));
     }
+
+  // TODO(eric.cousineau): Define cast_op_type???
 
 protected:
     friend class type_caster_generic;
@@ -697,7 +715,10 @@ protected:
             throw cast_error("Unable to load a custom holder type from a default-holder instance");
     }
 
-    bool load_value(value_and_holder &&v_h) {
+    bool load_value(value_and_holder &&v_h, LoadType load_type) {
+        // TODO(eric.cousineau): Restore `do_relelase_to_cpp` logic?
+        (void)load_type;
+
         if (v_h.holder_constructed()) {
             value = v_h.value_ptr();
             holder = v_h.template holder<holder_type>();
@@ -710,6 +731,7 @@ protected:
                          "of type '"
                          + type_id<holder_type>() + "''");
 #endif
+
     }
 
     template <typename T = holder_type, detail::enable_if_t<!std::is_constructible<T, const T &, type*>::value, int> = 0>
@@ -732,6 +754,7 @@ protected:
 
 
     holder_type holder;
+    constexpr static detail::HolderTypeId holder_type_id = detail::get_holder_type_id<holder_type>::value;
 };
 
 /// Specialize for the common std::shared_ptr, so users don't need to
@@ -742,15 +765,122 @@ class type_caster<std::shared_ptr<T>> : public copyable_holder_caster<T, std::sh
 /// Please consider the SFINAE hook an implementation detail, as explained
 /// in the comment for the copyable_holder_caster.
 template <typename type, typename holder_type, typename SFINAE = void>
-struct move_only_holder_caster {
+struct move_only_holder_caster : type_caster_base<type> {
+        using base = type_caster_base<type>;
+    static_assert(std::is_base_of<base, type_caster<type>>::value,
+            "Holder classes are only supported for custom types");
+    using base::base;
+    using base::cast;
+    using base::typeinfo;
+    using base::value;
+
+    // We must explicitly define the default constructor(s) since we define a
+    // destructor; otherwise, the compiler will incorrectly use the copy
+    // constructor.
+    move_only_holder_caster() = default;
+    move_only_holder_caster(move_only_holder_caster&&) = default;
+    move_only_holder_caster(const move_only_holder_caster&) = delete;
+    ~move_only_holder_caster() {
+        if (holder) {
+            // If the argument was loaded into C++, but not transferred out,
+            // then this was most likely part of a failed overload in
+            // `argument_loader`. Transfer ownership back to Python.
+            move_only_holder_caster::cast(
+                std::move(holder), return_value_policy{}, handle{});
+        }
+    }
+
     static_assert(std::is_base_of<type_caster_base<type>, type_caster<type>>::value,
             "Holder classes are only supported for custom types");
 
     static handle cast(holder_type &&src, return_value_policy, handle) {
+        // Move `src` so that `holder_helper<>::get()` can call `release` if need be.
+        // That way, if we mix `holder_type`s, we don't have to worry about `existing_holder`
+        // from being mistakenly reinterpret_cast'd to `shared_ptr<type>` (#1138).
         auto *ptr = holder_helper<holder_type>::get(src);
-        return type_caster_base<type>::cast_holder(ptr, std::addressof(src));
+        return type_caster_base<type>::cast_holder(ptr, holder_erased(std::addressof(src)));
     }
+
+  // Disable these?
+//  explicit operator type*() { return this->value; }
+//  explicit operator type&() { return *(this->value); }
+
+//  explicit operator holder_type*() { return &holder; }
+
+  // Force rvalue.
+  template <typename T>
+  using cast_op_type = holder_type&&;
+
+  explicit operator holder_type&&() { return std::move(holder); }
+
+    bool load(handle src, bool convert) {
+        return base::template load_impl<move_only_holder_caster>(src, convert);
+    }
+
     static constexpr auto name = type_caster_base<type>::name;
+
+protected:
+    friend class type_caster_generic;
+    void check_holder_compat() {
+        if (!typeinfo->default_holder)
+            throw cast_error("Unable to load a non-default holder type (unique_ptr)");
+    }
+
+    bool load_value(value_and_holder &&v_h, LoadType load_type) {
+        // TODO(eric.cousineau): This should try and find the downcast-lowest
+        // level (closest to child) `release_to_cpp` method that is derived-releasable
+        // (which derives from `wrapper<type>`).
+        // This should resolve general casting, and should also avoid alias
+        // branch issues:
+        //   Example: `Base` has wrapper `PyBase` which extends `wrapper<Base>`.
+        //   `Child` extends `Base`, has its own wrapper `PyChild`, which extends
+        //   `wrapper<Child>`.
+        //   Anything deriving from `Child` does not derive from `PyBase`, so we should
+        //   NOT try to release using `PyBase`s mechanism.
+        //   Additionally, if `Child` does not have a wrapper (for whatever reason) and is extended,
+        //   then we still can NOT use `PyBase` since it's not part of the hierachy.
+        handle src = (PyObject*)v_h.inst;
+        object obj = reinterpret_borrow<object>(src);
+        // Try to get the lowest-hierarchy level of the type.
+        // This requires that we are single-inheritance at most.
+        const detail::type_info* lowest_type = nullptr;
+        switch (load_type) {
+            case LoadType::PureCpp: {
+                // We already have the lowest type.
+                lowest_type = typeinfo;
+                break;
+            }
+            // If the base type is explicitly mentioned, then we can rely on `DerivedCppSinglePySingle` being used.
+            case LoadType::DerivedCppSinglePySingle:
+                // However, if it is not, it may be that we have a C++ type inheriting from another C++ type without the inheritance being registered.
+                // In this case, we delegate by effectively downcasting in Python by finding the lowest-level type.
+                // @note No `break` here on purpose!
+            case LoadType::ConversionNeeded: {
+                    // Try to get the lowest-hierarchy (closets to child class) of the type.
+                // The usage of `get_type_info` implicitly requires single inheritance.
+                auto* py_type = (PyTypeObject*)obj.get_type().ptr();
+                lowest_type = detail::get_type_info(py_type);
+                break;
+            }
+            case LoadType::DerivedCppMulti: {
+                throw std::runtime_error(
+                    "pybind11 does not support avoiding slicing with "
+                    "multiple inheritance");
+            }
+            default: {
+                throw std::runtime_error("Unsupported load type");
+            }
+        }
+        if (!lowest_type)
+            throw std::runtime_error("No valid lowest type. Internal error?");
+        auto& release_info = lowest_type->release_info;
+        if (!release_info.release_to_cpp)
+            throw std::runtime_error("No release mechanism in lowest type?");
+        release_info.release_to_cpp(v_h.inst, &holder, std::move(obj));
+        return true;
+    }
+
+    holder_type holder;
 };
 
 template <typename type, typename deleter>
@@ -835,21 +965,25 @@ class type_caster<T, enable_if_t<is_pyobject<T>::value>> : public pyobject_caste
 template <typename T> using move_is_plain_type = satisfies_none_of<T,
     std::is_void, std::is_pointer, std::is_reference, std::is_const
 >;
+template <typename T, typename SFINAE = void> struct move_common : std::false_type {};
+template <typename T> struct move_common<T, enable_if_t<all_of<
+    move_is_plain_type<T>,
+    std::is_move_constructible<T>,
+    std::is_same<
+        intrinsic_t<typename make_caster<T>::template cast_op_type<T&>>,
+        T>
+>::value>> : std::true_type {};
 template <typename T, typename SFINAE = void> struct move_always : std::false_type {};
 template <typename T> struct move_always<T, enable_if_t<all_of<
-    move_is_plain_type<T>,
-    negation<is_copy_constructible<T>>,
-    std::is_move_constructible<T>,
-    std::is_same<decltype(std::declval<make_caster<T>>().operator T&()), T&>
+    move_common<T>,
+    negation<is_copy_constructible<T>>
 >::value>> : std::true_type {};
 template <typename T, typename SFINAE = void> struct move_if_unreferenced : std::false_type {};
 template <typename T> struct move_if_unreferenced<T, enable_if_t<all_of<
-    move_is_plain_type<T>,
-    negation<move_always<T>>,
-    std::is_move_constructible<T>,
-    std::is_same<decltype(std::declval<make_caster<T>>().operator T&()), T&>
+    move_common<T>,
+    is_copy_constructible<T>
 >::value>> : std::true_type {};
-template <typename T> using move_never = none_of<move_always<T>, move_if_unreferenced<T>>;
+template <typename T> using move_never = negation<move_common<T>>;
 
 // Detect whether returning a `type` from a cast on type's type_caster is going to result in a
 // reference or pointer to a local variable of the type_caster.  Basically, only
@@ -929,6 +1063,18 @@ template <typename T> T handle::cast() const { return pybind11::cast<T>(*this); 
 template <> inline void handle::cast() const { return; }
 
 template <typename T>
+detail::enable_if_t<
+        // TODO(eric.cousineau): Figure out how to prevent perfect-forwarding more elegantly.
+        std::is_rvalue_reference<T&&>::value && !detail::is_pyobject<detail::intrinsic_t<T>>::value, object>
+    move(T&& value) {
+    // TODO(eric.cousineau): Add policies, parent, etc.
+    // It'd be nice to supply a parent, but for now, just leave it as-is.
+    handle no_parent;
+    return reinterpret_steal<object>(
+        detail::make_caster<T>::cast(std::move(value), return_value_policy::take_ownership, no_parent));
+}
+
+template <typename T>
 detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
     if (obj.ref_count() > 1)
 #if defined(NDEBUG)
@@ -940,7 +1086,7 @@ detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
 #endif
 
     // Move into a temporary and return that, because the reference may be a local value of `conv`
-    T ret = std::move(detail::load_type<T>(obj).operator T&());
+    T ret = std::move(detail::cast_op<T>(detail::load_type<T>(obj)));
     return ret;
 }
 

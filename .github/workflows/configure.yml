@@ -5,9 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - master
-      - stable
-      - v*
+      - drake
 
 jobs:
   # This tests various versions of CMake in various combinations, to make sure

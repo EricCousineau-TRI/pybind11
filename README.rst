@@ -1,9 +1,29 @@
+RobotLocomotion Fork for Drake
+==============================
+
+|DrakeCI|
+
+This is a fork of the
+`official pybind/pybind11 repository <https://github.com/pybind/pybind11/>`_.
+For information specific to this fork, please see
+`README_DRAKE.md <./README_DRAKE.md>`_.
+
+Some links within this fork's documentation may link back to the official
+upstream repository.
+
+.. |DrakeCI| image:: https://github.com/RobotLocomotion/pybind11/workflows/CI/badge.svg
+   :target: https://github.com/RobotLocomotion/pybind11/actions
+
+----------
+
 .. figure:: https://github.com/pybind/pybind11/raw/master/docs/pybind11-logo.png
    :alt: pybind11 logo
 
 **pybind11 — Seamless operability between C++11 and Python**
 
-|Latest Documentation Status| |Stable Documentation Status| |Gitter chat| |GitHub Discussions| |CI| |Build status|
+..
+   # Hide upstream's badges.
+   |Latest Documentation Status| |Stable Documentation Status| |Gitter chat| |GitHub Discussions| |CI| |Build status|
 
 |Repology| |PyPI package| |Conda-forge| |Python Versions|
 

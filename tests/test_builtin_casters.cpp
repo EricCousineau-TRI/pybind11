@@ -283,4 +283,13 @@ TEST_SUBMODULE(builtin_casters, m) {
     m.def("takes_const_ptr", [](const ConstRefCasted* x) { return x->tag; });
     m.def("takes_const_ref", [](const ConstRefCasted& x) { return x.tag; });
     m.def("takes_const_ref_wrap", [](std::reference_wrapper<const ConstRefCasted> x) { return x.get().tag; });
+
+    // For Drake issue: https://github.com/RobotLocomotion/drake/issues/9398
+    m.def("test_pointer_caster", []() -> bool {
+        UserType a;
+        UserType *a_ptr = &a;
+        py::object o = py::cast(&a); // Rvalue
+        py::object o1 = py::cast(a_ptr); // Non-rvalue
+        return (py::cast<UserType*>(o) == a_ptr && py::cast<UserType*>(o1) == a_ptr);
+    });
 }

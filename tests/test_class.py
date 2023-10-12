@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import pytest
+import weakref
 
 import env  # noqa: F401
 from pybind11_tests import ConstructorStats, UserType
@@ -349,16 +350,26 @@ def test_class_refcount():
         pass
 
     for cls in m.Dog, PyDog:
-        refcount_1 = getrefcount(cls)
-        molly = [cls("Molly") for _ in range(10)]
-        refcount_2 = getrefcount(cls)
+        for i in range(5):
+            refcount_1 = getrefcount(cls)
+            molly = [cls("Molly") for _ in range(10)]
+            refcount_2 = getrefcount(cls)
 
-        del molly
-        pytest.gc_collect()
-        refcount_3 = getrefcount(cls)
+            del molly
+            pytest.gc_collect()
+            refcount_3 = getrefcount(cls)
 
-        assert refcount_1 == refcount_3
-        assert refcount_2 > refcount_1
+            if cls == PyDog and i == 0:
+                # If this is the first time the derived class is called, then
+                # creating the instance created the dtor hook, introducing one more reference.
+                # @note This changes to `refcount_1 == refcount_3` in Python3.
+                assert refcount_1 + 1 == refcount_3 or refcount_1 == refcount_3
+            else:
+                assert refcount_1 == refcount_3
+            assert refcount_2 > refcount_1
+
+    # @note Deleting `PyDog` does not return the refcount of `m.Dog` back to zero, due to the
+    # destructor shim.
 
 
 def test_reentrant_implicit_conversion_failure(msg):
@@ -471,3 +482,40 @@ def test_register_duplicate_class():
         m.register_duplicate_nested_class_type(ClassScope)
     expected = 'generic_type: type "YetAnotherDuplicateNested" is already registered!'
     assert str(exc_info.value) == expected
+
+
+@pytest.mark.skip(
+    reason="Generally reproducible in CPython, Python 3, non-debug, on Linux. "
+    "However, hard to pin this down for CI."
+)
+def test_1922():
+    # Test #1922 (drake#11424).
+    # Define a derived class which *does not* overload the method.
+    # WARNING: The reproduction of this failure may be platform-specific, and
+    # seems to depend on the order of definition and/or the name of the classes
+    # defined. For example, trying to place this and the C++ code in
+    # `test_virtual_functions` makes `assert id_1 == id_2` below fail.
+    class Child1(m.ExampleVirt2):
+        pass
+
+    id_1 = id(Child1)
+    assert m.example_virt2_get_name(m.ExampleVirt2()) == "ExampleVirt2"
+    assert m.example_virt2_get_name(Child1()) == "ExampleVirt2"
+
+    # Now delete everything (and ensure it's deleted).
+    wref = weakref.ref(Child1)
+    del Child1
+    pytest.gc_collect()
+    assert wref() is None
+
+    # Define a derived class which *does* define an overload.
+    class Child2(m.ExampleVirt2):
+        def get_name(self):
+            return "Child2"
+
+    id_2 = id(Child2)
+    assert id_1 == id_2  # This happens in CPython; not sure about PyPy.
+    assert m.example_virt2_get_name(m.ExampleVirt2()) == "ExampleVirt2"
+    # THIS WILL FAIL: This is using the cached `ExampleVirt2.get_name`, rather
+    # than re-inspect the Python dictionary.
+    assert m.example_virt2_get_name(Child2()) == "Child2"

@@ -537,3 +537,7 @@ def test_const_ref_caster():
     assert m.takes_const_ptr(x) == 5
     assert m.takes_const_ref(x) == 4
     assert m.takes_const_ref_wrap(x) == 4
+
+
+def test_pointer_caster():
+    assert m.test_pointer_caster()

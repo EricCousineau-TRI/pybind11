@@ -45,6 +45,24 @@ int WithStatic2::static_value2 = 2;
 int VanillaStaticMix1::static_value = 12;
 int VanillaStaticMix2::static_value = 12;
 
+template <typename T, typename Ptr = std::unique_ptr<T>>
+class Container {
+public:
+    Container(Ptr ptr)
+        : ptr_(std::move(ptr)) {}
+    T* get() const { return ptr_.get(); }
+    Ptr release() { return std::move(ptr_); }
+
+    static void def(py::module &m, const std::string& name) {
+        py::class_<Container>(m, name.c_str())
+            .def(py::init<Ptr>())
+            .def("get", &Container::get)
+            .def("release", &Container::release);
+    }
+private:
+    Ptr ptr_;
+};
+
 // test_multiple_inheritance_virtbase
 struct Base1a {
     explicit Base1a(int i) : i(i) {}
@@ -106,6 +124,7 @@ TEST_SUBMODULE(multiple_inheritance, m) {
     py::class_<MIType, Base12>(m, "MIType")
         .def(py::init<int, int>());
 
+    Container<Base1>::def(m, "ContainerBase1");
 
     // test_multiple_inheritance_python_many_bases
 #define PYBIND11_BASEN(N)                                                                         \
@@ -142,6 +161,8 @@ TEST_SUBMODULE(multiple_inheritance, m) {
     py::class_<Base12a, /* Base1 missing */ Base2a,
                std::shared_ptr<Base12a>>(m, "Base12a", py::multiple_inheritance())
         .def(py::init<int, int>());
+
+    Container<Base2a, std::shared_ptr<Base2a>>::def(m, "ContainerBase2a");
 
     m.def("bar_base2a", [](Base2a *b) { return b->bar(); });
     m.def("bar_base2a_sharedptr", [](const std::shared_ptr<Base2a> &b) { return b->bar(); });
