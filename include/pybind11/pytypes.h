@@ -269,10 +269,7 @@ public:
     /// Copy constructor; always increases the reference count
     object(const object &o) : handle(o) { inc_ref(); }
     /// Move constructor; steals the object from ``other`` and preserves its reference count
-    object(object &&other) noexcept {
-        m_ptr = other.m_ptr;
-        other.m_ptr = nullptr;
-    }
+    object(object &&other) noexcept : handle(other) { other.m_ptr = nullptr; }
     /// Destructor; automatically calls `handle::dec_ref()`
     ~object() { dec_ref(); }
 
@@ -435,8 +432,6 @@ private:
 #    pragma warning(pop)
 #endif
 
-#if PY_VERSION_HEX >= 0x03030000
-
 /// Replaces the current Python error indicator with the chosen error, performing a
 /// 'raise from' to indicate that the chosen error was caused by the original error.
 inline void raise_from(PyObject *type, const char *message) {
@@ -473,8 +468,6 @@ inline void raise_from(error_already_set &err, PyObject *type, const char *messa
     err.restore();
     raise_from(type, message);
 }
-
-#endif
 
 /** \defgroup python_builtins const_name
     Unless stated otherwise, the following C++ functions behave the same
@@ -592,12 +585,9 @@ inline ssize_t hash(handle obj) {
 PYBIND11_NAMESPACE_BEGIN(detail)
 inline handle get_function(handle value) {
     if (value) {
-#if PY_MAJOR_VERSION >= 3
         if (PyInstanceMethod_Check(value.ptr())) {
             value = PyInstanceMethod_GET_FUNCTION(value.ptr());
-        } else
-#endif
-            if (PyMethod_Check(value.ptr())) {
+        } else if (PyMethod_Check(value.ptr())) {
             value = PyMethod_GET_FUNCTION(value.ptr());
         }
     }
@@ -609,34 +599,26 @@ inline handle get_function(handle value) {
 
 // copied from cpython _PyDict_GetItemStringWithError
 inline PyObject *dict_getitemstring(PyObject *v, const char *key) {
-#if PY_MAJOR_VERSION >= 3
     PyObject *kv = nullptr, *rv = nullptr;
     kv = PyUnicode_FromString(key);
-    if (kv == NULL) {
+    if (kv == nullptr) {
         throw error_already_set();
     }
 
     rv = PyDict_GetItemWithError(v, kv);
     Py_DECREF(kv);
-    if (rv == NULL && PyErr_Occurred()) {
+    if (rv == nullptr && PyErr_Occurred()) {
         throw error_already_set();
     }
     return rv;
-#else
-    return PyDict_GetItemString(v, key);
-#endif
 }
 
 inline PyObject *dict_getitem(PyObject *v, PyObject *key) {
-#if PY_MAJOR_VERSION >= 3
     PyObject *rv = PyDict_GetItemWithError(v, key);
-    if (rv == NULL && PyErr_Occurred()) {
+    if (rv == nullptr && PyErr_Occurred()) {
         throw error_already_set();
     }
     return rv;
-#else
-    return PyDict_GetItem(v, key);
-#endif
 }
 
 // Helper aliases/functions to support implicit casting of values given to python
@@ -1054,12 +1036,12 @@ public:                                                                         
     Name(const object &o)                                                                         \
         : Parent(check_(o) ? o.inc_ref().ptr() : ConvertFun(o.ptr()), stolen_t{}) {               \
         if (!m_ptr)                                                                               \
-            throw error_already_set();                                                            \
+            throw ::pybind11::error_already_set();                                                \
     }                                                                                             \
     /* NOLINTNEXTLINE(google-explicit-constructor) */                                             \
     Name(object &&o) : Parent(check_(o) ? o.release().ptr() : ConvertFun(o.ptr()), stolen_t{}) {  \
         if (!m_ptr)                                                                               \
-            throw error_already_set();                                                            \
+            throw ::pybind11::error_already_set();                                                \
     }
 
 #define PYBIND11_OBJECT_CVT_DEFAULT(Name, Parent, CheckFun, ConvertFun)                           \
@@ -1259,8 +1241,8 @@ public:
         }
         char *buffer = nullptr;
         ssize_t length = 0;
-        if (PYBIND11_BYTES_AS_STRING_AND_SIZE(temp.ptr(), &buffer, &length)) {
-            pybind11_fail("Unable to extract string contents! (invalid type)");
+        if (PyBytes_AsStringAndSize(temp.ptr(), &buffer, &length) != 0) {
+            throw error_already_set();
         }
         return std::string(buffer, (size_t) length);
     }
@@ -1274,13 +1256,6 @@ private:
     /// Return string representation -- always returns a new reference, even if already a str
     static PyObject *raw_str(PyObject *op) {
         PyObject *str_value = PyObject_Str(op);
-#if PY_MAJOR_VERSION < 3
-        if (!str_value)
-            throw error_already_set();
-        PyObject *unicode = PyUnicode_FromEncodedObject(str_value, "utf-8", nullptr);
-        Py_XDECREF(str_value);
-        str_value = unicode;
-#endif
         return str_value;
     }
 };
@@ -1322,14 +1297,7 @@ public:
     explicit bytes(const pybind11::str &s);
 
     // NOLINTNEXTLINE(google-explicit-constructor)
-    operator std::string() const {
-        char *buffer = nullptr;
-        ssize_t length = 0;
-        if (PYBIND11_BYTES_AS_STRING_AND_SIZE(m_ptr, &buffer, &length)) {
-            pybind11_fail("Unable to extract bytes contents!");
-        }
-        return std::string(buffer, (size_t) length);
-    }
+    operator std::string() const { return string_op<std::string>(); }
 
 #ifdef PYBIND11_HAS_STRING_VIEW
     // enable_if is needed to avoid "ambiguous conversion" errors (see PR #3521).
@@ -1341,15 +1309,18 @@ public:
     // valid so long as the `bytes` instance remains alive and so generally should not outlive the
     // lifetime of the `bytes` instance.
     // NOLINTNEXTLINE(google-explicit-constructor)
-    operator std::string_view() const {
+    operator std::string_view() const { return string_op<std::string_view>(); }
+#endif
+private:
+    template <typename T>
+    T string_op() const {
         char *buffer = nullptr;
         ssize_t length = 0;
-        if (PYBIND11_BYTES_AS_STRING_AND_SIZE(m_ptr, &buffer, &length)) {
-            pybind11_fail("Unable to extract bytes contents!");
+        if (PyBytes_AsStringAndSize(m_ptr, &buffer, &length) != 0) {
+            throw error_already_set();
         }
         return {buffer, static_cast<size_t>(length)};
     }
-#endif
 };
 // Note: breathe >= 4.17.0 will fail to build docs if the below two constructors
 // are included in the doxygen group; close here and reopen after as a workaround
@@ -1360,13 +1331,13 @@ inline bytes::bytes(const pybind11::str &s) {
     if (PyUnicode_Check(s.ptr())) {
         temp = reinterpret_steal<object>(PyUnicode_AsUTF8String(s.ptr()));
         if (!temp) {
-            pybind11_fail("Unable to extract string contents! (encoding issue)");
+            throw error_already_set();
         }
     }
     char *buffer = nullptr;
     ssize_t length = 0;
-    if (PYBIND11_BYTES_AS_STRING_AND_SIZE(temp.ptr(), &buffer, &length)) {
-        pybind11_fail("Unable to extract string contents! (invalid type)");
+    if (PyBytes_AsStringAndSize(temp.ptr(), &buffer, &length) != 0) {
+        throw error_already_set();
     }
     auto obj = reinterpret_steal<object>(PYBIND11_BYTES_FROM_STRING_AND_SIZE(buffer, length));
     if (!obj) {
@@ -1378,8 +1349,8 @@ inline bytes::bytes(const pybind11::str &s) {
 inline str::str(const bytes &b) {
     char *buffer = nullptr;
     ssize_t length = 0;
-    if (PYBIND11_BYTES_AS_STRING_AND_SIZE(b.ptr(), &buffer, &length)) {
-        pybind11_fail("Unable to extract bytes contents!");
+    if (PyBytes_AsStringAndSize(b.ptr(), &buffer, &length) != 0) {
+        throw error_already_set();
     }
     auto obj = reinterpret_steal<object>(PyUnicode_FromStringAndSize(buffer, length));
     if (!obj) {
@@ -1460,11 +1431,7 @@ PYBIND11_NAMESPACE_BEGIN(detail)
 // unsigned type: (A)-1 != (B)-1 when A and B are unsigned types of different sizes).
 template <typename Unsigned>
 Unsigned as_unsigned(PyObject *o) {
-    if (PYBIND11_SILENCE_MSVC_C4127(sizeof(Unsigned) <= sizeof(unsigned long))
-#if PY_VERSION_HEX < 0x03000000
-        || PyInt_Check(o)
-#endif
-    ) {
+    if (PYBIND11_SILENCE_MSVC_C4127(sizeof(Unsigned) <= sizeof(unsigned long))) {
         unsigned long v = PyLong_AsUnsignedLong(o);
         return v == (unsigned long) -1 && PyErr_Occurred() ? (Unsigned) -1 : (Unsigned) v;
     }
@@ -1536,6 +1503,9 @@ public:
     explicit weakref(handle obj, handle callback = {})
         : object(PyWeakref_NewRef(obj.ptr(), callback.ptr()), stolen_t{}) {
         if (!m_ptr) {
+            if (PyErr_Occurred()) {
+                throw error_already_set();
+            }
             pybind11_fail("Could not allocate weak reference!");
         }
     }
@@ -1547,8 +1517,8 @@ private:
 class slice : public object {
 public:
     PYBIND11_OBJECT_DEFAULT(slice, object, PySlice_Check)
-    slice(handle start, handle stop, handle step) {
-        m_ptr = PySlice_New(start.ptr(), stop.ptr(), step.ptr());
+    slice(handle start, handle stop, handle step)
+        : object(PySlice_New(start.ptr(), stop.ptr(), step.ptr()), stolen_t{}) {
         if (!m_ptr) {
             pybind11_fail("Could not allocate slice object!");
         }
@@ -1598,7 +1568,7 @@ public:
                      void (*destructor)(PyObject *) = nullptr)
         : object(PyCapsule_New(const_cast<void *>(value), name, destructor), stolen_t{}) {
         if (!m_ptr) {
-            pybind11_fail("Could not allocate capsule object!");
+            throw error_already_set();
         }
     }
 
@@ -1606,34 +1576,44 @@ public:
     capsule(const void *value, void (*destruct)(PyObject *))
         : object(PyCapsule_New(const_cast<void *>(value), nullptr, destruct), stolen_t{}) {
         if (!m_ptr) {
-            pybind11_fail("Could not allocate capsule object!");
+            throw error_already_set();
         }
     }
 
     capsule(const void *value, void (*destructor)(void *)) {
         m_ptr = PyCapsule_New(const_cast<void *>(value), nullptr, [](PyObject *o) {
             auto destructor = reinterpret_cast<void (*)(void *)>(PyCapsule_GetContext(o));
-            void *ptr = PyCapsule_GetPointer(o, nullptr);
+            if (destructor == nullptr) {
+                if (PyErr_Occurred()) {
+                    throw error_already_set();
+                }
+                pybind11_fail("Unable to get capsule context");
+            }
+            const char *name = get_name_in_error_scope(o);
+            void *ptr = PyCapsule_GetPointer(o, name);
+            if (ptr == nullptr) {
+                throw error_already_set();
+            }
             destructor(ptr);
         });
 
-        if (!m_ptr) {
-            pybind11_fail("Could not allocate capsule object!");
-        }
-
-        if (PyCapsule_SetContext(m_ptr, (void *) destructor) != 0) {
-            pybind11_fail("Could not set capsule context!");
+        if (!m_ptr || PyCapsule_SetContext(m_ptr, (void *) destructor) != 0) {
+            throw error_already_set();
         }
     }
 
     explicit capsule(void (*destructor)()) {
         m_ptr = PyCapsule_New(reinterpret_cast<void *>(destructor), nullptr, [](PyObject *o) {
-            auto destructor = reinterpret_cast<void (*)()>(PyCapsule_GetPointer(o, nullptr));
+            const char *name = get_name_in_error_scope(o);
+            auto destructor = reinterpret_cast<void (*)()>(PyCapsule_GetPointer(o, name));
+            if (destructor == nullptr) {
+                throw error_already_set();
+            }
             destructor();
         });
 
         if (!m_ptr) {
-            pybind11_fail("Could not allocate capsule object!");
+            throw error_already_set();
         }
     }
 
@@ -1648,8 +1628,7 @@ public:
         const auto *name = this->name();
         T *result = static_cast<T *>(PyCapsule_GetPointer(m_ptr, name));
         if (!result) {
-            PyErr_Clear();
-            pybind11_fail("Unable to extract capsule contents!");
+            throw error_already_set();
         }
         return result;
     }
@@ -1657,12 +1636,37 @@ public:
     /// Replaces a capsule's pointer *without* calling the destructor on the existing one.
     void set_pointer(const void *value) {
         if (PyCapsule_SetPointer(m_ptr, const_cast<void *>(value)) != 0) {
-            PyErr_Clear();
-            pybind11_fail("Could not set capsule pointer");
+            throw error_already_set();
         }
     }
 
-    const char *name() const { return PyCapsule_GetName(m_ptr); }
+    const char *name() const {
+        const char *name = PyCapsule_GetName(m_ptr);
+        if ((name == nullptr) && PyErr_Occurred()) {
+            throw error_already_set();
+        }
+        return name;
+    }
+
+    /// Replaces a capsule's name *without* calling the destructor on the existing one.
+    void set_name(const char *new_name) {
+        if (PyCapsule_SetName(m_ptr, new_name) != 0) {
+            throw error_already_set();
+        }
+    }
+
+private:
+    static const char *get_name_in_error_scope(PyObject *o) {
+        error_scope error_guard;
+
+        const char *name = PyCapsule_GetName(o);
+        if ((name == nullptr) && PyErr_Occurred()) {
+            // write out and consume error raised by call to PyCapsule_GetName
+            PyErr_WriteUnraisable(o);
+        }
+
+        return name;
+    }
 };
 
 class tuple : public object {
@@ -1781,25 +1785,35 @@ class kwargs : public dict {
     PYBIND11_OBJECT_DEFAULT(kwargs, dict, PyDict_Check)
 };
 
-class set : public object {
+class anyset : public object {
 public:
-    PYBIND11_OBJECT_CVT(set, object, PySet_Check, PySet_New)
-    set() : object(PySet_New(nullptr), stolen_t{}) {
+    PYBIND11_OBJECT(anyset, object, PyAnySet_Check)
+    size_t size() const { return static_cast<size_t>(PySet_Size(m_ptr)); }
+    bool empty() const { return size() == 0; }
+    template <typename T>
+    bool contains(T &&val) const {
+        return PySet_Contains(m_ptr, detail::object_or_cast(std::forward<T>(val)).ptr()) == 1;
+    }
+};
+
+class set : public anyset {
+public:
+    PYBIND11_OBJECT_CVT(set, anyset, PySet_Check, PySet_New)
+    set() : anyset(PySet_New(nullptr), stolen_t{}) {
         if (!m_ptr) {
             pybind11_fail("Could not allocate set object!");
         }
     }
-    size_t size() const { return (size_t) PySet_Size(m_ptr); }
-    bool empty() const { return size() == 0; }
     template <typename T>
     bool add(T &&val) /* py-non-const */ {
         return PySet_Add(m_ptr, detail::object_or_cast(std::forward<T>(val)).ptr()) == 0;
     }
     void clear() /* py-non-const */ { PySet_Clear(m_ptr); }
-    template <typename T>
-    bool contains(T &&val) const {
-        return PySet_Contains(m_ptr, detail::object_or_cast(std::forward<T>(val)).ptr()) == 1;
-    }
+};
+
+class frozenset : public anyset {
+public:
+    PYBIND11_OBJECT_CVT(frozenset, anyset, PyFrozenSet_Check, PyFrozenSet_New)
 };
 
 class function : public object {
@@ -1911,8 +1925,8 @@ public:
         return memoryview::from_buffer(reinterpret_cast<void *>(ptr),
                                        sizeof(T),
                                        format_descriptor<T>::value,
-                                       shape,
-                                       strides,
+                                       std::move(shape),
+                                       std::move(strides),
                                        readonly);
     }
 
@@ -1920,18 +1934,16 @@ public:
     static memoryview from_buffer(const T *ptr,
                                   detail::any_container<ssize_t> shape,
                                   detail::any_container<ssize_t> strides) {
-        return memoryview::from_buffer(const_cast<T *>(ptr), shape, strides, true);
+        return memoryview::from_buffer(
+            const_cast<T *>(ptr), std::move(shape), std::move(strides), true);
     }
 
-#if PY_MAJOR_VERSION >= 3
     /** \rst
         Creates ``memoryview`` from static memory.
 
         This method is meant for providing a ``memoryview`` for C/C++ buffer not
         managed by Python. The caller is responsible for managing the lifetime
         of ``mem``, which MUST outlive the memoryview constructed here.
-
-        This method is not available in Python 2.
 
         See also: Python C API documentation for `PyMemoryView_FromBuffer`_.
 
@@ -1951,12 +1963,10 @@ public:
         return memoryview::from_memory(const_cast<void *>(mem), size, true);
     }
 
-#    ifdef PYBIND11_HAS_STRING_VIEW
+#ifdef PYBIND11_HAS_STRING_VIEW
     static memoryview from_memory(std::string_view mem) {
         return from_memory(const_cast<char *>(mem.data()), static_cast<ssize_t>(mem.size()), true);
     }
-#    endif
-
 #endif
 };
 
@@ -2011,11 +2021,7 @@ inline size_t len(handle h) {
 /// Get the length hint of a Python object.
 /// Returns 0 when this cannot be determined.
 inline size_t len_hint(handle h) {
-#if PY_VERSION_HEX >= 0x03040000
     ssize_t result = PyObject_LengthHint(h.ptr(), 0);
-#else
-    ssize_t result = PyObject_Length(h.ptr());
-#endif
     if (result < 0) {
         // Sometimes a length can't be determined at all (eg generators)
         // In which case simply return 0
@@ -2030,13 +2036,6 @@ inline str repr(handle h) {
     if (!str_value) {
         throw error_already_set();
     }
-#if PY_MAJOR_VERSION < 3
-    PyObject *unicode = PyUnicode_FromEncodedObject(str_value, "utf-8", nullptr);
-    Py_XDECREF(str_value);
-    str_value = unicode;
-    if (!str_value)
-        throw error_already_set();
-#endif
     return reinterpret_steal<str>(str_value);
 }
 

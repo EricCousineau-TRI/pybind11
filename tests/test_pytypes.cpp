@@ -11,6 +11,34 @@
 
 #include <utility>
 
+namespace external {
+namespace detail {
+bool check(PyObject *o) { return PyFloat_Check(o) != 0; }
+
+PyObject *conv(PyObject *o) {
+    PyObject *ret = nullptr;
+    if (PyLong_Check(o)) {
+        double v = PyLong_AsDouble(o);
+        if (!(v == -1.0 && PyErr_Occurred())) {
+            ret = PyFloat_FromDouble(v);
+        }
+    } else {
+        PyErr_SetString(PyExc_TypeError, "Unexpected type");
+    }
+    return ret;
+}
+
+PyObject *default_constructed() { return PyFloat_FromDouble(0.0); }
+} // namespace detail
+class float_ : public py::object {
+    PYBIND11_OBJECT_CVT(float_, py::object, external::detail::check, external::detail::conv)
+
+    float_() : py::object(external::detail::default_constructed(), stolen_t{}) {}
+
+    double get_value() const { return PyFloat_AsDouble(this->ptr()); }
+};
+} // namespace external
+
 TEST_SUBMODULE(pytypes, m) {
     // test_bool
     m.def("get_bool", [] { return py::bool_(false); });
@@ -47,7 +75,7 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("get_none", [] { return py::none(); });
     m.def("print_none", [](const py::none &none) { py::print("none: {}"_s.format(none)); });
 
-    // test_set
+    // test_set, test_frozenset
     m.def("get_set", []() {
         py::set set;
         set.add(py::str("key1"));
@@ -55,14 +83,26 @@ TEST_SUBMODULE(pytypes, m) {
         set.add(std::string("key3"));
         return set;
     });
-    m.def("print_set", [](const py::set &set) {
+    m.def("get_frozenset", []() {
+        py::set set;
+        set.add(py::str("key1"));
+        set.add("key2");
+        set.add(std::string("key3"));
+        return py::frozenset(set);
+    });
+    m.def("print_anyset", [](const py::anyset &set) {
         for (auto item : set) {
             py::print("key:", item);
         }
     });
-    m.def("set_contains",
-          [](const py::set &set, const py::object &key) { return set.contains(key); });
-    m.def("set_contains", [](const py::set &set, const char *key) { return set.contains(key); });
+    m.def("anyset_size", [](const py::anyset &set) { return set.size(); });
+    m.def("anyset_empty", [](const py::anyset &set) { return set.empty(); });
+    m.def("anyset_contains",
+          [](const py::anyset &set, const py::object &key) { return set.contains(key); });
+    m.def("anyset_contains",
+          [](const py::anyset &set, const char *key) { return set.contains(key); });
+    m.def("set_add", [](py::set &set, const py::object &key) { set.add(key); });
+    m.def("set_clear", [](py::set &set) { set.clear(); });
 
     // test_dict
     m.def("get_dict", []() { return py::dict("key"_a = "value"); });
@@ -87,7 +127,6 @@ TEST_SUBMODULE(pytypes, m) {
     m.def("tuple_size_t", []() { return py::tuple{(py::size_t) 0}; });
     m.def("get_tuple", []() { return py::make_tuple(42, py::none(), "spam"); });
 
-#if PY_VERSION_HEX >= 0x03030000
     // test_simple_namespace
     m.def("get_simple_namespace", []() {
         auto ns = py::module_::import("types").attr("SimpleNamespace")(
@@ -96,7 +135,6 @@ TEST_SUBMODULE(pytypes, m) {
         py::setattr(ns, "right", py::int_(2));
         return ns;
     });
-#endif
 
     // test_str
     m.def("str_from_char_ssize_t", []() { return py::str{"red", (py::ssize_t) 3}; });
@@ -133,11 +171,31 @@ TEST_SUBMODULE(pytypes, m) {
         return py::capsule([]() { py::print("destructing capsule"); });
     });
 
+    m.def("return_renamed_capsule_with_destructor", []() {
+        py::print("creating capsule");
+        auto cap = py::capsule([]() { py::print("destructing capsule"); });
+        static const char *capsule_name = "test_name1";
+        py::print("renaming capsule");
+        cap.set_name(capsule_name);
+        return cap;
+    });
+
     m.def("return_capsule_with_destructor_2", []() {
         py::print("creating capsule");
         return py::capsule((void *) 1234, [](void *ptr) {
             py::print("destructing capsule: {}"_s.format((size_t) ptr));
         });
+    });
+
+    m.def("return_renamed_capsule_with_destructor_2", []() {
+        py::print("creating capsule");
+        auto cap = py::capsule((void *) 1234, [](void *ptr) {
+            py::print("destructing capsule: {}"_s.format((size_t) ptr));
+        });
+        static const char *capsule_name = "test_name2";
+        py::print("renaming capsule");
+        cap.set_name(capsule_name);
+        return cap;
     });
 
     m.def("return_capsule_with_name_and_destructor", []() {
@@ -264,6 +322,7 @@ TEST_SUBMODULE(pytypes, m) {
                         "list"_a = py::list(d["list"]),
                         "dict"_a = py::dict(d["dict"]),
                         "set"_a = py::set(d["set"]),
+                        "frozenset"_a = py::frozenset(d["frozenset"]),
                         "memoryview"_a = py::memoryview(d["memoryview"]));
     });
 
@@ -279,6 +338,7 @@ TEST_SUBMODULE(pytypes, m) {
                         "list"_a = d["list"].cast<py::list>(),
                         "dict"_a = d["dict"].cast<py::dict>(),
                         "set"_a = d["set"].cast<py::set>(),
+                        "frozenset"_a = d["frozenset"].cast<py::frozenset>(),
                         "memoryview"_a = d["memoryview"].cast<py::memoryview>());
     });
 
@@ -423,12 +483,10 @@ TEST_SUBMODULE(pytypes, m) {
         return py::memoryview::from_buffer(static_cast<void *>(nullptr), 1, "B", {}, {});
     });
 
-#if PY_MAJOR_VERSION >= 3
     m.def("test_memoryview_from_memory", []() {
         const char *buf = "\xff\xe1\xab\x37";
         return py::memoryview::from_memory(buf, static_cast<py::ssize_t>(strlen(buf)));
     });
-#endif
 
     // test_builtin_functions
     m.def("get_len", [](py::handle h) { return py::len(h); });
@@ -548,5 +606,10 @@ TEST_SUBMODULE(pytypes, m) {
         py::detail::accessor_policies::tuple_item::set(o, (py::size_t) 1, s1);
         py::detail::accessor_policies::tuple_item::set(o, (py::size_t) 0, s0);
         return o;
+    });
+
+    m.def("square_float_", [](const external::float_ &x) -> double {
+        double v = x.get_value();
+        return v * v;
     });
 }
