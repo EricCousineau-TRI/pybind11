@@ -98,8 +98,12 @@ public:
             explicit func_wrapper(func_handle &&hf) noexcept : hfunc(std::move(hf)) {}
             Return operator()(Args... args) const {
                 gil_scoped_acquire acq;
-                // casts the returned object as a rvalue to the return type
-                return hfunc.f(std::forward<Args>(args)...).template cast<Return>();
+                // Note: Our Drake fork has a possible bug where returning an rvalue
+                // does not work. Thus, we revert the change for the following line (c42414db).
+                // TODO(eric.cousineau): Fix this on our side.
+                // return object(hfunc.f(std::forward<Args>(args)...)).template cast<Return>();
+                object retval(hfunc.f(std::forward<Args>(args)...));
+                return retval.template cast<Return>();
             }
         };
 
