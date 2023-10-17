@@ -14,6 +14,7 @@
 
 #include "pybind11_tests.h"
 #include "object.h"
+#include "pybind11/functional.h"
 
 namespace {
 
@@ -532,6 +533,16 @@ TEST_SUBMODULE(smart_ptr, m) {
             out["obj"] = py::cast(std::move(obj));
             out["overload"] = 2;
             return out;
+        });
+
+    using Callback = std::function<std::unique_ptr<UniquePtrHeld>()>;
+    m.def("unique_ptr_callback",
+        [](const Callback& callback) {
+            auto obj = callback();
+            if (obj->value() != 10) {
+                throw std::runtime_error("obj.value() must be 10");
+            }
+            return callback();
         });
 
     // Ensure class is non-empty, so it's easier to detect double-free
