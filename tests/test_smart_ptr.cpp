@@ -468,8 +468,29 @@ TEST_SUBMODULE(smart_ptr, m) {
         int value_{};
     };
     py::class_<UniquePtrHeld>(m, "UniquePtrHeld")
-        .def(py::init<int>())
+        .def(py::init<int>(), py::arg("value"))
         .def("value", &UniquePtrHeld::value);
+
+    class SharedPtrHeld {
+    public:
+        SharedPtrHeld() = delete;
+        SharedPtrHeld(const SharedPtrHeld&) = delete;
+        SharedPtrHeld(SharedPtrHeld&&) = delete;
+
+        SharedPtrHeld(int value)
+            : value_(value) {
+            print_created(this, value);
+        }
+        ~SharedPtrHeld() {
+            print_destroyed(this);
+        }
+        int value() const { return value_; }
+    private:
+        int value_{};
+    };
+    py::class_<SharedPtrHeld, std::shared_ptr<SharedPtrHeld>>(m, "SharedPtrHeld")
+        .def(py::init<int>(), py::arg("value"))
+        .def("value", &SharedPtrHeld::value);
 
     class UniquePtrOther {};
     py::class_<UniquePtrOther>(m, "UniquePtrOther")
@@ -534,40 +555,76 @@ TEST_SUBMODULE(smart_ptr, m) {
             return out;
         });
 
-    // Ensure class is non-empty, so it's easier to detect double-free
-    // corruption. (If empty, this may be harder to see easily.)
-    struct SharedPtrHeld { int value = 10; };
-    py::class_<SharedPtrHeld, std::shared_ptr<SharedPtrHeld>>(m, "SharedPtrHeld")
-        .def(py::init<>());
     m.def("shared_ptr_held_in_unique_ptr",
         []() {
-            return std::unique_ptr<SharedPtrHeld>(new SharedPtrHeld());
+            return std::unique_ptr<SharedPtrHeld>(new SharedPtrHeld(10));
         });
     m.def("shared_ptr_held_func",
         [](std::shared_ptr<SharedPtrHeld> obj) {
-            return obj != nullptr && obj->value == 10;
+            return obj != nullptr && obj->value() == 10;
         });
 
     // Test passing ownership of registered, but unowned, C++ instances back to
     // Python. This happens when a raw pointer is passed first, and then
     // ownership is transfered.
     struct UniquePtrHeldContainer {
+        using Ptr = std::unique_ptr<UniquePtrHeld>;
+
         UniquePtrHeldContainer() {
-            value_.reset(new UniquePtrHeld(10));
+            value_ = std::make_unique<UniquePtrHeld>(10);
         }
+        UniquePtrHeldContainer(Ptr value) : value_(std::move(value)) {}
+
         UniquePtrHeld* get() const {
             return value_.get();
         }
-        using Ptr = std::unique_ptr<UniquePtrHeld>;
         Ptr reset(Ptr to) {
             Ptr from = std::move(value_);
             value_ = std::move(to);
             return from;
         }
-        std::unique_ptr<UniquePtrHeld> value_;
+
+        Ptr value_;
     };
     py::class_<UniquePtrHeldContainer>(m, "UniquePtrHeldContainer")
         .def(py::init())
+        // Note: Keep alive at this point is only important if we care about the *Python* portion
+        // of an object (e.g., maintaining identity, or preserving keep alive relationships).
+        // For vanilla C++ behavior, having the Python view of the object be deleted should be "ok".
+        .def(py::init<std::unique_ptr<UniquePtrHeld>>(), py::arg("value"))
         .def("get", &UniquePtrHeldContainer::get, py::return_value_policy::reference_internal)
-        .def("reset", &UniquePtrHeldContainer::reset);
+        .def("reset", &UniquePtrHeldContainer::reset, py::arg("to"), py::keep_alive<2, 1>());
+
+    struct SharedPtrHeldContainer {
+        using Ptr = std::shared_ptr<SharedPtrHeld>;
+
+        SharedPtrHeldContainer() {
+            value_ = std::make_shared<SharedPtrHeld>(10);
+        }
+        SharedPtrHeldContainer(Ptr value) : value_(std::move(value)) {}
+
+        Ptr get() const {
+            return value_;
+        }
+        Ptr reset(Ptr to) {
+            Ptr from = std::move(value_);
+            value_ = std::move(to);
+            return from;
+        }
+        Ptr value_;
+    };
+    py::class_<SharedPtrHeldContainer>(m, "SharedPtrHeldContainer")
+        .def(py::init())
+        // Same as above - without an explicit keep_alive here, the Python portion of the object
+        // can be refcount gc'd, and thus cause keep_alive() against that object to be lost.
+        .def(py::init<std::shared_ptr<SharedPtrHeld>>(), py::arg("value"))
+        .def("get", &SharedPtrHeldContainer::get)
+        .def("reset", &SharedPtrHeldContainer::reset, py::arg("to"));
+
+    m.def(
+        "keep_alive_impl",
+        [](py::handle nurse, py::handle patient) {
+            keep_alive_impl(nurse, patient);
+        },
+        py::arg("nurse"), py::arg("patient"));
 }
