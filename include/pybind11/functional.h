@@ -93,7 +93,12 @@ public:
             Return operator()(Args... args) const {
                 gil_scoped_acquire acq;
                 // casts the returned object as a rvalue to the return type
+                // uses object.cast &&() -> py::move()
                 return object(hfunc.f(std::forward<Args>(args)...)).template cast<Return>();
+
+                // uses object.cast const&() -> py::cast()
+                // object retval(hfunc.f(std::forward<Args>(args)...));
+                // return (retval.template cast<Return>());
             }
         };
 
