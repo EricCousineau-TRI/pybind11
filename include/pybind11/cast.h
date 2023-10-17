@@ -1219,17 +1219,19 @@ move(T &&value) {
 }
 
 template <typename T>
-detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {
-    if (obj.ref_count() > 1) {
+detail::enable_if_t<!detail::move_never<T>::value, T> move(object &&obj) {\
+    if constexpr (detail::cast_is_temporary_value_reference<T>::value) {
+        if (obj.ref_count() > 1) {
 #if !defined(PYBIND11_DETAILED_ERROR_MESSAGES)
-        throw cast_error(
+            throw cast_error(
             "Unable to cast Python instance to C++ rvalue: instance has multiple references"
-            " (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)");
+                " (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)");
 #else
-        throw cast_error("Unable to move from Python " + (std::string) str(type::handle_of(obj))
-                         + " instance to C++ " + type_id<T>()
+            throw cast_error("Unable to move from Python " + (std::string) str(type::handle_of(obj))
+                             + " instance to C++ " + type_id<T>()
                          + " instance: instance has multiple references");
 #endif
+        }
     }
 
     // Move into a temporary and return that, because the reference may be a local value of `conv`
