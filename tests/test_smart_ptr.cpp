@@ -467,4 +467,58 @@ TEST_SUBMODULE(smart_ptr, m) {
             }
             return list;
         });
+
+    class SharedPtrHeld {
+    public:
+        SharedPtrHeld() = delete;
+        SharedPtrHeld(const SharedPtrHeld&) = delete;
+        SharedPtrHeld(SharedPtrHeld&&) = delete;
+
+        SharedPtrHeld(int value)
+            : value_(value) {
+            print_created(this, value);
+        }
+        ~SharedPtrHeld() {
+            print_destroyed(this);
+        }
+        int value() const { return value_; }
+    private:
+        int value_{};
+    };
+    py::class_<SharedPtrHeld, std::shared_ptr<SharedPtrHeld>>(m, "SharedPtrHeld")
+        .def(py::init<int>(), py::arg("value"))
+        .def("value", &SharedPtrHeld::value);
+
+    struct SharedPtrHeldContainer {
+        using Ptr = std::shared_ptr<SharedPtrHeld>;
+
+        SharedPtrHeldContainer() {
+            value_ = std::make_shared<SharedPtrHeld>(10);
+        }
+        SharedPtrHeldContainer(Ptr value) : value_(std::move(value)) {}
+
+        Ptr get() const {
+            return value_;
+        }
+        Ptr reset(Ptr to) {
+            Ptr from = std::move(value_);
+            value_ = std::move(to);
+            return from;
+        }
+        Ptr value_;
+    };
+    py::class_<SharedPtrHeldContainer>(m, "SharedPtrHeldContainer")
+        .def(py::init())
+        // Same as above - without an explicit keep_alive here, the Python portion of the object
+        // can be refcount gc'd, and thus cause keep_alive() against that object to be lost.
+        .def(py::init<std::shared_ptr<SharedPtrHeld>>(), py::arg("value"))
+        .def("get", &SharedPtrHeldContainer::get)
+        .def("reset", &SharedPtrHeldContainer::reset, py::arg("to"));
+
+    m.def(
+        "keep_alive_impl",
+        [](py::handle nurse, py::handle patient) {
+            keep_alive_impl(nurse, patient);
+        },
+        py::arg("nurse"), py::arg("patient"));
 }

@@ -1,4 +1,5 @@
 import pytest
+import weakref
 
 m = pytest.importorskip("pybind11_tests.smart_ptr")
 from pybind11_tests import ConstructorStats  # noqa: E402
@@ -313,3 +314,44 @@ def test_shared_ptr_gc():
     pytest.gc_collect()
     for i, v in enumerate(el.get()):
         assert i == v.value()
+
+
+class CustomPatient:
+    pass
+
+
+def test_shared_ptr_held_container_from_cpp_refcount_with_keep_alive():
+
+    def make_container():
+        # This tests the general behavior of losing a Python view of a C++
+        # object, in addition to confirming that existing keep_alive
+        # relationships are lost once that Python view is gc'd.
+        obj = m.SharedPtrHeld(50)
+        c = m.SharedPtrHeldContainer(obj)
+        obj_ref = weakref.ref(obj)
+        obj_id = id(obj)
+
+        # Simulate `py::keep_alive<>` annotation.
+        patient = CustomPatient()
+        m.keep_alive_impl(nurse=obj, patient=patient)
+        patient_ref = weakref.ref(patient)
+
+        return c, obj_ref, obj_id, patient_ref
+
+    c, obj_ref, obj_id_original, patient_ref = make_container()
+    # Expected. The Python view of `obj` is gc'd, but the actual C++ object is
+    # kept.
+    assert obj_ref() is None
+    # Show that the keep alive relationship is lost, thus the patient itself is
+    # gc'd.
+    assert patient_ref() is None
+
+    # Show that we can get a new Python view of the object, and that if we keep
+    # a reference to that object, the identity is preserved.
+    obj = c.get()
+    assert obj is c.get()
+    # Reinforce that this is a new view of the original object by showing that
+    # the id() (in this case, the address) of the Python view is not the same
+    # as it originally was.
+    # (The C++ pointer value, however, should be the same.)
+    assert id(obj) != obj_id_original
