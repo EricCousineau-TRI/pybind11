@@ -32,6 +32,12 @@ typedef Eigen::Matrix<ADScalar, 5, 1> Vector5ADScalar;
 typedef Eigen::Matrix<ADScalar, 1, 6> Vector6ADScalarR;
 PYBIND11_NUMPY_OBJECT_DTYPE(ADScalar);
 
+struct MyScalar {
+  int value{};
+};
+PYBIND11_NUMPY_OBJECT_DTYPE(MyScalar);
+using VectorXMyScalar = Eigen::Matrix<MyScalar, Eigen::Dynamic, 1>;
+
 // Sets/resets a testing reference matrix to have values of 10*r + c, where r and c are the
 // (1-based) row/column number.
 template <typename M>
@@ -516,4 +522,34 @@ TEST_SUBMODULE(eigen_matrix, m) {
         py::module_::import("numpy").attr("ones")(10);
         return v[0](5);
     });
+
+    // test_eigen_dense_sparse_overload
+    // https://github.com/RobotLocomotion/drake/issues/20516
+    // Certain argument combinations seem to make overloads go sideways.
+    py::class_<MyScalar>(m, "MyScalar")
+      .def(py::init<int>(), py::arg("value"))
+      .def_readwrite("value", &MyScalar::value);
+
+    m.def(
+        "accept_matrix",
+        [](const Eigen::MatrixXd&) { return "dense"; });
+    m.def(
+        "accept_matrix",
+        [](const Eigen::SparseMatrix<double>&) { return "sparse"; });
+    m.def(
+        "accept_matrix_and_dtype_object",
+        [](const Eigen::MatrixXd&, const VectorXADScalar&) { return "dense"; });
+    m.def(
+        "accept_matrix_and_dtype_object",
+        [](const Eigen::SparseMatrix<double>&, const VectorXADScalar&) {
+          return "sparse";
+        });
+    m.def(
+        "accept_matrix_and_dtype_object",
+        [](const Eigen::MatrixXd&, const VectorXMyScalar&) { return "dense"; });
+    m.def(
+        "accept_matrix_and_dtype_object",
+        [](const Eigen::SparseMatrix<double>&, const VectorXMyScalar&) {
+          return "sparse";
+        });
 }

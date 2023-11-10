@@ -903,3 +903,25 @@ def test_custom_operator_new():
     o = m.CustomOperatorNew()
     np.testing.assert_allclose(o.a, 0.0)
     np.testing.assert_allclose(o.b.diagonal(), 1.0)
+
+
+def test_eigen_dense_sparse_overload():
+    """Overloads that should prefer dense vs. sparse should work as
+    expected, even when combining with arguments like dtype=object."""
+
+    pytest.importorskip("scipy")
+    import scipy.sparse
+
+    A_dense = np.eye(2)
+    A_sparse = scipy.sparse.csc_matrix(np.eye(2))
+
+    assert m.accept_matrix(A_dense) == "dense"
+    assert m.accept_matrix(A_sparse) == "sparse"
+
+    x_ad = float_to_adscalar(np.ones(2), deriv=[1.0])
+    assert m.accept_matrix_and_dtype_object(A_dense, x_ad) == "dense"
+    assert m.accept_matrix_and_dtype_object(A_sparse, x_ad) == "sparse"
+
+    x_myscalar = np.array([m.MyScalar(1), m.MyScalar(2)])
+    assert m.accept_matrix_and_dtype_object(A_dense, x_myscalar) == "dense"
+    assert m.accept_matrix_and_dtype_object(A_sparse, x_myscalar) == "sparse"
