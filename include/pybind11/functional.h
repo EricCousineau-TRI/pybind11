@@ -89,6 +89,7 @@ public:
             }
             func_handle(const func_handle &f_) { operator=(f_); }
             func_handle &operator=(const func_handle &f_) {
+                // Eric's example change.
                 gil_scoped_acquire acq;
                 f = f_.f;
                 return *this;
