@@ -39,6 +39,9 @@ jobs:
         # - 'pypy-3.8'
         # - 'pypy-3.9'
         # - 'pypy-3.10'
+        numpy_version:
+        - '1.x'
+        - '2.x'
 
         # Items in here will either be added to the build matrix (if not
         # present), or add new keys to an existing matrix element if all the
@@ -66,7 +69,7 @@ jobs:
           # - runs-on: windows-2019
           #   python: '2.7'
 
-    name: "🐍 ${{ matrix.python }} • ${{ matrix.runs-on }} • x64 ${{ matrix.args }}"
+    name: "🐍 ${{ matrix.python }} • ${{ matrix.runs-on }} • x64 • NumPy ${{ matrix.numpy_version }} • ${{ matrix.args }}"
     runs-on: ${{ matrix.runs-on }}
 
     steps:
@@ -104,6 +107,10 @@ jobs:
       run: |
         python -m pip install -r tests/requirements.txt
 
+    - name: Install NumPy >= 2
+      if: matrix.numpy_version == '2.x'
+      run: pip install 'numpy>=2.0.0b1' 'scipy>=1.13.0rc1'
+
     - name: Setup annotations on Linux
       if: runner.os == 'Linux'
       run: python -m pip install pytest-github-actions-annotate-failures
@@ -117,7 +124,7 @@ jobs:
         -DPYBIND11_WERROR=ON
         -DPYBIND11_DISABLE_HANDLE_TYPE_NAME_DEFAULT_IMPLEMENTATION=ON
         -DPYBIND11_SIMPLE_GIL_MANAGEMENT=ON
-        -DPYBIND11_NUMPY_1_ONLY=ON
+        -DPYBIND11_NUMPY_1_ONLY=${{ matrix.numpy_version == '1.x' && 'ON' || 'OFF' }}
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
         -DCMAKE_CXX_STANDARD=11
@@ -148,7 +155,7 @@ jobs:
         cmake -S . -B build2
         -DPYBIND11_WERROR=ON
         -DPYBIND11_SIMPLE_GIL_MANAGEMENT=OFF
-        -DPYBIND11_NUMPY_1_ONLY=ON
+        -DPYBIND11_NUMPY_1_ONLY=${{ matrix.numpy_version == '1.x' && 'ON' || 'OFF' }}
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
         -DCMAKE_CXX_STANDARD=17
@@ -170,6 +177,7 @@ jobs:
       run: >
         cmake -S . -B build3
         -DPYBIND11_WERROR=ON
+        -DPYBIND11_NUMPY_1_ONLY=${{ matrix.numpy_version == '1.x' && 'ON' || 'OFF' }}
         -DDOWNLOAD_CATCH=ON
         -DDOWNLOAD_EIGEN=ON
         -DCMAKE_CXX_STANDARD=17
